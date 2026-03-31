@@ -1,6 +1,7 @@
-import { mockSettings } from "@/lib/mock-data";
+import { createClient } from "@/lib/supabase/server";
 import type { Settings, SettingsInput, SettingsUpdate } from "@/lib/types";
 import { formatDate } from "@/lib/utils/date-utils";
+import { mockSettings } from "@/lib/mock-data";
 
 export function createDefaultSettings(): Settings {
   return {
@@ -26,26 +27,158 @@ export function createDefaultSettings(): Settings {
   };
 }
 
-let settings: Settings = createDefaultSettings();
+function rowToSettings(row: Record<string, unknown>): Settings {
+  return {
+    coachName: (row.coach_name as string) ?? "Soma",
+    height: (row.height as number) ?? 0,
+    currentWeight: (row.current_weight as number) ?? 0,
+    gender: (row.gender as "남성" | "여성") ?? "남성",
+    dietStartDate: (row.diet_start_date as string) ?? formatDate(new Date()),
+    startWeight: (row.start_weight as number) ?? 0,
+    targetWeight: (row.target_weight as number) ?? 0,
+    dietPreset:
+      (row.diet_preset as "sustainable" | "medium" | "intensive" | "custom") ??
+      "sustainable",
+    targetMonths: (row.target_months as number) ?? 12,
+    waterGoal: (row.water_goal as number) ?? 2.8,
+    routineWeightTime:
+      (row.routine_weight_time as string) ?? "아침 기상 직후",
+    routineEnergyTime: (row.routine_energy_time as string) ?? "21:00",
+    routineExtra: (row.routine_extra as string[]) ?? [],
+    intensiveDayOn: (row.intensive_day_on as boolean) ?? true,
+    intensiveDayCriteria:
+      (row.intensive_day_criteria as
+        | "역대최저"
+        | "0.5kg"
+        | "1.0kg"
+        | "직접입력") ?? "역대최저",
+    coachStylePreset:
+      (row.coach_style_preset as "strong" | "balanced" | "empathy" | "data") ??
+      "strong",
+    coachStyleExtra: (row.coach_style_extra as string[]) ?? [],
+    defaultTab: (row.default_tab as "input" | "home") ?? "input",
+    onboardingComplete: (row.onboarding_complete as boolean) ?? false,
+  };
+}
+
+function settingsToRow(
+  s: Settings | SettingsInput,
+  userId: string
+): Record<string, unknown> {
+  return {
+    user_id: userId,
+    coach_name: s.coachName,
+    height: s.height,
+    current_weight: s.currentWeight,
+    gender: s.gender,
+    diet_start_date: s.dietStartDate,
+    start_weight: s.startWeight,
+    target_weight: s.targetWeight,
+    diet_preset: s.dietPreset,
+    target_months: s.targetMonths,
+    water_goal: s.waterGoal,
+    routine_weight_time: s.routineWeightTime,
+    routine_energy_time: s.routineEnergyTime,
+    routine_extra: s.routineExtra,
+    intensive_day_on: s.intensiveDayOn,
+    intensive_day_criteria: s.intensiveDayCriteria,
+    coach_style_preset: s.coachStylePreset,
+    coach_style_extra: s.coachStyleExtra,
+    default_tab: s.defaultTab,
+    onboarding_complete:
+      "onboardingComplete" in s ? s.onboardingComplete : false,
+  };
+}
 
 export async function getSettings(): Promise<Settings> {
-  return { ...settings };
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return createDefaultSettings();
+
+  const { data, error } = await supabase
+    .from("settings")
+    .select("*")
+    .eq("user_id", user.id)
+    .single();
+
+  if (error || !data) return createDefaultSettings();
+
+  return rowToSettings(data as Record<string, unknown>);
 }
 
 export async function updateSettings(data: SettingsUpdate): Promise<Settings> {
-  settings = { ...settings, ...data };
-  return { ...settings };
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) throw new Error("Unauthorized");
+
+  const current = await getSettings();
+  const merged: Settings = { ...current, ...data };
+
+  const row = settingsToRow(merged, user.id);
+
+  const { data: upserted, error } = await supabase
+    .from("settings")
+    .upsert(row, { onConflict: "user_id" })
+    .select()
+    .single();
+
+  if (error || !upserted) throw new Error(error?.message ?? "upsert failed");
+
+  return rowToSettings(upserted as Record<string, unknown>);
 }
 
-export async function initializeSettings(data: SettingsInput): Promise<Settings> {
-  settings = { ...data, onboardingComplete: true };
-  return { ...settings };
+export async function initializeSettings(
+  data: SettingsInput
+): Promise<Settings> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) throw new Error("Unauthorized");
+
+  const full: Settings = { ...data, onboardingComplete: true };
+  const row = settingsToRow(full, user.id);
+
+  const { data: upserted, error } = await supabase
+    .from("settings")
+    .upsert(row, { onConflict: "user_id" })
+    .select()
+    .single();
+
+  if (error || !upserted) throw new Error(error?.message ?? "upsert failed");
+
+  return rowToSettings(upserted as Record<string, unknown>);
 }
 
-export function resetSettings(): void {
-  settings = createDefaultSettings();
+export async function resetSettings(): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return;
+
+  await supabase.from("settings").delete().eq("user_id", user.id);
 }
 
-export function loadMockSettings(): void {
-  settings = { ...mockSettings };
+export async function loadMockSettings(): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return;
+
+  const row = settingsToRow(mockSettings, user.id);
+
+  await supabase
+    .from("settings")
+    .upsert(row, { onConflict: "user_id" });
 }

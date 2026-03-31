@@ -10,10 +10,13 @@ import {
 } from "react";
 import type { Settings, SettingsUpdate, SettingsInput } from "@/lib/types";
 import { mockSettings } from "@/lib/mock-data";
+import {
+  actionGetSettings,
+  actionUpdateSettings,
+  actionInitializeSettings,
+} from "@/app/actions/settings-actions";
 
-const STORAGE_KEY = "somalog-settings";
-
-const DEFAULT_SETTINGS: Settings = {
+export const DEFAULT_SETTINGS: Settings = {
   coachName: "Soma",
   height: 0,
   currentWeight: 0,
@@ -47,46 +50,49 @@ interface SettingsContextValue {
 const SettingsContext = createContext<SettingsContextValue | null>(null);
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  // SSR-safe 초기값으로 mockSettings 사용 (hydration mismatch 방지)
-  const [settings, setSettings] = useState<Settings>(mockSettings);
+  // SSR-safe 초기값으로 DEFAULT_SETTINGS 사용 (hydration mismatch 방지)
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        setSettings(JSON.parse(stored));
-      } else {
-        // localStorage 없음 = 신규 유저 → onboardingComplete: false 기본값 사용
+    const loadSettings = async () => {
+      try {
+        const loaded = await actionGetSettings();
+        setSettings(loaded);
+      } catch {
         setSettings(DEFAULT_SETTINGS);
+      } finally {
+        setIsLoaded(true);
       }
+    };
+    loadSettings();
+  }, []);
+
+  const updateSettings = useCallback(async (data: SettingsUpdate) => {
+    try {
+      const updated = await actionUpdateSettings(data);
+      setSettings(updated);
     } catch {
-      setSettings(DEFAULT_SETTINGS);
+      // 실패 시 로컬 state만 업데이트 (낙관적 업데이트)
+      setSettings((prev) => ({ ...prev, ...data }));
     }
-    setIsLoaded(true);
   }, []);
 
-  useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  const initializeSettings = useCallback(async (data: SettingsInput) => {
+    try {
+      const initialized = await actionInitializeSettings(data);
+      setSettings(initialized);
+    } catch {
+      setSettings({ ...data, onboardingComplete: true });
     }
-  }, [settings, isLoaded]);
-
-  const updateSettings = useCallback((data: SettingsUpdate) => {
-    setSettings((prev) => ({ ...prev, ...data }));
   }, []);
 
-  const initializeSettings = useCallback((data: SettingsInput) => {
-    setSettings({ ...data, onboardingComplete: true });
-  }, []);
-
-  /** 모든 설정 + localStorage 초기화 */
+  /** 모든 설정을 DEFAULT_SETTINGS로 리셋 (실제 데이터 삭제는 settings-form에서 serverResetAllData 호출) */
   const resetAllSettings = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY);
     setSettings(DEFAULT_SETTINGS);
   }, []);
 
-  /** 데모 데이터로 설정 교체 */
+  /** 데모 데이터로 설정 state 교체 (실제 데이터 로드는 settings-form에서 serverLoadDemoData 호출 후 이 함수로 상태 동기화) */
   const loadDemoSettings = useCallback(() => {
     setSettings({ ...mockSettings });
   }, []);

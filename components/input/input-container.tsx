@@ -5,12 +5,11 @@ import { cn } from "@/lib/utils";
 import { useSettings } from "@/lib/contexts/settings-context";
 import { formatDate, getDayNumber } from "@/lib/utils/date-utils";
 import {
-  getTodayLog,
-  getDailyLog,
-  upsertDailyLog,
-  closeDailyLog,
-  getRecentDailyLogs,
-} from "@/lib/services/daily-log-service";
+  actionGetDailyLog,
+  actionUpsertDailyLog,
+  actionCloseDailyLog,
+  actionGetRecentDailyLogs,
+} from "@/app/actions/log-actions";
 import { DateHeader } from "./date-header";
 import { InputChipList } from "./input-chip-list";
 import { InputModal, type ItemKey } from "./input-modal";
@@ -32,10 +31,10 @@ export function InputContainer() {
   const [pendingDays, setPendingDays] = useState(0);
 
   const loadLog = useCallback(async (date: string) => {
-    let log = await getDailyLog(date);
+    let log = await actionGetDailyLog(date);
     // 오늘 로그가 없으면 빈 로그 자동 생성
     if (!log && date === formatDate(new Date())) {
-      log = await upsertDailyLog(date, {});
+      log = await actionUpsertDailyLog(date, {});
     }
     setCurrentLog(log);
     setCurrentDate(date);
@@ -44,7 +43,7 @@ export function InputContainer() {
   useEffect(() => {
     const init = async () => {
       // 가장 오래된 미완료(closed=false) 날짜 찾기
-      const logs = await getRecentDailyLogs(30);
+      const logs = await actionGetRecentDailyLogs(30);
       const unclosed = logs.filter((l) => !l.closed);
       const oldest = unclosed.length > 0
         ? unclosed[unclosed.length - 1]
@@ -76,19 +75,19 @@ export function InputContainer() {
   };
 
   const handleModalSave = async (update: DailyLogUpdate) => {
-    const updated = await upsertDailyLog(currentDate, update);
+    const updated = await actionUpsertDailyLog(currentDate, update);
     setCurrentLog(updated);
     setModalField(null);
   };
 
   const handleClose = async () => {
     if (!currentLog) return;
-    const updated = await closeDailyLog(currentDate);
+    const updated = await actionCloseDailyLog(currentDate);
     if (updated) setCurrentLog(updated);
   };
 
   const handleFreeText = async (update: DailyLogUpdate) => {
-    const updated = await upsertDailyLog(currentDate, update);
+    const updated = await actionUpsertDailyLog(currentDate, update);
     setCurrentLog(updated);
   };
 

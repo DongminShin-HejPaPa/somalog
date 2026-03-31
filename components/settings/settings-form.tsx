@@ -1,10 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/lib/contexts/settings-context";
 import type { Settings } from "@/lib/types";
 import Link from "next/link";
+import { serverResetAllData, serverLoadDemoData } from "@/app/actions/data-actions";
+
+type DialogState = "idle" | "confirm-reset" | "confirm-onboarding" | "confirm-demo";
 
 const coachStyles = [
   { value: "strong", label: "팩트 위주 / 강한 코치", desc: "위로보다 수치와 사실로 강하게" },
@@ -64,9 +68,12 @@ function InputField({
 }
 
 export function SettingsForm() {
-  const { settings, updateSettings, isLoaded } = useSettings();
+  const { settings, updateSettings, resetAllSettings, loadDemoSettings, isLoaded } = useSettings();
   const [form, setForm] = useState<Settings>(settings);
   const [saved, setSaved] = useState(false);
+  const [dialog, setDialog] = useState<DialogState>("idle");
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
 
   useEffect(() => {
     if (isLoaded) {
@@ -84,6 +91,25 @@ export function SettingsForm() {
     updateSettings(form);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  };
+
+  /** 데이터 초기화 확인 → 서버 + 클라이언트 모두 리셋 → 온보딩 재시작 여부 묻기 */
+  const handleResetConfirm = () => {
+    startTransition(async () => {
+      await serverResetAllData();
+      resetAllSettings();
+      setDialog("confirm-onboarding");
+    });
+  };
+
+  /** 데모 데이터 불러오기 확인 → 서버 + 클라이언트 모두 데모 데이터로 교체 */
+  const handleDemoConfirm = () => {
+    startTransition(async () => {
+      await serverLoadDemoData();
+      loadDemoSettings();
+      setDialog("idle");
+      router.refresh();
+    });
   };
 
   return (
@@ -359,7 +385,8 @@ export function SettingsForm() {
         </div>
       </Section>
 
-      <div className="px-4 py-4">
+      {/* 저장 버튼 */}
+      <div className="px-4 py-4 border-b border-border">
         <button
           onClick={handleSave}
           className={cn(
@@ -373,13 +400,117 @@ export function SettingsForm() {
         </button>
       </div>
 
-      <div className="px-4 pb-6">
+      {/* 초기 설정 다시 하기 */}
+      <div className="px-4 py-4 border-b border-border">
         <Link
           href="/onboarding"
           className="block w-full py-3 rounded-xl text-center text-sm font-medium text-coral border border-coral/30 hover:bg-coral-light transition-colors min-h-[48px] leading-[48px]"
         >
           초기 설정 다시 하기
         </Link>
+      </div>
+
+      {/* 데이터 관리 */}
+      <div className="px-4 py-4 space-y-3 pb-8">
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+          데이터 관리
+        </h3>
+
+        {/* 기본 버튼들 */}
+        {dialog === "idle" && (
+          <>
+            <button
+              onClick={() => setDialog("confirm-demo")}
+              className="w-full py-3 rounded-xl text-sm font-medium min-h-[48px] bg-secondary text-foreground border border-border hover:bg-secondary/80 transition-colors"
+            >
+              데모 데이터 불러오기
+            </button>
+            <button
+              onClick={() => setDialog("confirm-reset")}
+              className="w-full py-3 rounded-xl text-sm font-medium min-h-[48px] text-coral border border-coral/30 hover:bg-coral-light transition-colors"
+            >
+              데이터 초기화
+            </button>
+          </>
+        )}
+
+        {/* 데이터 초기화 확인 */}
+        {dialog === "confirm-reset" && (
+          <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+            <p className="text-sm font-semibold text-red-800 mb-1">
+              모든 기록과 설정이 삭제됩니다
+            </p>
+            <p className="text-xs text-red-600 mb-4">
+              일별 기록, 주간 기록, 설정이 모두 초기화됩니다. 이 작업은 되돌릴 수 없어요.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={handleResetConfirm}
+                disabled={isPending}
+                className="flex-1 py-2.5 rounded-lg bg-red-600 text-white text-sm font-semibold min-h-[44px] disabled:opacity-50 transition-colors"
+              >
+                {isPending ? "초기화 중..." : "확인, 초기화할게요"}
+              </button>
+              <button
+                onClick={() => setDialog("idle")}
+                disabled={isPending}
+                className="flex-1 py-2.5 rounded-lg bg-secondary text-foreground text-sm font-medium min-h-[44px] disabled:opacity-50 transition-colors"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 온보딩 재시작 여부 */}
+        {dialog === "confirm-onboarding" && (
+          <div className="p-4 bg-secondary border border-border rounded-xl">
+            <p className="text-sm font-semibold mb-1">초기화 완료 ✓</p>
+            <p className="text-sm text-muted-foreground mb-4">
+              온보딩을 다시 시작하시겠어요?
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => router.push("/onboarding")}
+                className="flex-1 py-2.5 rounded-lg bg-navy text-white text-sm font-semibold min-h-[44px] transition-colors"
+              >
+                예, 시작할게요
+              </button>
+              <button
+                onClick={() => setDialog("idle")}
+                className="flex-1 py-2.5 rounded-lg bg-secondary text-foreground text-sm font-medium min-h-[44px] border border-border transition-colors"
+              >
+                아니오
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 데모 데이터 확인 */}
+        {dialog === "confirm-demo" && (
+          <div className="p-4 bg-secondary border border-border rounded-xl">
+            <p className="text-sm font-semibold mb-1">데모 데이터를 불러옵니다</p>
+            <p className="text-xs text-muted-foreground mb-4">
+              현재 데이터가 샘플 데이터(약 2주치 기록)로 교체됩니다.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={handleDemoConfirm}
+                disabled={isPending}
+                className="flex-1 py-2.5 rounded-lg bg-navy text-white text-sm font-semibold min-h-[44px] disabled:opacity-50 transition-colors"
+              >
+                {isPending ? "불러오는 중..." : "확인"}
+              </button>
+              <button
+                onClick={() => setDialog("idle")}
+                disabled={isPending}
+                className="flex-1 py-2.5 rounded-lg bg-secondary text-foreground text-sm font-medium min-h-[44px] border border-border disabled:opacity-50 transition-colors"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

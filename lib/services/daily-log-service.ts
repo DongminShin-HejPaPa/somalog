@@ -12,7 +12,15 @@ import { generateFeedback, generateDailySummary, generateOneLiner, generateWeekl
 import { getSettings } from "./settings-service";
 import { upsertWeeklyLog } from "./weekly-log-service";
 
-let dailyLogs: DailyLog[] = [...mockDailyLogs];
+let dailyLogs: DailyLog[] = [];
+
+export function resetDailyLogs(): void {
+  dailyLogs = [];
+}
+
+export function loadMockDailyLogs(): void {
+  dailyLogs = [...mockDailyLogs];
+}
 
 export async function getTodayLog(): Promise<DailyLog | null> {
   const today = formatDate(new Date());

@@ -1,11 +1,9 @@
 import { mockWeeklyLog } from "@/lib/mock-data";
 import type { WeeklyLog } from "@/lib/types";
 
-const weeklyLogs: WeeklyLog[] = [{ ...mockWeeklyLog }];
+let weeklyLogs: WeeklyLog[] = [];
 
-export async function getWeeklyLog(
-  weekStart: string
-): Promise<WeeklyLog | null> {
+export async function getWeeklyLog(weekStart: string): Promise<WeeklyLog | null> {
   return weeklyLogs.find((log) => log.weekStart === weekStart) ?? null;
 }
 
@@ -21,4 +19,12 @@ export async function upsertWeeklyLog(log: WeeklyLog): Promise<WeeklyLog> {
     weeklyLogs.unshift(log);
   }
   return log;
+}
+
+export function resetWeeklyLogs(): void {
+  weeklyLogs = [];
+}
+
+export function loadMockWeeklyLogs(): void {
+  weeklyLogs = [{ ...mockWeeklyLog }];
 }

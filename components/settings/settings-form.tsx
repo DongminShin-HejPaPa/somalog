@@ -1,12 +1,10 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import type { Settings } from "@/lib/mock-data";
+import { useSettings } from "@/lib/contexts/settings-context";
+import type { Settings } from "@/lib/types";
 import Link from "next/link";
-
-interface SettingsFormProps {
-  settings: Settings;
-}
 
 const coachStyles = [
   { value: "strong", label: "팩트 위주 / 강한 코치", desc: "위로보다 수치와 사실로 강하게" },
@@ -38,14 +36,25 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function InputField({ label, value, suffix }: { label: string; value: string; suffix?: string }) {
+function InputField({
+  label,
+  value,
+  suffix,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  suffix?: string;
+  onChange: (v: string) => void;
+}) {
   return (
     <div className="flex items-center justify-between py-2">
       <label className="text-sm text-muted-foreground">{label}</label>
       <div className="flex items-center gap-1">
         <input
           type="text"
-          defaultValue={value}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
           className="w-24 text-right px-2 py-1.5 text-sm border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[36px]"
         />
         {suffix && <span className="text-sm text-muted-foreground">{suffix}</span>}
@@ -54,26 +63,63 @@ function InputField({ label, value, suffix }: { label: string; value: string; su
   );
 }
 
-export function SettingsForm({ settings }: SettingsFormProps) {
+export function SettingsForm() {
+  const { settings, updateSettings, isLoaded } = useSettings();
+  const [form, setForm] = useState<Settings>(settings);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (isLoaded) {
+      setForm(settings);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded]);
+
+  const handleChange = <K extends keyof Settings>(key: K, value: Settings[K]) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+    setSaved(false);
+  };
+
+  const handleSave = () => {
+    updateSettings(form);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
   return (
     <div>
       <Section title="코치 이름">
-        <InputField label="이름" value={settings.coachName} />
+        <InputField
+          label="이름"
+          value={form.coachName}
+          onChange={(v) => handleChange("coachName", v)}
+        />
         <p className="text-xs text-muted-foreground mt-1">최대 10자</p>
       </Section>
 
       <Section title="신체 정보">
-        <InputField label="키" value={settings.height.toString()} suffix="cm" />
-        <InputField label="현재 체중" value={settings.currentWeight.toString()} suffix="kg" />
+        <InputField
+          label="키"
+          value={form.height.toString()}
+          suffix="cm"
+          onChange={(v) => handleChange("height", Number(v) || 0)}
+        />
+        <InputField
+          label="현재 체중"
+          value={form.currentWeight.toString()}
+          suffix="kg"
+          onChange={(v) => handleChange("currentWeight", Number(v) || 0)}
+        />
         <div className="flex items-center justify-between py-2">
           <label className="text-sm text-muted-foreground">성별</label>
           <div className="flex gap-1.5">
-            {["남성", "여성"].map((g) => (
+            {(["남성", "여성"] as const).map((g) => (
               <button
                 key={g}
+                onClick={() => handleChange("gender", g)}
                 className={cn(
                   "px-4 py-1.5 rounded-lg text-sm font-medium min-h-[36px] transition-colors",
-                  settings.gender === g
+                  form.gender === g
                     ? "bg-navy text-white"
                     : "bg-secondary text-muted-foreground"
                 )}
@@ -90,9 +136,10 @@ export function SettingsForm({ settings }: SettingsFormProps) {
           {dietPresets.map((p) => (
             <button
               key={p.value}
+              onClick={() => handleChange("dietPreset", p.value as Settings["dietPreset"])}
               className={cn(
                 "w-full flex items-center justify-between px-3 py-3 rounded-xl border text-left min-h-[52px] transition-colors",
-                settings.dietPreset === p.value
+                form.dietPreset === p.value
                   ? "border-navy bg-navy/5"
                   : "border-border"
               )}
@@ -111,38 +158,65 @@ export function SettingsForm({ settings }: SettingsFormProps) {
               <div
                 className={cn(
                   "w-5 h-5 rounded-full border-2 flex items-center justify-center",
-                  settings.dietPreset === p.value
+                  form.dietPreset === p.value
                     ? "border-navy"
                     : "border-border"
                 )}
               >
-                {settings.dietPreset === p.value && (
+                {form.dietPreset === p.value && (
                   <div className="w-2.5 h-2.5 rounded-full bg-navy" />
                 )}
               </div>
             </button>
           ))}
         </div>
-        <InputField label="시작일" value={settings.dietStartDate} />
-        <InputField label="시작 체중" value={settings.startWeight.toString()} suffix="kg" />
-        <InputField label="목표 체중" value={settings.targetWeight.toString()} suffix="kg" />
-        <InputField label="목표 기간" value={settings.targetMonths.toString()} suffix="개월" />
+        <InputField
+          label="시작일"
+          value={form.dietStartDate}
+          onChange={(v) => handleChange("dietStartDate", v)}
+        />
+        <InputField
+          label="시작 체중"
+          value={form.startWeight.toString()}
+          suffix="kg"
+          onChange={(v) => handleChange("startWeight", Number(v) || 0)}
+        />
+        <InputField
+          label="목표 체중"
+          value={form.targetWeight.toString()}
+          suffix="kg"
+          onChange={(v) => handleChange("targetWeight", Number(v) || 0)}
+        />
+        <InputField
+          label="목표 기간"
+          value={form.targetMonths.toString()}
+          suffix="개월"
+          onChange={(v) => handleChange("targetMonths", Number(v) || 0)}
+        />
         <div className="flex items-center justify-between py-2">
           <span className="text-sm text-muted-foreground">총 감량 목표</span>
           <span className="text-sm font-medium">
-            {(settings.startWeight - settings.targetWeight).toFixed(1)} kg
+            {(form.startWeight - form.targetWeight).toFixed(1)} kg
           </span>
         </div>
         <div className="flex items-center justify-between py-2">
           <span className="text-sm text-muted-foreground">월 평균 목표</span>
           <span className="text-sm font-medium">
-            {((settings.startWeight - settings.targetWeight) / settings.targetMonths).toFixed(1)} kg/월
+            {form.targetMonths > 0
+              ? ((form.startWeight - form.targetWeight) / form.targetMonths).toFixed(1)
+              : "0.0"}{" "}
+            kg/월
           </span>
         </div>
       </Section>
 
       <Section title="하루 수분 목표">
-        <InputField label="수분 목표" value={settings.waterGoal.toString()} suffix="L" />
+        <InputField
+          label="수분 목표"
+          value={form.waterGoal.toString()}
+          suffix="L"
+          onChange={(v) => handleChange("waterGoal", Number(v) || 0)}
+        />
         <p className="text-xs text-muted-foreground mt-1">
           신체 정보 기반 권장: 3.1L
           <button className="ml-2 text-navy font-medium underline">권장값으로 변경</button>
@@ -150,8 +224,16 @@ export function SettingsForm({ settings }: SettingsFormProps) {
       </Section>
 
       <Section title="나의 루틴">
-        <InputField label="몸무게 측정" value={settings.routineWeightTime} />
-        <InputField label="체력 기준 시각" value={settings.routineEnergyTime} />
+        <InputField
+          label="몸무게 측정"
+          value={form.routineWeightTime}
+          onChange={(v) => handleChange("routineWeightTime", v)}
+        />
+        <InputField
+          label="체력 기준 시각"
+          value={form.routineEnergyTime}
+          onChange={(v) => handleChange("routineEnergyTime", v)}
+        />
         <button className="text-sm text-navy font-medium mt-2">+ 루틴 추가</button>
         <p className="text-xs text-muted-foreground mt-2 p-2 bg-secondary rounded-lg">
           루틴 설정은 AI 코치 맥락 필터링에 사용됩니다. 잘못 설정하면 맥락에 맞지 않는 조언을 받을 수 있어요.
@@ -162,15 +244,16 @@ export function SettingsForm({ settings }: SettingsFormProps) {
         <div className="flex items-center justify-between py-2 mb-3">
           <span className="text-sm">사용 여부</span>
           <button
+            onClick={() => handleChange("intensiveDayOn", !form.intensiveDayOn)}
             className={cn(
               "relative w-12 h-7 rounded-full transition-colors",
-              settings.intensiveDayOn ? "bg-navy" : "bg-border"
+              form.intensiveDayOn ? "bg-navy" : "bg-border"
             )}
           >
             <span
               className={cn(
                 "absolute top-0.5 w-6 h-6 rounded-full bg-white shadow transition-transform",
-                settings.intensiveDayOn ? "left-[22px]" : "left-0.5"
+                form.intensiveDayOn ? "left-[22px]" : "left-0.5"
               )}
             />
           </button>
@@ -179,9 +262,12 @@ export function SettingsForm({ settings }: SettingsFormProps) {
           {intensiveCriteria.map((c) => (
             <button
               key={c.value}
+              onClick={() =>
+                handleChange("intensiveDayCriteria", c.value as Settings["intensiveDayCriteria"])
+              }
               className={cn(
                 "w-full flex items-center justify-between px-3 py-2.5 rounded-xl border text-left min-h-[44px] transition-colors",
-                settings.intensiveDayCriteria === c.value
+                form.intensiveDayCriteria === c.value
                   ? "border-navy bg-navy/5"
                   : "border-border"
               )}
@@ -195,12 +281,12 @@ export function SettingsForm({ settings }: SettingsFormProps) {
               <div
                 className={cn(
                   "w-4 h-4 rounded-full border-2 flex items-center justify-center",
-                  settings.intensiveDayCriteria === c.value
+                  form.intensiveDayCriteria === c.value
                     ? "border-navy"
                     : "border-border"
                 )}
               >
-                {settings.intensiveDayCriteria === c.value && (
+                {form.intensiveDayCriteria === c.value && (
                   <div className="w-2 h-2 rounded-full bg-navy" />
                 )}
               </div>
@@ -214,9 +300,12 @@ export function SettingsForm({ settings }: SettingsFormProps) {
           {coachStyles.map((s) => (
             <button
               key={s.value}
+              onClick={() =>
+                handleChange("coachStylePreset", s.value as Settings["coachStylePreset"])
+              }
               className={cn(
                 "w-full flex items-center justify-between px-3 py-3 rounded-xl border text-left min-h-[52px] transition-colors",
-                settings.coachStylePreset === s.value
+                form.coachStylePreset === s.value
                   ? "border-navy bg-navy/5"
                   : "border-border"
               )}
@@ -228,12 +317,12 @@ export function SettingsForm({ settings }: SettingsFormProps) {
               <div
                 className={cn(
                   "w-5 h-5 rounded-full border-2 flex items-center justify-center",
-                  settings.coachStylePreset === s.value
+                  form.coachStylePreset === s.value
                     ? "border-navy"
                     : "border-border"
                 )}
               >
-                {settings.coachStylePreset === s.value && (
+                {form.coachStylePreset === s.value && (
                   <div className="w-2.5 h-2.5 rounded-full bg-navy" />
                 )}
               </div>
@@ -248,15 +337,18 @@ export function SettingsForm({ settings }: SettingsFormProps) {
 
       <Section title="앱 진입 기본 탭">
         <div className="flex gap-2">
-          {[
-            { value: "input", label: "입력 탭" },
-            { value: "home", label: "홈 탭" },
-          ].map((t) => (
+          {(
+            [
+              { value: "input", label: "입력 탭" },
+              { value: "home", label: "홈 탭" },
+            ] as const
+          ).map((t) => (
             <button
               key={t.value}
+              onClick={() => handleChange("defaultTab", t.value)}
               className={cn(
                 "flex-1 py-2.5 rounded-xl text-sm font-medium min-h-[44px] transition-colors",
-                settings.defaultTab === t.value
+                form.defaultTab === t.value
                   ? "bg-navy text-white"
                   : "bg-secondary text-muted-foreground border border-border"
               )}
@@ -267,7 +359,21 @@ export function SettingsForm({ settings }: SettingsFormProps) {
         </div>
       </Section>
 
-      <div className="px-4 py-6">
+      <div className="px-4 py-4">
+        <button
+          onClick={handleSave}
+          className={cn(
+            "w-full py-3 rounded-xl text-sm font-semibold min-h-[48px] transition-colors",
+            saved
+              ? "bg-success text-white"
+              : "bg-navy text-white active:scale-[0.98]"
+          )}
+        >
+          {saved ? "저장 완료" : "저장"}
+        </button>
+      </div>
+
+      <div className="px-4 pb-6">
         <Link
           href="/onboarding"
           className="block w-full py-3 rounded-xl text-center text-sm font-medium text-coral border border-coral/30 hover:bg-coral-light transition-colors min-h-[48px] leading-[48px]"

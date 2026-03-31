@@ -1,10 +1,6 @@
 import Link from "next/link";
-import { DietProgressBanner } from "@/components/home/diet-progress-banner";
-import { InputStatusChips } from "@/components/home/input-status-chips";
-import { CoachOneLiner } from "@/components/home/coach-one-liner";
-import { WeightMiniGraph } from "@/components/home/weight-mini-graph";
-import { DailySummary } from "@/components/home/daily-summary";
-import { mockDailyLogs, mockSettings } from "@/lib/mock-data";
+import { HomeContent } from "@/components/home/home-content";
+import { getTodayLog, getRecentDailyLogs } from "@/lib/services/daily-log-service";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function HomePage() {
@@ -13,13 +9,10 @@ export default async function HomePage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const today = mockDailyLogs[0];
-  const yesterday = mockDailyLogs[1];
-
-  const oneLiner = today.closed
-    ? today.oneLiner
-    : yesterday?.oneLiner;
-  const isYesterday = !today.closed && !!yesterday?.oneLiner;
+  const [todayLog, recentLogs] = await Promise.all([
+    getTodayLog(),
+    getRecentDailyLogs(14),
+  ]);
 
   return (
     <div className="pb-6">
@@ -37,37 +30,7 @@ export default async function HomePage() {
         )}
       </header>
 
-      <DietProgressBanner
-        day={today.day}
-        currentWeight={today.weight}
-        startWeight={mockSettings.startWeight}
-        targetWeight={mockSettings.targetWeight}
-        weightChange={today.weightChange}
-        isIntensiveDay={today.intensiveDay === true}
-      />
-
-      <InputStatusChips log={today} />
-
-      {oneLiner && (
-        <CoachOneLiner
-          coachName={mockSettings.coachName}
-          oneLiner={oneLiner}
-          isYesterday={isYesterday}
-        />
-      )}
-
-      <WeightMiniGraph
-        data={mockDailyLogs.slice(0, 14).map((d) => ({
-          date: d.date,
-          weight: d.weight,
-        }))}
-      />
-
-      <DailySummary
-        todayLog={today}
-        recentLogs={mockDailyLogs}
-        coachName={mockSettings.coachName}
-      />
+      <HomeContent todayLog={todayLog} recentLogs={recentLogs} />
     </div>
   );
 }

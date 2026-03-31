@@ -12,7 +12,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import { cn } from "@/lib/utils";
-import type { DailyLog } from "@/lib/mock-data";
+import type { DailyLog } from "@/lib/types";
 
 interface WeightChartProps {
   logs: DailyLog[];
@@ -95,6 +95,17 @@ export function WeightChart({
   lowestWeightDate,
 }: WeightChartProps) {
   const [period, setPeriod] = useState<Period>("all");
+  const [show3dAvg, setShow3dAvg] = useState(true);
+
+  const hasData = logs.some((log) => log.weight !== null);
+
+  if (!hasData) {
+    return (
+      <div className="px-4 py-16 text-center text-sm text-muted-foreground">
+        아직 체중 데이터가 없어요
+      </div>
+    );
+  }
 
   const sortedLogs = [...logs].reverse();
 
@@ -183,9 +194,12 @@ export function WeightChart({
           <span className="flex items-center gap-1">
             <span className="w-4 h-0.5 bg-navy inline-block" /> 일별 체중
           </span>
-          <span className="flex items-center gap-1">
-            <span className="w-4 h-0.5 bg-gray-400 inline-block border-dashed border-t border-gray-400" /> 3일 이동평균
-          </span>
+          <button
+            onClick={() => setShow3dAvg((v) => !v)}
+            className={cn("flex items-center gap-1 transition-opacity", !show3dAvg && "opacity-40")}
+          >
+            <span className="w-4 h-0.5 bg-gray-400 inline-block" /> 3일 이동평균
+          </button>
           <span className="flex items-center gap-1">
             <span className="w-4 h-0.5 bg-green-300 inline-block" /> 목표 감량선
           </span>
@@ -251,15 +265,17 @@ export function WeightChart({
               dot={false}
               connectNulls
             />
-            <Line
-              type="monotone"
-              dataKey="avg3d"
-              stroke="#9ca3af"
-              strokeWidth={1.5}
-              strokeDasharray="4 4"
-              dot={false}
-              connectNulls
-            />
+            {show3dAvg && (
+              <Line
+                type="monotone"
+                dataKey="avg3d"
+                stroke="#9ca3af"
+                strokeWidth={1.5}
+                strokeDasharray="4 4"
+                dot={false}
+                connectNulls
+              />
+            )}
             <Line
               type="monotone"
               dataKey="weight"

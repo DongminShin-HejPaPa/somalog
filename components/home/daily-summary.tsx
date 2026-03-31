@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import type { DailyLog } from "@/lib/mock-data";
+import type { DailyLog } from "@/lib/types";
 
 interface DailySummaryProps {
   todayLog: DailyLog;

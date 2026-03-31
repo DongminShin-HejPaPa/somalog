@@ -3,11 +3,11 @@
 import { useState } from "react";
 import { Search, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { DailyLog, WeeklyLog } from "@/lib/mock-data";
+import type { DailyLog, WeeklyLog } from "@/lib/types";
 
 interface LogListProps {
   logs: DailyLog[];
-  weeklyLog: WeeklyLog;
+  weeklyLogs: WeeklyLog[];
 }
 
 function getDayOfWeek(dateStr: string) {
@@ -15,7 +15,7 @@ function getDayOfWeek(dateStr: string) {
   return days[new Date(dateStr).getDay()];
 }
 
-export function LogList({ logs, weeklyLog }: LogListProps) {
+export function LogList({ logs, weeklyLogs }: LogListProps) {
   const [viewMode, setViewMode] = useState<"daily" | "weekly">("daily");
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -95,137 +95,153 @@ export function LogList({ logs, weeklyLog }: LogListProps) {
 
       {viewMode === "daily" ? (
         <div className="px-4 space-y-2">
-          {filteredLogs.map((log) => {
-            const isExpanded = expandedDate === log.date;
-            return (
-              <div
-                key={log.date}
-                className="border border-border rounded-xl overflow-hidden"
-              >
-                <button
-                  onClick={() => setExpandedDate(isExpanded ? null : log.date)}
-                  className="w-full flex items-center justify-between px-4 py-3 min-h-[52px] text-left"
+          {filteredLogs.length === 0 ? (
+            <div className="py-12 text-center text-sm text-muted-foreground">
+              {searchQuery || activeFilter ? "검색 결과가 없어요" : "아직 기록이 없어요. Input 탭에서 첫 번째 기록을 시작해보세요."}
+            </div>
+          ) : (
+            filteredLogs.map((log) => {
+              const isExpanded = expandedDate === log.date;
+              return (
+                <div
+                  key={log.date}
+                  className="border border-border rounded-xl overflow-hidden"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="text-sm">
-                      <span className="font-semibold">
-                        {log.date.slice(5)} {getDayOfWeek(log.date)}
-                      </span>
-                      <span className="text-muted-foreground ml-1.5 text-xs">
-                        D+{log.day}
-                      </span>
+                  <button
+                    onClick={() => setExpandedDate(isExpanded ? null : log.date)}
+                    className="w-full flex items-center justify-between px-4 py-3 min-h-[52px] text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="text-sm">
+                        <span className="font-semibold">
+                          {log.date.slice(5)} {getDayOfWeek(log.date)}
+                        </span>
+                        <span className="text-muted-foreground ml-1.5 text-xs">
+                          D+{log.day}
+                        </span>
+                      </div>
+                      {log.intensiveDay && (
+                        <span className="w-2 h-2 rounded-full bg-coral inline-block" />
+                      )}
                     </div>
-                    {log.intensiveDay && (
-                      <span className="w-2 h-2 rounded-full bg-coral inline-block" />
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span>{log.weight ? `${log.weight}kg` : ""}</span>
-                    <span>{log.exercise === "Y" ? "운동" : ""}</span>
-                    {isExpanded ? (
-                      <ChevronUp className="w-4 h-4" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4" />
-                    )}
-                  </div>
-                </button>
-
-                {isExpanded && (
-                  <div className="border-t border-border px-4 py-3 bg-secondary/30">
-                    <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm mb-3">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">체중</span>
-                        <span>{log.weight ?? ""} kg</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">3일 평균</span>
-                        <span>{log.avgWeight3d ?? ""} kg</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">수분</span>
-                        <span>{log.water ? `${log.water}L` : ""}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">운동</span>
-                        <span>{log.exercise ?? ""}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">야식</span>
-                        <span>{log.lateSnack ?? ""}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">체력</span>
-                        <span>{log.energy ?? ""}</span>
-                      </div>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <span>{log.weight ? `${log.weight}kg` : ""}</span>
+                      <span>{log.exercise === "Y" ? "운동" : ""}</span>
+                      {isExpanded ? (
+                        <ChevronUp className="w-4 h-4" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4" />
+                      )}
                     </div>
+                  </button>
 
-                    <div className="space-y-1 text-sm mb-3">
-                      <div className="flex gap-2">
-                        <span className="text-muted-foreground w-8 flex-shrink-0">아침</span>
-                        <span>{log.breakfast ?? ""}</span>
+                  {isExpanded && (
+                    <div className="border-t border-border px-4 py-3 bg-secondary/30">
+                      <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm mb-3">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">체중</span>
+                          <span>{log.weight ?? ""} kg</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">3일 평균</span>
+                          <span>{log.avgWeight3d ?? ""} kg</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">수분</span>
+                          <span>{log.water ? `${log.water}L` : ""}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">운동</span>
+                          <span>{log.exercise ?? ""}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">야식</span>
+                          <span>{log.lateSnack ?? ""}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">체력</span>
+                          <span>{log.energy ?? ""}</span>
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <span className="text-muted-foreground w-8 flex-shrink-0">점심</span>
-                        <span>{log.lunch ?? ""}</span>
+
+                      <div className="space-y-1 text-sm mb-3">
+                        <div className="flex gap-2">
+                          <span className="text-muted-foreground w-8 flex-shrink-0">아침</span>
+                          <span>{log.breakfast ?? ""}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <span className="text-muted-foreground w-8 flex-shrink-0">점심</span>
+                          <span>{log.lunch ?? ""}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <span className="text-muted-foreground w-8 flex-shrink-0">저녁</span>
+                          <span>{log.dinner ?? ""}</span>
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <span className="text-muted-foreground w-8 flex-shrink-0">저녁</span>
-                        <span>{log.dinner ?? ""}</span>
-                      </div>
+
+                      {log.dailySummary && (
+                        <details className="group">
+                          <summary className="text-xs font-medium text-navy cursor-pointer py-1">
+                            코치의 총평
+                          </summary>
+                          <p className="text-sm leading-relaxed mt-1 text-muted-foreground">
+                            {log.dailySummary}
+                          </p>
+                        </details>
+                      )}
+
+                      {log.closed && (
+                        <button className="mt-2 text-xs text-navy font-medium underline">
+                          총평 재생성
+                        </button>
+                      )}
                     </div>
-
-                    {log.dailySummary && (
-                      <details className="group">
-                        <summary className="text-xs font-medium text-navy cursor-pointer py-1">
-                          코치의 총평
-                        </summary>
-                        <p className="text-sm leading-relaxed mt-1 text-muted-foreground">
-                          {log.dailySummary}
-                        </p>
-                      </details>
-                    )}
-
-                    {log.closed && (
-                      <button className="mt-2 text-xs text-navy font-medium underline">
-                        총평 재생성
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                  )}
+                </div>
+              );
+            })
+          )}
         </div>
       ) : (
         <div className="px-4">
-          <div className="border border-border rounded-xl p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <p className="text-sm font-semibold">
-                  {weeklyLog.weekStart.slice(5)} ~ {weeklyLog.weekEnd.slice(5)}
-                </p>
-                <p className="text-xs text-muted-foreground">주간 요약</p>
-              </div>
+          {weeklyLogs.length === 0 ? (
+            <div className="py-12 text-center text-sm text-muted-foreground">
+              아직 주간 기록이 없어요
             </div>
-            <div className="grid grid-cols-3 gap-3 mb-4">
-              <div className="text-center p-2 bg-secondary rounded-lg">
-                <p className="text-lg font-bold">{weeklyLog.avgWeight}</p>
-                <p className="text-xs text-muted-foreground">평균 체중</p>
-              </div>
-              <div className="text-center p-2 bg-secondary rounded-lg">
-                <p className="text-lg font-bold">{weeklyLog.exerciseDays}</p>
-                <p className="text-xs text-muted-foreground">운동일수</p>
-              </div>
-              <div className="text-center p-2 bg-secondary rounded-lg">
-                <p className="text-lg font-bold">{weeklyLog.lateSnackCount}</p>
-                <p className="text-xs text-muted-foreground">야식횟수</p>
-              </div>
+          ) : (
+            <div className="space-y-3">
+              {weeklyLogs.map((wl) => (
+                <div key={wl.weekStart} className="border border-border rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="text-sm font-semibold">
+                        {wl.weekStart.slice(5)} ~ {wl.weekEnd.slice(5)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">주간 요약</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3 mb-4">
+                    <div className="text-center p-2 bg-secondary rounded-lg">
+                      <p className="text-lg font-bold">{wl.avgWeight}</p>
+                      <p className="text-xs text-muted-foreground">평균 체중</p>
+                    </div>
+                    <div className="text-center p-2 bg-secondary rounded-lg">
+                      <p className="text-lg font-bold">{wl.exerciseDays}</p>
+                      <p className="text-xs text-muted-foreground">운동일수</p>
+                    </div>
+                    <div className="text-center p-2 bg-secondary rounded-lg">
+                      <p className="text-lg font-bold">{wl.lateSnackCount}</p>
+                      <p className="text-xs text-muted-foreground">야식횟수</p>
+                    </div>
+                  </div>
+                  <div className="p-3 bg-secondary/50 rounded-lg">
+                    <p className="text-xs font-medium text-muted-foreground mb-1">주간 총평</p>
+                    <p className="text-sm leading-relaxed">{wl.weeklySummary}</p>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="p-3 bg-secondary/50 rounded-lg">
-              <p className="text-xs font-medium text-muted-foreground mb-1">주간 총평</p>
-              <p className="text-sm leading-relaxed">{weeklyLog.weeklySummary}</p>
-            </div>
-          </div>
+          )}
         </div>
       )}
     </div>

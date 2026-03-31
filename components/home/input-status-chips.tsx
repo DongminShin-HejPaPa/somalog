@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { DailyLog } from "@/lib/mock-data";
+import type { DailyLog } from "@/lib/types";
 
 interface InputStatusChipsProps {
   log: DailyLog;

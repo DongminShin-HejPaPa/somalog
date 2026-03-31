@@ -1,4 +1,5 @@
 import { BottomNav } from "@/components/layout/bottom-nav";
+import { TabsProviders } from "@/components/layout/tabs-providers";
 
 export default function TabsLayout({
   children,
@@ -6,9 +7,11 @@ export default function TabsLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="pb-14">
-      {children}
-      <BottomNav />
-    </div>
+    <TabsProviders>
+      <div className="pb-14">
+        {children}
+        <BottomNav />
+      </div>
+    </TabsProviders>
   );
 }

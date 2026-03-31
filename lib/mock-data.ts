@@ -1,54 +1,12 @@
-export interface DailyLog {
-  date: string;
-  day: number;
-  weight: number | null;
-  avgWeight3d: number | null;
-  weightChange: number | null;
-  water: number | null;
-  exercise: "Y" | "N" | null;
-  breakfast: string | null;
-  lunch: string | null;
-  dinner: string | null;
-  lateSnack: "Y" | "N" | null;
-  energy: "여유" | "보통" | "피곤" | null;
-  note: string | null;
-  closed: boolean;
-  intensiveDay: boolean | null;
-  feedback: string | null;
-  dailySummary: string | null;
-  oneLiner: string | null;
-}
+export type { DailyLog, WeeklyLog, Settings } from "./types";
+export type {
+  DailyLogInput,
+  DailyLogUpdate,
+  SettingsInput,
+  SettingsUpdate,
+} from "./types";
 
-export interface WeeklyLog {
-  weekStart: string;
-  weekEnd: string;
-  avgWeight: number;
-  exerciseDays: number;
-  lateSnackCount: number;
-  weeklySummary: string;
-}
-
-export interface Settings {
-  coachName: string;
-  height: number;
-  currentWeight: number;
-  gender: "남성" | "여성";
-  dietStartDate: string;
-  startWeight: number;
-  targetWeight: number;
-  dietPreset: "sustainable" | "medium" | "intensive" | "custom";
-  targetMonths: number;
-  waterGoal: number;
-  routineWeightTime: string;
-  routineEnergyTime: string;
-  routineExtra: string[];
-  intensiveDayOn: boolean;
-  intensiveDayCriteria: "역대최저" | "0.5kg" | "1.0kg" | "직접입력";
-  coachStylePreset: "strong" | "balanced" | "empathy" | "data";
-  coachStyleExtra: string[];
-  defaultTab: "input" | "home";
-  onboardingComplete: boolean;
-}
+import type { DailyLog, WeeklyLog, Settings } from "./types";
 
 export const mockSettings: Settings = {
   coachName: "Soma",

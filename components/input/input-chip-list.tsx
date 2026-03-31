@@ -2,14 +2,15 @@
 
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { DailyLog } from "@/lib/mock-data";
+import type { DailyLog } from "@/lib/types";
+import type { ItemKey } from "./input-modal";
 
 interface InputChipListProps {
   log: DailyLog;
   waterGoal: number;
+  onChipClick: (key: ItemKey) => void;
+  isClosed: boolean;
 }
-
-type ItemKey = "weight" | "water" | "exercise" | "breakfast" | "lunch" | "dinner" | "lateSnack" | "energy";
 
 const items: { key: ItemKey; label: string }[] = [
   { key: "weight", label: "체중" },
@@ -30,8 +31,9 @@ function formatValue(key: ItemKey, value: unknown, waterGoal: number): string {
     case "water":
       return `${value}L / ${waterGoal}L`;
     case "exercise":
-    case "lateSnack":
       return value === "Y" ? "했음" : "안 했음";
+    case "lateSnack":
+      return value === "Y" ? "먹음" : "안 먹음";
     case "energy":
       return value as string;
     default:
@@ -39,7 +41,12 @@ function formatValue(key: ItemKey, value: unknown, waterGoal: number): string {
   }
 }
 
-export function InputChipList({ log, waterGoal }: InputChipListProps) {
+export function InputChipList({
+  log,
+  waterGoal,
+  onChipClick,
+  isClosed,
+}: InputChipListProps) {
   const completedCount = items.filter(
     (item) => log[item.key] !== null && log[item.key] !== undefined
   ).length;
@@ -55,8 +62,11 @@ export function InputChipList({ log, waterGoal }: InputChipListProps) {
           return (
             <button
               key={item.key}
+              onClick={() => onChipClick(item.key)}
+              disabled={isClosed}
               className={cn(
                 "w-full flex items-center justify-between px-4 py-3 rounded-xl min-h-[52px] transition-colors text-left",
+                isClosed ? "cursor-not-allowed opacity-70" : "cursor-pointer",
                 completed
                   ? "bg-navy/5 border border-navy/20"
                   : "bg-secondary border border-border hover:border-navy/30"

@@ -77,7 +77,9 @@ export const TEST_IDS = {
   GRAPH_WEIGHT_CHART: "graph-weight-chart",
 
   // ── Settings Page ─────────────────────────────────────
+  SETTINGS_COACH_NAME: "settings-coach-name",
   SETTINGS_SAVE: "settings-save",
   SETTINGS_RESET: "settings-reset",
   SETTINGS_DEMO: "settings-demo",
+  SETTINGS_LOGOUT: "settings-logout",
 } as const;

@@ -1,6 +1,24 @@
 import { test, expect } from "../../fixtures";
 
 test.describe("Auth Redirect", () => {
-  // TODO: 비인증 상태에서 보호된 페이지 접근 → /login 리다이렉트
-  // TODO: 인증 상태에서 /login 접근 → 앱으로 리다이렉트
+  test("비인증 상태에서 /home 접근 → /login으로 리다이렉트", async ({ browser }) => {
+    // storageState 없이 새 컨텍스트 생성
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    await page.goto("http://localhost:3000/home");
+    await expect(page).toHaveURL(/\/login/);
+
+    await context.close();
+  });
+
+  test("비인증 상태에서 /input 접근 → /login으로 리다이렉트", async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    await page.goto("http://localhost:3000/input");
+    await expect(page).toHaveURL(/\/login/);
+
+    await context.close();
+  });
 });

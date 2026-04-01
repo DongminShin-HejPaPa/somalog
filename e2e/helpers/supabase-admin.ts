@@ -39,15 +39,26 @@ export async function deleteTestUser(email: string) {
   if (error) throw error;
 }
 
-/** 이메일로 유저 ID 조회 */
+/** 이메일로 유저 ID 조회 (페이지네이션 처리) */
 export async function getUserIdByEmail(email: string): Promise<string> {
   const admin = getAdminClient();
-  const {
-    data: { users },
-  } = await admin.auth.admin.listUsers();
-  const user = users.find((u) => u.email === email);
-  if (!user) throw new Error(`유저를 찾을 수 없습니다: ${email}`);
-  return user.id;
+  let page = 1;
+  const perPage = 1000;
+
+  while (true) {
+    const {
+      data: { users },
+    } = await admin.auth.admin.listUsers({ page, perPage });
+
+    const user = users.find((u) => u.email === email);
+    if (user) return user.id;
+
+    // 더 이상 페이지가 없으면 종료
+    if (users.length < perPage) break;
+    page++;
+  }
+
+  throw new Error(`유저를 찾을 수 없습니다: ${email}`);
 }
 
 /** 해당 유저의 모든 데이터 삭제 (daily_logs, weekly_logs, settings) */

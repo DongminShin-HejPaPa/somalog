@@ -39,7 +39,7 @@ export function LogList({ logs, weeklyLogs }: LogListProps) {
   });
 
   return (
-    <div>
+    <div data-testid="log-list">
       <div className="px-4 mb-3">
         <div className="relative mb-3">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -105,6 +105,7 @@ export function LogList({ logs, weeklyLogs }: LogListProps) {
               return (
                 <div
                   key={log.date}
+                  data-testid={`log-item-${log.date}`}
                   className="border border-border rounded-xl overflow-hidden"
                 >
                   <button

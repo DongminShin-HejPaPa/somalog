@@ -171,7 +171,7 @@ export function WeightChart({
     : null;
 
   return (
-    <div>
+    <div data-testid="graph-weight-chart">
       <div className="px-4 mb-3 flex gap-1.5">
         {(Object.keys(periodLabels) as Period[]).map((p) => (
           <button

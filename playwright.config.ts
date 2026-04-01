@@ -8,10 +8,10 @@ dotenv.config({ path: path.resolve(__dirname, ".env.test.local"), override: true
 
 export default defineConfig({
   testDir: "./e2e/tests",
-  fullyParallel: true,
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: 1,
   reporter: [["html", { open: "never" }], ["list"]],
   use: {
     baseURL: "http://localhost:3000",
@@ -25,6 +25,7 @@ export default defineConfig({
     // 브라우저 인증 상태 저장 (globalSetup에서 만든 유저로 로그인)
     {
       name: "setup",
+      testDir: "./e2e",
       testMatch: /auth\.setup\.ts/,
     },
     // 비인증 테스트 (로그인, 회원가입, 리다이렉트)

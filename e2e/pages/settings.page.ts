@@ -6,12 +6,14 @@ export class SettingsPage {
   readonly saveButton: Locator;
   readonly resetButton: Locator;
   readonly demoButton: Locator;
+  readonly logoutButton: Locator;
 
   constructor(page: Page) {
     this.page = page;
     this.saveButton = page.getByTestId(TEST_IDS.SETTINGS_SAVE);
     this.resetButton = page.getByTestId(TEST_IDS.SETTINGS_RESET);
     this.demoButton = page.getByTestId(TEST_IDS.SETTINGS_DEMO);
+    this.logoutButton = page.getByTestId(TEST_IDS.SETTINGS_LOGOUT);
   }
 
   async goto() {

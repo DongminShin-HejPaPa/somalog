@@ -9,11 +9,13 @@ import {
   getLowestWeightFromLogs,
 } from "@/lib/utils/compute-daily";
 import {
-  generateFeedback,
   generateDailySummary,
-  generateOneLiner,
   generateWeeklySummary,
 } from "@/lib/utils/templates";
+import {
+  generateAiFeedback,
+  generateAiOneLiner,
+} from "@/lib/ai/coach-service";
 import { getSettings } from "./settings-service";
 import { upsertWeeklyLog } from "./weekly-log-service";
 import { mockDailyLogs } from "@/lib/mock-data";
@@ -193,11 +195,10 @@ export async function upsertDailyLog(
     const prevLog = logsWithMerged.find(
       (l) => l.date < date && l.weight !== null
     );
-    merged.feedback = generateFeedback(
+    merged.feedback = await generateAiFeedback(
       merged,
       prevLog?.weight ?? null,
-      lowestW,
-      settings.waterGoal
+      settings
     );
   }
 
@@ -232,7 +233,7 @@ export async function closeDailyLog(date: string): Promise<DailyLog | null> {
   const updated: DailyLog = {
     ...existing,
     dailySummary: generateDailySummary(existing, settings.waterGoal),
-    oneLiner: generateOneLiner(existing),
+    oneLiner: await generateAiOneLiner(existing, settings),
     closed: true,
   };
 

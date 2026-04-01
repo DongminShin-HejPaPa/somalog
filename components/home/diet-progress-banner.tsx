@@ -24,6 +24,7 @@ export function DietProgressBanner({
 
   return (
     <div
+      data-testid="home-progress-banner"
       className={cn(
         "p-4 rounded-xl mx-4 mt-4",
         isIntensiveDay
@@ -42,7 +43,7 @@ export function DietProgressBanner({
       </div>
 
       <div className="flex items-baseline gap-2 mb-1">
-        <span className="text-2xl font-bold">
+        <span data-testid="home-weight-display" className="text-2xl font-bold">
           {currentWeight ? `${currentWeight} kg` : "미입력"}
         </span>
         {weightChange !== null && (

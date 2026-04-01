@@ -47,11 +47,13 @@ function InputField({
   value,
   suffix,
   onChange,
+  testId,
 }: {
   label: string;
   value: string;
   suffix?: string;
   onChange: (v: string) => void;
+  testId?: string;
 }) {
   return (
     <div className="flex items-center justify-between py-2">
@@ -61,6 +63,7 @@ function InputField({
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          data-testid={testId}
           className="w-24 text-right px-2 py-1.5 text-sm border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[36px]"
         />
         {suffix && <span className="text-sm text-muted-foreground">{suffix}</span>}
@@ -122,6 +125,7 @@ export function SettingsForm() {
           label="이름"
           value={form.coachName}
           onChange={(v) => handleChange("coachName", v)}
+          testId="settings-coach-name"
         />
         <p className="text-xs text-muted-foreground mt-1">최대 10자</p>
       </Section>

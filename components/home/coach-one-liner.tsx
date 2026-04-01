@@ -12,7 +12,7 @@ export function CoachOneLiner({
   isYesterday = false,
 }: CoachOneLinerProps) {
   return (
-    <div className="mx-4 mt-4 p-4 bg-secondary/50 rounded-xl border border-border">
+    <div data-testid="home-coach-oneliner" className="mx-4 mt-4 p-4 bg-secondary/50 rounded-xl border border-border">
       <div className="flex items-center gap-2 mb-2">
         <div className="w-8 h-8 rounded-full bg-navy flex items-center justify-center">
           <MessageCircle className="w-4 h-4 text-white" />

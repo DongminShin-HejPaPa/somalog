@@ -64,6 +64,7 @@ export function InputChipList({
               key={item.key}
               onClick={() => onChipClick(item.key)}
               disabled={isClosed}
+              data-testid={`chip-${item.key}`}
               className={cn(
                 "w-full flex items-center justify-between px-4 py-3 rounded-xl min-h-[52px] transition-colors text-left",
                 isClosed ? "cursor-not-allowed opacity-70" : "cursor-pointer",
@@ -103,7 +104,7 @@ export function InputChipList({
           <span>진행률</span>
           <span>{completedCount}/8</span>
         </div>
-        <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
+        <div data-testid="progress-bar" className="w-full h-2 bg-secondary rounded-full overflow-hidden">
           <div
             className="h-full bg-navy rounded-full transition-all"
             style={{ width: `${(completedCount / 8) * 100}%` }}

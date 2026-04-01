@@ -41,7 +41,7 @@ export default function RegisterPage() {
           <h2 className="text-base font-semibold text-foreground mb-4">회원가입</h2>
 
           {state.error && (
-            <div className="mb-3 p-3 rounded-lg bg-coral-light border border-coral/30 text-sm text-coral">
+            <div data-testid="register-error" className="mb-3 p-3 rounded-lg bg-coral-light border border-coral/30 text-sm text-coral">
               {state.error}
             </div>
           )}
@@ -57,6 +57,7 @@ export default function RegisterPage() {
                 placeholder="홍길동"
                 defaultValue={state.fields?.name ?? ""}
                 key={`name-${state.fields?.name}`}
+                data-testid="register-name"
                 className="w-full h-11 px-3 rounded-lg border border-border bg-white text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-navy/30 focus:border-navy transition-colors"
               />
             </div>
@@ -71,6 +72,7 @@ export default function RegisterPage() {
                 placeholder="email@example.com"
                 defaultValue={state.fields?.email ?? ""}
                 key={`email-${state.fields?.email}`}
+                data-testid="register-email"
                 className="w-full h-11 px-3 rounded-lg border border-border bg-white text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-navy/30 focus:border-navy transition-colors"
               />
             </div>
@@ -83,6 +85,7 @@ export default function RegisterPage() {
                 type="password"
                 required
                 placeholder="6자 이상 입력하세요"
+                data-testid="register-password"
                 className="w-full h-11 px-3 rounded-lg border border-border bg-white text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-navy/30 focus:border-navy transition-colors"
               />
             </div>
@@ -95,6 +98,7 @@ export default function RegisterPage() {
                 type="password"
                 required
                 placeholder="비밀번호를 다시 입력하세요"
+                data-testid="register-password-confirm"
                 className="w-full h-11 px-3 rounded-lg border border-border bg-white text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-navy/30 focus:border-navy transition-colors"
               />
             </div>
@@ -160,6 +164,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={isPending}
+              data-testid="register-submit"
               className="w-full h-11 mt-1 rounded-lg bg-navy text-white text-sm font-semibold hover:bg-navy/90 active:scale-[0.98] disabled:opacity-60 transition-all"
             >
               {isPending ? "처리 중..." : "회원가입"}

@@ -26,6 +26,7 @@ export function BottomNav() {
             <Link
               key={tab.href}
               href={tab.href}
+              data-testid={`nav-${tab.href.slice(1)}`}
               className={cn(
                 "flex flex-col items-center justify-center gap-0.5 w-full h-full min-h-[44px] min-w-[44px] text-xs transition-colors",
                 isActive

@@ -139,6 +139,7 @@ export function InputContainer() {
       <div className="px-4 mt-4">
         <button
           onClick={!currentLog.closed ? handleClose : undefined}
+          data-testid="close-button"
           className={cn(
             "w-full py-3 rounded-xl font-semibold text-sm min-h-[48px] transition-colors",
             currentLog.closed

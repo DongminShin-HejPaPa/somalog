@@ -34,11 +34,12 @@ export function DateHeader({
       <div className="flex items-center justify-between mb-2">
         <button
           onClick={onPrev}
+          data-testid="date-prev"
           className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-secondary"
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
-        <div className="text-center">
+        <div data-testid="date-display" className="text-center">
           <div className="flex items-center gap-2 text-lg font-bold">
             <span>
               {formatDate(date)} {getDayOfWeek(date)}요일
@@ -56,6 +57,7 @@ export function DateHeader({
         </div>
         <button
           onClick={onNext}
+          data-testid="date-next"
           className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-secondary"
         >
           <ChevronRight className="w-5 h-5" />

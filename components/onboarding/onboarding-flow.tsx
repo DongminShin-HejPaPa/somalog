@@ -116,10 +116,10 @@ export function OnboardingFlow() {
     <div className="min-h-dvh flex flex-col">
       <div className="px-4 pt-4 pb-2">
         <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-          <span>Step {currentStep + 1} / {steps.length}</span>
+          <span data-testid="onboarding-step-indicator">Step {currentStep + 1} / {steps.length}</span>
           <span>{Math.round(progress)}%</span>
         </div>
-        <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden">
+        <div data-testid="onboarding-progress" className="w-full h-1.5 bg-secondary rounded-full overflow-hidden">
           <div
             className="h-full bg-navy rounded-full transition-all duration-300"
             style={{ width: `${progress}%` }}
@@ -146,6 +146,7 @@ export function OnboardingFlow() {
                 value={coachName}
                 onChange={(e) => setCoachName(e.target.value)}
                 maxLength={10}
+                data-testid="onboarding-coach-name"
                 className="w-full px-4 py-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[48px]"
               />
               <button
@@ -345,6 +346,7 @@ export function OnboardingFlow() {
           {step.id === 8 && (
             <button
               onClick={handleComplete}
+              data-testid="onboarding-complete"
               className="w-full py-3 rounded-xl bg-navy text-white text-sm font-semibold text-center min-h-[48px]"
             >
               첫 기록 남기러 가기
@@ -357,6 +359,7 @@ export function OnboardingFlow() {
         <div className="px-4 pb-6">
           <button
             onClick={nextStep}
+            data-testid="onboarding-next"
             className="w-full py-3 rounded-xl bg-navy text-white text-sm font-semibold flex items-center justify-center gap-2 min-h-[48px]"
           >
             다음

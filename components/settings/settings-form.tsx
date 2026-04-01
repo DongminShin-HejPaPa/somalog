@@ -6,7 +6,9 @@ import { cn } from "@/lib/utils";
 import { useSettings } from "@/lib/contexts/settings-context";
 import type { Settings } from "@/lib/types";
 import Link from "next/link";
+import { LogOut } from "lucide-react";
 import { serverResetAllData, serverLoadDemoData } from "@/app/actions/data-actions";
+import { logout } from "@/app/actions/auth-actions";
 
 type DialogState = "idle" | "confirm-reset" | "confirm-onboarding" | "confirm-demo";
 
@@ -72,6 +74,7 @@ export function SettingsForm() {
   const [form, setForm] = useState<Settings>(settings);
   const [saved, setSaved] = useState(false);
   const [dialog, setDialog] = useState<DialogState>("idle");
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -389,6 +392,7 @@ export function SettingsForm() {
       <div className="px-4 py-4 border-b border-border">
         <button
           onClick={handleSave}
+          data-testid="settings-save"
           className={cn(
             "w-full py-3 rounded-xl text-sm font-semibold min-h-[48px] transition-colors",
             saved
@@ -421,12 +425,14 @@ export function SettingsForm() {
           <>
             <button
               onClick={() => setDialog("confirm-demo")}
+              data-testid="settings-demo"
               className="w-full py-3 rounded-xl text-sm font-medium min-h-[48px] bg-secondary text-foreground border border-border hover:bg-secondary/80 transition-colors"
             >
               데모 데이터 불러오기
             </button>
             <button
               onClick={() => setDialog("confirm-reset")}
+              data-testid="settings-reset"
               className="w-full py-3 rounded-xl text-sm font-medium min-h-[48px] text-coral border border-coral/30 hover:bg-coral-light transition-colors"
             >
               데이터 초기화
@@ -503,6 +509,47 @@ export function SettingsForm() {
               </button>
               <button
                 onClick={() => setDialog("idle")}
+                disabled={isPending}
+                className="flex-1 py-2.5 rounded-lg bg-secondary text-foreground text-sm font-medium min-h-[44px] border border-border disabled:opacity-50 transition-colors"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 계정 */}
+      <div className="px-4 py-4 space-y-3 pb-10">
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+          계정
+        </h3>
+
+        {!showLogoutConfirm ? (
+          <button
+            onClick={() => setShowLogoutConfirm(true)}
+            data-testid="settings-logout"
+            className="w-full py-3 rounded-xl text-sm font-medium min-h-[48px] text-muted-foreground border border-border hover:bg-secondary transition-colors flex items-center justify-center gap-2"
+          >
+            <LogOut className="w-4 h-4" />
+            로그아웃
+          </button>
+        ) : (
+          <div className="p-4 bg-secondary border border-border rounded-xl">
+            <p className="text-sm font-semibold mb-1">로그아웃 하시겠어요?</p>
+            <p className="text-xs text-muted-foreground mb-4">
+              로그아웃 후 다시 로그인하면 기존 데이터가 유지됩니다.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => startTransition(() => logout())}
+                disabled={isPending}
+                className="flex-1 py-2.5 rounded-lg bg-navy text-white text-sm font-semibold min-h-[44px] disabled:opacity-50 transition-colors"
+              >
+                {isPending ? "로그아웃 중..." : "로그아웃"}
+              </button>
+              <button
+                onClick={() => setShowLogoutConfirm(false)}
                 disabled={isPending}
                 className="flex-1 py-2.5 rounded-lg bg-secondary text-foreground text-sm font-medium min-h-[44px] border border-border disabled:opacity-50 transition-colors"
               >

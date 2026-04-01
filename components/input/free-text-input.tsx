@@ -60,10 +60,12 @@ export function FreeTextInput({ onSave }: FreeTextInputProps) {
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
           placeholder="자유롭게 입력해보세요 (예: 아침은 샌드위치, 운동 했어)"
+          data-testid="free-text-input"
           className="flex-1 px-3 py-2.5 text-sm rounded-lg border border-border bg-secondary focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy/40 min-h-[44px]"
         />
         <button
           onClick={handleSubmit}
+          data-testid="free-text-submit"
           className="p-2.5 rounded-lg bg-navy text-white min-w-[44px] min-h-[44px] flex items-center justify-center"
         >
           <Send className="w-4 h-4" />

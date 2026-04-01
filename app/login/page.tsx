@@ -22,7 +22,7 @@ export default async function LoginPage({
           <h2 className="text-base font-semibold text-foreground mb-4">로그인</h2>
 
           {error && (
-            <div className="mb-3 p-3 rounded-lg bg-coral-light border border-coral/30 text-sm text-coral">
+            <div data-testid="login-error" className="mb-3 p-3 rounded-lg bg-coral-light border border-coral/30 text-sm text-coral">
               {error}
             </div>
           )}
@@ -43,6 +43,7 @@ export default async function LoginPage({
                 required
                 placeholder="email@example.com"
                 defaultValue={email ?? ""}
+                data-testid="login-email"
                 className="w-full h-11 px-3 rounded-lg border border-border bg-white text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-navy/30 focus:border-navy transition-colors"
               />
             </div>
@@ -55,6 +56,7 @@ export default async function LoginPage({
                 type="password"
                 required
                 placeholder="비밀번호를 입력하세요"
+                data-testid="login-password"
                 className="w-full h-11 px-3 rounded-lg border border-border bg-white text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-navy/30 focus:border-navy transition-colors"
               />
             </div>
@@ -69,6 +71,7 @@ export default async function LoginPage({
             {/* 로그인 버튼 */}
             <button
               type="submit"
+              data-testid="login-submit"
               className="w-full h-11 mt-1 rounded-lg bg-navy text-white text-sm font-semibold hover:bg-navy/90 active:scale-[0.98] transition-all"
             >
               로그인

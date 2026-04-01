@@ -101,6 +101,7 @@ export function InputModal({
           <h3 className="text-base font-semibold">{label} 입력</h3>
           <button
             onClick={onClose}
+            data-testid="modal-close"
             className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-secondary"
           >
             <X className="w-5 h-5" />
@@ -118,12 +119,14 @@ export function InputModal({
                 value={weightValue}
                 onChange={(e) => setWeightValue(e.target.value)}
                 autoFocus
+                data-testid="modal-weight-input"
                 className="flex-1 px-4 py-3 text-lg text-right border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[52px]"
               />
               <span className="text-base text-muted-foreground font-medium">kg</span>
             </div>
             <button
               onClick={handleWeightSave}
+              data-testid="modal-save"
               className="w-full py-3 rounded-xl bg-navy text-white text-sm font-semibold min-h-[48px]"
             >
               저장
@@ -139,6 +142,7 @@ export function InputModal({
                 <button
                   key={v}
                   onClick={() => setWaterValue(v)}
+                  data-testid={`modal-water-${v}`}
                   className={cn(
                     "py-3 rounded-xl text-sm font-medium min-h-[48px] transition-colors",
                     waterValue === v
@@ -156,6 +160,7 @@ export function InputModal({
             <button
               onClick={handleWaterSave}
               disabled={waterValue == null}
+              data-testid="modal-save"
               className="w-full py-3 rounded-xl bg-navy text-white text-sm font-semibold min-h-[48px] disabled:opacity-40"
             >
               저장
@@ -168,6 +173,7 @@ export function InputModal({
           <div className="flex gap-3">
             <button
               onClick={() => onSave({ exercise: "Y" })}
+              data-testid="modal-exercise-y"
               className={cn(
                 "flex-1 py-4 rounded-xl text-sm font-semibold min-h-[60px] transition-colors",
                 log.exercise === "Y"
@@ -179,6 +185,7 @@ export function InputModal({
             </button>
             <button
               onClick={() => onSave({ exercise: "N" })}
+              data-testid="modal-exercise-n"
               className={cn(
                 "flex-1 py-4 rounded-xl text-sm font-semibold min-h-[60px] transition-colors",
                 log.exercise === "N"
@@ -201,10 +208,12 @@ export function InputModal({
               onChange={(e) => setTextValue(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleTextSave()}
               autoFocus
+              data-testid="modal-meal-input"
               className="w-full px-4 py-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[52px]"
             />
             <button
               onClick={handleTextSave}
+              data-testid="modal-save"
               className="w-full py-3 rounded-xl bg-navy text-white text-sm font-semibold min-h-[48px]"
             >
               저장
@@ -217,6 +226,7 @@ export function InputModal({
           <div className="flex gap-3">
             <button
               onClick={() => onSave({ lateSnack: "Y" })}
+              data-testid="modal-late-snack-y"
               className={cn(
                 "flex-1 py-4 rounded-xl text-sm font-semibold min-h-[60px] transition-colors",
                 log.lateSnack === "Y"
@@ -228,6 +238,7 @@ export function InputModal({
             </button>
             <button
               onClick={() => onSave({ lateSnack: "N" })}
+              data-testid="modal-late-snack-n"
               className={cn(
                 "flex-1 py-4 rounded-xl text-sm font-semibold min-h-[60px] transition-colors",
                 log.lateSnack === "N"
@@ -247,6 +258,7 @@ export function InputModal({
               <button
                 key={e}
                 onClick={() => onSave({ energy: e })}
+                data-testid={`modal-energy-${e}`}
                 className={cn(
                   "flex-1 py-4 rounded-xl text-sm font-semibold min-h-[60px] transition-colors",
                   log.energy === e

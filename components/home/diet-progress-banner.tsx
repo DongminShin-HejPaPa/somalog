@@ -18,8 +18,10 @@ export function DietProgressBanner({
   isIntensiveDay,
 }: DietProgressBannerProps) {
   const totalToLose = startWeight - targetWeight;
-  const lost = weightChange ? Math.abs(weightChange) : 0;
-  const progress = totalToLose > 0 ? Math.min((lost / totalToLose) * 100, 100) : 0;
+  // weightChange = currentWeight - startWeight (음수면 감량, 양수면 증가)
+  // 체중이 늘었을 때는 0으로 처리 (진행 없음)
+  const actualLost = weightChange !== null ? Math.max(-weightChange, 0) : 0;
+  const progress = totalToLose > 0 ? Math.min((actualLost / totalToLose) * 100, 100) : 0;
   const remaining = currentWeight ? currentWeight - targetWeight : startWeight - targetWeight;
 
   return (
@@ -37,7 +39,7 @@ export function DietProgressBanner({
         {isIntensiveDay && (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-coral text-white text-xs font-semibold">
             <span className="w-2 h-2 rounded-full bg-white inline-block" />
-            Intensive Day
+            Hard Reset
           </span>
         )}
       </div>

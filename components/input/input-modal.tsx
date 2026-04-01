@@ -136,7 +136,37 @@ export function InputModal({
 
         {/* Water */}
         {field === "water" && (
-          <div className="space-y-3">
+          <div className="space-y-4">
+            {/* 슬라이더 */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-muted-foreground">0L</span>
+                <span className="text-xl font-bold text-navy">
+                  {waterValue != null ? waterValue.toFixed(1) : "0.0"}L
+                </span>
+                <span className="text-xs text-muted-foreground">4L</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={4}
+                step={0.1}
+                value={waterValue ?? 0}
+                onChange={(e) => setWaterValue(Math.round(Number(e.target.value) * 10) / 10)}
+                className="w-full h-2 rounded-full appearance-none cursor-pointer accent-navy bg-secondary"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                <span>목표 {waterGoal}L</span>
+                {waterValue != null && waterValue > 0 && waterValue < waterGoal && (
+                  <span>목표까지 {(waterGoal - waterValue).toFixed(1)}L 남음</span>
+                )}
+                {waterValue != null && waterValue >= waterGoal && (
+                  <span className="text-success font-medium">목표 달성!</span>
+                )}
+              </div>
+            </div>
+
+            {/* 빠른 선택 버튼 */}
             <div className="grid grid-cols-4 gap-2">
               {waterPresets.map((v) => (
                 <button
@@ -144,7 +174,7 @@ export function InputModal({
                   onClick={() => setWaterValue(v)}
                   data-testid={`modal-water-${v}`}
                   className={cn(
-                    "py-3 rounded-xl text-sm font-medium min-h-[48px] transition-colors",
+                    "py-2.5 rounded-xl text-sm font-medium min-h-[44px] transition-colors",
                     waterValue === v
                       ? "bg-navy text-white"
                       : "bg-secondary text-foreground border border-border"
@@ -154,12 +184,10 @@ export function InputModal({
                 </button>
               ))}
             </div>
-            <p className="text-xs text-muted-foreground text-center">
-              목표: {waterGoal}L
-            </p>
+
             <button
               onClick={handleWaterSave}
-              disabled={waterValue == null}
+              disabled={waterValue == null || waterValue === 0}
               data-testid="modal-save"
               className="w-full py-3 rounded-xl bg-navy text-white text-sm font-semibold min-h-[48px] disabled:opacity-40"
             >

@@ -5,9 +5,12 @@ import { createClient } from "@/lib/supabase/server";
 
 export default async function HomePage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // 이름 표시 목적으로만 사용 (인증은 middleware가 담당)
+  const { data: { session } } = await supabase.auth.getSession();
+  const user = session?.user;
+  const displayName = user?.user_metadata?.full_name
+    ?? user?.email?.split("@")[0]
+    ?? null;
 
   const [todayLog, recentLogs] = await Promise.all([
     getTodayLog(),
@@ -18,8 +21,8 @@ export default async function HomePage() {
     <div className="pb-6">
       <header className="px-4 pt-4 pb-2 flex items-center justify-between">
         <h1 className="text-lg font-bold">Soma Log</h1>
-        {user ? (
-          <span className="text-xs text-muted-foreground">{user.email}</span>
+        {displayName ? (
+          <span className="text-xs text-muted-foreground">{displayName} 님</span>
         ) : (
           <Link
             href="/login"

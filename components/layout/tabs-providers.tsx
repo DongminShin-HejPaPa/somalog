@@ -1,7 +1,17 @@
 "use client";
 
 import { SettingsProvider } from "@/lib/contexts/settings-context";
+import type { Settings } from "@/lib/types";
 
-export function TabsProviders({ children }: { children: React.ReactNode }) {
-  return <SettingsProvider>{children}</SettingsProvider>;
+interface TabsProvidersProps {
+  children: React.ReactNode;
+  initialSettings: Settings | null;
+}
+
+export function TabsProviders({ children, initialSettings }: TabsProvidersProps) {
+  return (
+    <SettingsProvider initialSettings={initialSettings}>
+      {children}
+    </SettingsProvider>
+  );
 }

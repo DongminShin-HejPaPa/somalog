@@ -37,7 +37,7 @@ function rowToSettings(row: Record<string, unknown>): Settings {
     startWeight: (row.start_weight as number) ?? 0,
     targetWeight: (row.target_weight as number) ?? 0,
     dietPreset:
-      (row.diet_preset as "sustainable" | "medium" | "intensive" | "custom") ??
+      (row.diet_preset as "easygoing" | "sustainable" | "medium" | "intensive" | "custom") ??
       "sustainable",
     targetMonths: (row.target_months as number) ?? 12,
     waterGoal: (row.water_goal as number) ?? 2.8,

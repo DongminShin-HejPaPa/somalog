@@ -1,5 +1,3 @@
-export const dynamic = "force-dynamic";
-
 import { WeightChart } from "@/components/graph/weight-chart";
 import { getRecentDailyLogs } from "@/lib/services/daily-log-service";
 import { getSettings } from "@/lib/services/settings-service";

@@ -36,7 +36,7 @@ export interface Settings {
   dietStartDate: string;
   startWeight: number;
   targetWeight: number;
-  dietPreset: "sustainable" | "medium" | "intensive" | "custom";
+  dietPreset: "easygoing" | "sustainable" | "medium" | "intensive" | "custom";
   targetMonths: number;
   waterGoal: number;
   routineWeightTime: string;

@@ -20,11 +20,16 @@ const coachStyles = [
 ];
 
 const dietPresets = [
-  { value: "sustainable", label: "Sustainable Diet", desc: "12개월, ~1.7kg/월, 코칭 보통", badge: "추천" },
-  { value: "medium", label: "중기 집중", desc: "6개월, ~2.5kg/월, 코칭 높음" },
-  { value: "intensive", label: "단기 강력", desc: "3개월, ~3.3kg/월, 코칭 최강" },
-  { value: "custom", label: "자유 설정", desc: "직접 입력" },
+  { value: "easygoing", label: "여유롭게", desc: "18개월, ~1.2kg/월, 코칭 보통" },
+  { value: "sustainable", label: "착실하게", desc: "12개월, ~1.7kg/월, 코칭 보통", badge: "추천" },
+  { value: "medium", label: "집중해서", desc: "6개월, ~2.5kg/월, 코칭 높음" },
+  { value: "intensive", label: "전력 질주", desc: "3개월, ~3.3kg/월, 코칭 최강" },
+  { value: "custom", label: "내가 정할게", desc: "목표 체중·기간 직접 입력" },
 ];
+
+const presetMonths: Partial<Record<string, number>> = {
+  easygoing: 18, sustainable: 12, medium: 6, intensive: 3,
+};
 
 const intensiveCriteria = [
   { value: "역대최저", label: "역대 최저 체중 초과 시", desc: "가장 엄격 (추천)" },
@@ -90,6 +95,16 @@ export function SettingsForm() {
 
   const handleChange = <K extends keyof Settings>(key: K, value: Settings[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+    setSaved(false);
+  };
+
+  const handlePresetChange = (value: Settings["dietPreset"]) => {
+    const months = presetMonths[value];
+    setForm((prev) => ({
+      ...prev,
+      dietPreset: value,
+      ...(months !== undefined ? { targetMonths: months } : {}),
+    }));
     setSaved(false);
   };
 
@@ -169,7 +184,7 @@ export function SettingsForm() {
           {dietPresets.map((p) => (
             <button
               key={p.value}
-              onClick={() => handleChange("dietPreset", p.value as Settings["dietPreset"])}
+              onClick={() => handlePresetChange(p.value as Settings["dietPreset"])}
               className={cn(
                 "w-full flex items-center justify-between px-3 py-3 rounded-xl border text-left min-h-[52px] transition-colors",
                 form.dietPreset === p.value
@@ -267,13 +282,40 @@ export function SettingsForm() {
           value={form.routineEnergyTime}
           onChange={(v) => handleChange("routineEnergyTime", v)}
         />
-        <button className="text-sm text-navy font-medium mt-2">+ 루틴 추가</button>
+        {form.routineExtra.map((item, i) => (
+          <div key={i} className="flex items-center gap-2 py-1.5">
+            <input
+              type="text"
+              value={item}
+              placeholder="루틴 설명"
+              onChange={(e) => {
+                const updated = [...form.routineExtra];
+                updated[i] = e.target.value;
+                handleChange("routineExtra", updated);
+              }}
+              className="flex-1 px-2 py-1.5 text-sm border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[36px]"
+            />
+            <button
+              onClick={() => handleChange("routineExtra", form.routineExtra.filter((_, idx) => idx !== i))}
+              className="text-coral text-lg leading-none px-1"
+              aria-label="삭제"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+        <button
+          onClick={() => handleChange("routineExtra", [...form.routineExtra, ""])}
+          className="text-sm text-navy font-medium mt-2"
+        >
+          + 루틴 추가
+        </button>
         <p className="text-xs text-muted-foreground mt-2 p-2 bg-secondary rounded-lg">
           루틴 설정은 AI 코치 맥락 필터링에 사용됩니다. 잘못 설정하면 맥락에 맞지 않는 조언을 받을 수 있어요.
         </p>
       </Section>
 
-      <Section title="Intensive Day">
+      <Section title="Hard Reset Mode">
         <div className="flex items-center justify-between py-2 mb-3">
           <span className="text-sm">사용 여부</span>
           <button
@@ -362,7 +404,34 @@ export function SettingsForm() {
             </button>
           ))}
         </div>
-        <button className="text-sm text-navy font-medium">+ 항목 추가</button>
+        {form.coachStyleExtra.map((item, i) => (
+          <div key={i} className="flex items-center gap-2 py-1.5">
+            <input
+              type="text"
+              value={item}
+              placeholder="예: 아침에는 부드럽게 말해줘"
+              onChange={(e) => {
+                const updated = [...form.coachStyleExtra];
+                updated[i] = e.target.value;
+                handleChange("coachStyleExtra", updated);
+              }}
+              className="flex-1 px-2 py-1.5 text-sm border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[36px]"
+            />
+            <button
+              onClick={() => handleChange("coachStyleExtra", form.coachStyleExtra.filter((_, idx) => idx !== i))}
+              className="text-coral text-lg leading-none px-1"
+              aria-label="삭제"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+        <button
+          onClick={() => handleChange("coachStyleExtra", [...form.coachStyleExtra, ""])}
+          className="text-sm text-navy font-medium"
+        >
+          + 항목 추가
+        </button>
         <p className="text-xs text-muted-foreground mt-2">
           10개 초과 시 조언 품질이 저하될 수 있어요
         </p>

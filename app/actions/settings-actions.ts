@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import {
   getSettings,
   updateSettings,
@@ -14,11 +15,16 @@ export async function actionGetSettings(): Promise<Settings> {
 export async function actionUpdateSettings(
   data: SettingsUpdate
 ): Promise<Settings> {
-  return updateSettings(data);
+  const result = await updateSettings(data);
+  revalidatePath("/graph");
+  revalidatePath("/home");
+  return result;
 }
 
 export async function actionInitializeSettings(
   data: SettingsInput
 ): Promise<Settings> {
-  return initializeSettings(data);
+  const result = await initializeSettings(data);
+  revalidatePath("/", "layout");
+  return result;
 }

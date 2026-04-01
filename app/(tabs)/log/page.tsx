@@ -1,5 +1,3 @@
-export const dynamic = "force-dynamic";
-
 import { LogList } from "@/components/log/log-list";
 import { getRecentDailyLogs } from "@/lib/services/daily-log-service";
 import { getWeeklyLogs } from "@/lib/services/weekly-log-service";

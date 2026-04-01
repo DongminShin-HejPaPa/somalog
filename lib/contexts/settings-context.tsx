@@ -49,12 +49,21 @@ interface SettingsContextValue {
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
 
-export function SettingsProvider({ children }: { children: ReactNode }) {
-  // SSR-safe 초기값으로 DEFAULT_SETTINGS 사용 (hydration mismatch 방지)
-  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
-  const [isLoaded, setIsLoaded] = useState(false);
+export function SettingsProvider({
+  children,
+  initialSettings,
+}: {
+  children: ReactNode;
+  initialSettings?: Settings | null;
+}) {
+  const [settings, setSettings] = useState<Settings>(
+    initialSettings ?? DEFAULT_SETTINGS
+  );
+  const [isLoaded, setIsLoaded] = useState(initialSettings != null);
 
   useEffect(() => {
+    // 서버에서 이미 settings를 받았으면 클라이언트 fetch 생략
+    if (initialSettings != null) return;
     const loadSettings = async () => {
       try {
         const loaded = await actionGetSettings();
@@ -66,7 +75,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       }
     };
     loadSettings();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateSettings = useCallback(async (data: SettingsUpdate) => {
     try {

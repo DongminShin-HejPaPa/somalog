@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import {
   getDailyLog,
   upsertDailyLog,
@@ -18,13 +19,21 @@ export async function actionUpsertDailyLog(
   date: string,
   data: DailyLogUpdate
 ): Promise<DailyLog> {
-  return upsertDailyLog(date, data);
+  const result = await upsertDailyLog(date, data);
+  revalidatePath("/home");
+  revalidatePath("/log");
+  revalidatePath("/graph");
+  return result;
 }
 
 export async function actionCloseDailyLog(
   date: string
 ): Promise<DailyLog | null> {
-  return closeDailyLog(date);
+  const result = await closeDailyLog(date);
+  revalidatePath("/home");
+  revalidatePath("/log");
+  revalidatePath("/graph");
+  return result;
 }
 
 export async function actionGetRecentDailyLogs(

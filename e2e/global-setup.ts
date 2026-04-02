@@ -37,11 +37,12 @@ export default async function globalSetup(_config: FullConfig) {
     await createTestUser(email, password);
     console.log(`✅ 테스트 유저 생성: ${email}`);
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    if (msg.includes("already") || msg.includes("duplicate") || msg.includes("email")) {
+    const msg = (error instanceof Error ? error.message : String(error)).toLowerCase();
+    // Supabase 중복 유저 에러 메시지: "User already registered" / "already been registered"
+    if (msg.includes("already") || msg.includes("duplicate")) {
       console.log(`ℹ️  테스트 유저 이미 존재: ${email}`);
     } else {
-      throw error;
+      throw new Error(`테스트 유저 생성 실패 (${email}): ${msg}`);
     }
   }
 }

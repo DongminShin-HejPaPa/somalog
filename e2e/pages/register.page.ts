@@ -24,11 +24,28 @@ export class RegisterPage {
     await this.page.goto("/register");
   }
 
-  async register(name: string, email: string, password: string) {
+  /** 필수 약관(이용약관 + 개인정보처리방침) 체크 */
+  async agreeRequired() {
+    await this.page.locator("label").filter({ hasText: "이용약관 동의" }).locator("input[type=checkbox]").click();
+    await this.page.locator("label").filter({ hasText: "개인정보 처리방침 동의" }).locator("input[type=checkbox]").click();
+  }
+
+  /** 전체 동의 체크 */
+  async agreeAll() {
+    await this.page.locator("label").filter({ hasText: "전체 동의" }).locator("input[type=checkbox]").click();
+  }
+
+  /** 기본 필드 채우기 (passwordConfirm 미입력 시 password와 동일) */
+  async fill(name: string, email: string, password: string, passwordConfirm?: string) {
     await this.nameInput.fill(name);
     await this.emailInput.fill(email);
     await this.passwordInput.fill(password);
-    await this.passwordConfirmInput.fill(password);
+    await this.passwordConfirmInput.fill(passwordConfirm ?? password);
+  }
+
+  async register(name: string, email: string, password: string) {
+    await this.fill(name, email, password);
+    await this.agreeAll();
     await this.submitButton.click();
   }
 }

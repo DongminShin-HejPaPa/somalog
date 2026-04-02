@@ -29,7 +29,8 @@ export class OnboardingPage {
     await this.nextButton.click();
     // Step 2: 신체 정보
     await this.nextButton.click();
-    // Step 3: 다이어트 목표
+    // Step 3: 다이어트 목표 (목표 체중 필수 입력)
+    await this.page.getByPlaceholder("목표 체중").fill("80");
     await this.nextButton.click();
     // Step 4: 수분 목표 → 버튼 클릭으로 바로 다음 스텝
     await this.page.getByText("2.8L로 할게").click();

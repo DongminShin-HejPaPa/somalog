@@ -24,7 +24,26 @@ const dietPresets = [
 
 function calcMonths(totalLoss: number, rate: number): number {
   if (totalLoss <= 0 || rate <= 0) return 1;
-  return Math.ceil(totalLoss / rate);
+  return Math.max(1, Math.round(totalLoss / rate));
+}
+
+/**
+ * 전체 프리셋 개월 수를 한꺼번에 계산하고,
+ * "빠른 프리셋 = 더 적은 개월" 순서를 보장하도록 후처리.
+ * presets는 느린 순서(index 0)부터 빠른 순서(index n-1)로 전달.
+ */
+function calcAllPresetMonths(
+  totalLoss: number,
+  rates: number[]
+): number[] {
+  const months = rates.map((r) => calcMonths(totalLoss, r));
+  // 빠른 쪽(뒤)부터 앞(느린 쪽)을 보정: 느린 프리셋은 항상 1 이상 더 많아야 함
+  for (let i = months.length - 2; i >= 0; i--) {
+    if (months[i] <= months[i + 1]) {
+      months[i] = months[i + 1] + 1;
+    }
+  }
+  return months;
 }
 
 const intensiveCriteriaOptions = [
@@ -94,6 +113,17 @@ export function OnboardingFlow() {
   const step = steps[currentStep];
   const progress = ((currentStep + 1) / steps.length) * 100;
 
+  // 커스텀 제외 프리셋의 개월 수 (Math.round + 순서 보장)
+  const presetMonthsMap = useMemo(() => {
+    const totalLoss = Number(weight) - Number(targetWeight);
+    if (totalLoss <= 0 || !targetWeight) return {} as Record<string, number>;
+    const nonCustom = dietPresets.filter((p) => p.value !== "custom");
+    const months = calcAllPresetMonths(totalLoss, nonCustom.map((p) => p.ratePerMonth));
+    const map: Record<string, number> = {};
+    nonCustom.forEach((p, i) => { map[p.value] = months[i]; });
+    return map;
+  }, [weight, targetWeight]);
+
   // 신체정보 기반 권장 수분량 (체중 × 35ml/남성, 31ml/여성)
   const recommendedWater = useMemo(() => {
     const w = Number(weight) || 0;
@@ -102,16 +132,14 @@ export function OnboardingFlow() {
     return Math.round(ml / 100) / 10; // ml → L, 소수점 1자리
   }, [weight, gender]);
 
-  // targetWeight 변경 시 현재 선택된 프리셋 기준으로 개월 수 재계산
+  // targetWeight / weight / selectedPreset 변경 시 presetMonthsMap 기반으로 개월 수 재계산
   useEffect(() => {
     if (selectedPreset === "custom") return;
-    const preset = dietPresets.find((p) => p.value === selectedPreset);
-    if (!preset) return;
-    const totalLoss = Number(weight) - Number(targetWeight);
-    const months = calcMonths(totalLoss, preset.ratePerMonth);
+    const months = presetMonthsMap[selectedPreset];
+    if (!months) return;
     setTargetMonths(months);
     setTargetMonthsInput(String(months));
-  }, [targetWeight, selectedPreset, weight]);
+  }, [targetWeight, selectedPreset, weight, presetMonthsMap]);
 
   // 다이어트 목표 요약 (step 3)
   const dietStats = useMemo(() => {
@@ -137,13 +165,7 @@ export function OnboardingFlow() {
 
   const handlePresetSelect = (value: string) => {
     setSelectedPreset(value);
-    if (value === "custom") return;
-    const preset = dietPresets.find((p) => p.value === value);
-    if (!preset) return;
-    const totalLoss = Number(weight) - Number(targetWeight);
-    const months = calcMonths(totalLoss, preset.ratePerMonth);
-    setTargetMonths(months);
-    setTargetMonthsInput(String(months));
+    // useEffect가 presetMonthsMap 기반으로 개월 수를 자동 갱신함
   };
 
   const handleMonthsInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -340,11 +362,12 @@ export function OnboardingFlow() {
               <div className="space-y-2">
                 {dietPresets.map((p) => {
                   const totalLoss = Number(weight) - Number(targetWeight);
-                  const months = p.value !== "custom" && totalLoss > 0
-                    ? calcMonths(totalLoss, p.ratePerMonth)
+                  const months = p.value !== "custom" ? (presetMonthsMap[p.value] ?? null) : null;
+                  const actualRate = months != null && totalLoss > 0
+                    ? (totalLoss / months).toFixed(1)
                     : null;
                   const desc = months != null
-                    ? `${months}개월 · 월 약 ${p.ratePerMonth}kg`
+                    ? `${months}개월 · 월 약 ${actualRate}kg`
                     : p.desc;
                   return (
                     <button
@@ -435,20 +458,26 @@ export function OnboardingFlow() {
               </button>
               {showRoutineEdit && (
                 <div className="space-y-2 mt-2">
-                  <input
-                    type="text"
-                    value={routineWeightTime}
-                    onChange={(e) => setRoutineWeightTime(e.target.value)}
-                    placeholder="몸무게 측정 시간"
-                    className="w-full px-3 py-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[48px]"
-                  />
-                  <input
-                    type="text"
-                    value={routineEnergyTime}
-                    onChange={(e) => setRoutineEnergyTime(e.target.value)}
-                    placeholder="체력 기준 시각"
-                    className="w-full px-3 py-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[48px]"
-                  />
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-medium text-muted-foreground">몸무게 측정 시간</label>
+                    <input
+                      type="text"
+                      value={routineWeightTime}
+                      onChange={(e) => setRoutineWeightTime(e.target.value)}
+                      placeholder="예: 아침 기상 직후"
+                      className="w-full px-3 py-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[48px]"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-medium text-muted-foreground">체력 기준 시각</label>
+                    <input
+                      type="text"
+                      value={routineEnergyTime}
+                      onChange={(e) => setRoutineEnergyTime(e.target.value)}
+                      placeholder="예: 21:00"
+                      className="w-full px-3 py-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[48px]"
+                    />
+                  </div>
                   <button
                     onClick={nextStep}
                     className="w-full py-3 rounded-xl bg-navy text-white text-sm font-medium min-h-[48px]"
@@ -602,8 +631,8 @@ export function OnboardingFlow() {
         )}
       </div>
 
-      {/* 바로 사용 링크 */}
-      <div className="px-4 pb-6 text-center">
+      {/* 바로 사용 링크 — step 8 제외 */}
+      {step.id !== 8 && <div className="px-4 pb-6 text-center">
         {!showSkipConfirm ? (
           <button
             onClick={() => setShowSkipConfirm(true)}
@@ -639,7 +668,7 @@ export function OnboardingFlow() {
             </div>
           </div>
         )}
-      </div>
+      </div>}
     </div>
   );
 }

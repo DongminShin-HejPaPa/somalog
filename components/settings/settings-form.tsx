@@ -6,9 +6,10 @@ import { cn } from "@/lib/utils";
 import { useSettings } from "@/lib/contexts/settings-context";
 import type { Settings } from "@/lib/types";
 import Link from "next/link";
-import { LogOut } from "lucide-react";
+import { LogOut, UserPen } from "lucide-react";
 import { serverResetAllData, serverLoadDemoData } from "@/app/actions/data-actions";
 import { logout } from "@/app/actions/auth-actions";
+import { AccountInfoDialog } from "./account-info-dialog";
 
 type DialogState = "idle" | "confirm-reset" | "confirm-onboarding" | "confirm-demo";
 
@@ -83,6 +84,7 @@ export function SettingsForm() {
   const [saved, setSaved] = useState(false);
   const [dialog, setDialog] = useState<DialogState>("idle");
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showAccountInfo, setShowAccountInfo] = useState(false);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -598,6 +600,17 @@ export function SettingsForm() {
           계정
         </h3>
 
+        {/* 개인정보 변경 */}
+        <button
+          type="button"
+          onClick={() => setShowAccountInfo(true)}
+          data-testid="settings-account-info"
+          className="w-full py-3 rounded-xl text-sm font-medium min-h-[48px] text-foreground border border-border hover:bg-secondary transition-colors flex items-center justify-center gap-2"
+        >
+          <UserPen className="w-4 h-4" />
+          개인정보 변경
+        </button>
+
         {!showLogoutConfirm ? (
           <button
             onClick={() => setShowLogoutConfirm(true)}
@@ -632,6 +645,12 @@ export function SettingsForm() {
           </div>
         )}
       </div>
+
+      {/* 개인정보 변경 다이얼로그 */}
+      <AccountInfoDialog
+        isOpen={showAccountInfo}
+        onClose={() => setShowAccountInfo(false)}
+      />
     </div>
   );
 }

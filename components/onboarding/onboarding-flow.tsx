@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { MessageCircle, ArrowRight, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -15,12 +15,17 @@ const coachStyles = [
 ];
 
 const dietPresets = [
-  { value: "easygoing", label: "여유롭게", desc: "18개월 · 코칭 보통", months: 18, ratePerMonth: 1.2 },
-  { value: "sustainable", label: "착실하게", desc: "12개월 · 코칭 보통", badge: "추천", months: 12, ratePerMonth: 1.7 },
-  { value: "medium", label: "집중해서", desc: "6개월 · 코칭 높음", months: 6, ratePerMonth: 2.5 },
-  { value: "intensive", label: "전력 질주", desc: "3개월 · 코칭 최강", months: 3, ratePerMonth: 3.3 },
-  { value: "custom", label: "내가 정할게", desc: "목표 체중·기간 직접 입력", months: 12, ratePerMonth: 0 },
+  { value: "easygoing", label: "여유롭게", desc: "월 약 1kg · 코칭 보통", ratePerMonth: 1 },
+  { value: "sustainable", label: "착실하게", desc: "월 약 2kg · 코칭 보통", badge: "추천", ratePerMonth: 2 },
+  { value: "medium", label: "집중해서", desc: "월 약 3kg · 코칭 높음", ratePerMonth: 3 },
+  { value: "intensive", label: "전력 질주", desc: "월 약 4kg · 코칭 최강", ratePerMonth: 4 },
+  { value: "custom", label: "내가 정할게", desc: "목표 체중·기간 직접 입력", ratePerMonth: 0 },
 ];
+
+function calcMonths(totalLoss: number, rate: number): number {
+  if (totalLoss <= 0 || rate <= 0) return 1;
+  return Math.ceil(totalLoss / rate);
+}
 
 const intensiveCriteriaOptions = [
   { value: "역대최저", label: "역대 최저 체중 초과 시", desc: "가장 엄격 (추천)" },
@@ -80,6 +85,12 @@ export function OnboardingFlow() {
   // Step 7
   const [selectedStyle, setSelectedStyle] = useState("strong");
 
+  // 온보딩 없이 바로 사용
+  const [showSkipConfirm, setShowSkipConfirm] = useState(false);
+
+  // 온보딩 완료 처리 중 (더블클릭 방지)
+  const [isCompleting, setIsCompleting] = useState(false);
+
   const step = steps[currentStep];
   const progress = ((currentStep + 1) / steps.length) * 100;
 
@@ -90,6 +101,17 @@ export function OnboardingFlow() {
     const ml = gender === "남성" ? w * 35 : w * 31;
     return Math.round(ml / 100) / 10; // ml → L, 소수점 1자리
   }, [weight, gender]);
+
+  // targetWeight 변경 시 현재 선택된 프리셋 기준으로 개월 수 재계산
+  useEffect(() => {
+    if (selectedPreset === "custom") return;
+    const preset = dietPresets.find((p) => p.value === selectedPreset);
+    if (!preset) return;
+    const totalLoss = Number(weight) - Number(targetWeight);
+    const months = calcMonths(totalLoss, preset.ratePerMonth);
+    setTargetMonths(months);
+    setTargetMonthsInput(String(months));
+  }, [targetWeight, selectedPreset, weight]);
 
   // 다이어트 목표 요약 (step 3)
   const dietStats = useMemo(() => {
@@ -115,11 +137,13 @@ export function OnboardingFlow() {
 
   const handlePresetSelect = (value: string) => {
     setSelectedPreset(value);
+    if (value === "custom") return;
     const preset = dietPresets.find((p) => p.value === value);
-    if (preset && value !== "custom") {
-      setTargetMonths(preset.months);
-      setTargetMonthsInput(String(preset.months));
-    }
+    if (!preset) return;
+    const totalLoss = Number(weight) - Number(targetWeight);
+    const months = calcMonths(totalLoss, preset.ratePerMonth);
+    setTargetMonths(months);
+    setTargetMonthsInput(String(months));
   };
 
   const handleMonthsInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -129,11 +153,13 @@ export function OnboardingFlow() {
     if (!isNaN(n) && n > 0) setTargetMonths(n);
   };
 
-  const handleComplete = () => {
-    const today = new Date().toISOString().split("T")[0];
+  const handleComplete = async () => {
+    if (isCompleting) return;
+    setIsCompleting(true);
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
     const weightNum = Number(weight) || 0;
 
-    initializeSettings({
+    await initializeSettings({
       coachName: coachName || "Soma",
       height: Number(height) || 0,
       currentWeight: weightNum,
@@ -154,6 +180,33 @@ export function OnboardingFlow() {
       defaultTab: "input",
     });
 
+    router.push("/input");
+  };
+
+  const handleSkip = async () => {
+    if (isCompleting) return;
+    setIsCompleting(true);
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
+    await initializeSettings({
+      coachName: "Soma",
+      height: 0,
+      currentWeight: 0,
+      gender: "남성",
+      dietStartDate: today,
+      startWeight: 0,
+      targetWeight: 0,
+      dietPreset: "sustainable",
+      targetMonths: 12,
+      waterGoal: 2.8,
+      routineWeightTime: "아침 기상 직후",
+      routineEnergyTime: "21:00",
+      routineExtra: [],
+      intensiveDayOn: true,
+      intensiveDayCriteria: "역대최저",
+      coachStylePreset: "strong",
+      coachStyleExtra: [],
+      defaultTab: "input",
+    });
     router.push("/input");
   };
 
@@ -495,17 +548,23 @@ export function OnboardingFlow() {
           {step.id === 8 && (
             <button
               onClick={handleComplete}
+              disabled={isCompleting}
               data-testid="onboarding-complete"
-              className="w-full py-3 rounded-xl bg-navy text-white text-sm font-semibold text-center min-h-[48px]"
+              className="w-full py-3 rounded-xl bg-navy text-white text-sm font-semibold text-center min-h-[48px] disabled:opacity-60 flex items-center justify-center gap-2"
             >
-              첫 기록 남기러 가기
+              {isCompleting ? (
+                <>
+                  <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  저장 중...
+                </>
+              ) : "첫 기록 남기러 가기"}
             </button>
           )}
         </div>
       </div>
 
       {/* 하단 네비게이션: 이전 + 다음 */}
-      <div className="px-4 pb-6 flex gap-3">
+      <div className="px-4 pb-2 flex gap-3">
         {currentStep > 0 && (
           <button
             onClick={prevStep}
@@ -531,6 +590,45 @@ export function OnboardingFlow() {
             다음
             <ArrowRight className="w-4 h-4" />
           </button>
+        )}
+      </div>
+
+      {/* 바로 사용 링크 */}
+      <div className="px-4 pb-6 text-center">
+        {!showSkipConfirm ? (
+          <button
+            onClick={() => setShowSkipConfirm(true)}
+            className="text-xs text-muted-foreground underline underline-offset-2"
+          >
+            온보딩 없이 바로 사용할게요!
+          </button>
+        ) : (
+          <div className="bg-secondary rounded-xl p-4 text-left space-y-3">
+            <p className="text-sm font-medium">온보딩에서 나갈까요?</p>
+            <p className="text-xs text-muted-foreground">
+              모든 설정값이 기본값으로 지정돼요. 나중에 설정 탭에서 언제든지 바꿀 수 있어요.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={handleSkip}
+                disabled={isCompleting}
+                className="flex-1 py-2.5 rounded-xl bg-navy text-white text-sm font-semibold disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {isCompleting ? (
+                  <>
+                    <span className="inline-block w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    저장 중...
+                  </>
+                ) : "네, 기본값으로 시작할게요"}
+              </button>
+              <button
+                onClick={() => setShowSkipConfirm(false)}
+                className="px-4 py-2.5 rounded-xl border border-border text-sm text-muted-foreground"
+              >
+                취소
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>

@@ -3,6 +3,22 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
+function toKoreanError(msg: string): string {
+  if (msg.includes("User already registered") || msg.includes("already been registered"))
+    return "이미 가입된 이메일입니다.";
+  if (msg.includes("Password should be at least 6"))
+    return "비밀번호는 6자 이상이어야 합니다.";
+  if (msg.includes("invalid format") || msg.includes("invalid email") || msg.includes("Unable to validate email"))
+    return "유효하지 않은 이메일 형식입니다.";
+  if (msg.includes("Email rate limit") || msg.includes("rate limit"))
+    return "이메일 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.";
+  if (msg.includes("signup disabled") || msg.includes("Signups not allowed"))
+    return "현재 회원가입이 비활성화되어 있습니다.";
+  if (msg.includes("Network") || msg.includes("Failed to fetch"))
+    return "네트워크 오류가 발생했습니다. 다시 시도해주세요.";
+  return "오류가 발생했습니다. 다시 시도해주세요.";
+}
+
 export type RegisterState = {
   error: string | null;
   fields?: {
@@ -40,7 +56,7 @@ export async function signup(
   });
 
   if (error) {
-    return { error: error.message, fields: savedFields };
+    return { error: toKoreanError(error.message), fields: savedFields };
   }
 
   redirect(

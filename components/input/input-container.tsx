@@ -30,6 +30,8 @@ export function InputContainer() {
   const [modalField, setModalField] = useState<ItemKey | null>(null);
   const [pendingDays, setPendingDays] = useState(0);
   const [prevWeight, setPrevWeight] = useState<number | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
 
   const loadLog = useCallback(async (date: string) => {
     let log = await actionGetDailyLog(date);
@@ -81,15 +83,25 @@ export function InputContainer() {
   };
 
   const handleModalSave = async (update: DailyLogUpdate) => {
-    const updated = await actionUpsertDailyLog(currentDate, update);
-    setCurrentLog(updated);
-    setModalField(null);
+    setIsSaving(true);
+    try {
+      const updated = await actionUpsertDailyLog(currentDate, update);
+      setCurrentLog(updated);
+      setModalField(null);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleClose = async () => {
-    if (!currentLog) return;
-    const updated = await actionCloseDailyLog(currentDate);
-    if (updated) setCurrentLog(updated);
+    if (!currentLog || isClosing) return;
+    setIsClosing(true);
+    try {
+      const updated = await actionCloseDailyLog(currentDate);
+      if (updated) setCurrentLog(updated);
+    } finally {
+      setIsClosing(false);
+    }
   };
 
   const handleFreeText = async (update: DailyLogUpdate) => {
@@ -145,17 +157,24 @@ export function InputContainer() {
       <div className="px-4 mt-4">
         <button
           onClick={!currentLog.closed ? handleClose : undefined}
+          disabled={isClosing}
           data-testid="close-button"
           className={cn(
-            "w-full py-3 rounded-xl font-semibold text-sm min-h-[48px] transition-colors",
+            "w-full py-3 rounded-xl font-semibold text-sm min-h-[48px] transition-colors flex items-center justify-center gap-2",
             currentLog.closed
               ? "bg-secondary text-muted-foreground cursor-default"
               : allCompleted
               ? "bg-navy text-white hover:bg-navy/90 ring-2 ring-navy/30"
-              : "bg-navy/70 text-white hover:bg-navy/80"
+              : "bg-navy/70 text-white hover:bg-navy/80",
+            isClosing && "opacity-60"
           )}
         >
-          {currentLog.closed ? "마감 완료" : "마감하기"}
+          {isClosing ? (
+            <>
+              <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              마감 중...
+            </>
+          ) : currentLog.closed ? "마감 완료" : "마감하기"}
         </button>
       </div>
 
@@ -166,6 +185,7 @@ export function InputContainer() {
         log={currentLog}
         waterGoal={settings.waterGoal}
         prevWeight={prevWeight}
+        isSaving={isSaving}
         onSave={handleModalSave}
         onClose={() => setModalField(null)}
       />

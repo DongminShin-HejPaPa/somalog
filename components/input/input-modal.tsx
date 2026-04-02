@@ -20,6 +20,7 @@ interface InputModalProps {
   log: DailyLog;
   waterGoal: number;
   prevWeight: number | null;
+  isSaving?: boolean;
   onSave: (update: DailyLogUpdate) => void;
   onClose: () => void;
 }
@@ -37,11 +38,40 @@ const fieldLabels: Record<ItemKey, string> = {
 
 const waterPresets = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5];
 
+function SaveButton({
+  onClick,
+  disabled,
+  isSaving,
+  testId,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+  isSaving?: boolean;
+  testId?: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled || isSaving}
+      data-testid={testId ?? "modal-save"}
+      className="w-full py-3 rounded-xl bg-navy text-white text-sm font-semibold min-h-[48px] disabled:opacity-40 flex items-center justify-center gap-2"
+    >
+      {isSaving ? (
+        <>
+          <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+          저장 중...
+        </>
+      ) : "저장"}
+    </button>
+  );
+}
+
 export function InputModal({
   field,
   log,
   waterGoal,
   prevWeight,
+  isSaving,
   onSave,
   onClose,
 }: InputModalProps) {
@@ -182,13 +212,7 @@ export function InputModal({
               />
               <span className="text-base text-muted-foreground font-medium">kg</span>
             </div>
-            <button
-              onClick={handleWeightSave}
-              data-testid="modal-save"
-              className="w-full py-3 rounded-xl bg-navy text-white text-sm font-semibold min-h-[48px]"
-            >
-              저장
-            </button>
+            <SaveButton onClick={handleWeightSave} isSaving={isSaving} />
           </div>
         )}
 
@@ -243,14 +267,11 @@ export function InputModal({
               ))}
             </div>
 
-            <button
+            <SaveButton
               onClick={handleWaterSave}
               disabled={waterValue == null || waterValue === 0}
-              data-testid="modal-save"
-              className="w-full py-3 rounded-xl bg-navy text-white text-sm font-semibold min-h-[48px] disabled:opacity-40"
-            >
-              저장
-            </button>
+              isSaving={isSaving}
+            />
           </div>
         )}
 
@@ -297,13 +318,7 @@ export function InputModal({
               data-testid="modal-meal-input"
               className="w-full px-4 py-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[52px]"
             />
-            <button
-              onClick={handleTextSave}
-              data-testid="modal-save"
-              className="w-full py-3 rounded-xl bg-navy text-white text-sm font-semibold min-h-[48px]"
-            >
-              저장
-            </button>
+            <SaveButton onClick={handleTextSave} isSaving={isSaving} />
           </div>
         )}
 

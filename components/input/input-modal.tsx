@@ -19,6 +19,7 @@ interface InputModalProps {
   field: ItemKey | null;
   log: DailyLog;
   waterGoal: number;
+  prevWeight: number | null;
   onSave: (update: DailyLogUpdate) => void;
   onClose: () => void;
 }
@@ -40,6 +41,7 @@ export function InputModal({
   field,
   log,
   waterGoal,
+  prevWeight,
   onSave,
   onClose,
 }: InputModalProps) {
@@ -47,6 +49,30 @@ export function InputModal({
   const [waterValue, setWaterValue] = useState<number | null>(null);
   const [textValue, setTextValue] = useState("");
   const overlayRef = useRef<HTMLDivElement>(null);
+
+  // iOS 키보드 높이 감지 → 패널 bottom offset 조정
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
+
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const update = () => {
+      const kbHeight = Math.max(
+        0,
+        window.innerHeight - vv.height - vv.offsetTop
+      );
+      setKeyboardOffset(kbHeight);
+    };
+
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+      setKeyboardOffset(0);
+    };
+  }, []);
 
   // Pre-fill existing values when modal opens
   useEffect(() => {
@@ -65,6 +91,12 @@ export function InputModal({
   }, [field, log]);
 
   if (!field) return null;
+
+  // 체중 슬라이더 범위 계산
+  const weightAnchor = log.weight ?? prevWeight ?? 70;
+  const sliderMin = Math.max(30, Math.round((weightAnchor - 10) * 10) / 10);
+  const sliderMax = Math.round((weightAnchor + 10) * 10) / 10;
+  const sliderValue = parseFloat(weightValue) || weightAnchor;
 
   const handleOverlayClick = (e: React.MouseEvent) => {
     if (e.target === overlayRef.current) onClose();
@@ -95,7 +127,10 @@ export function InputModal({
       onClick={handleOverlayClick}
       className="fixed inset-0 bg-black/40 z-50 flex items-end justify-center"
     >
-      <div className="w-full max-w-[480px] bg-white rounded-t-2xl px-4 pb-8 pt-4 animate-in slide-in-from-bottom-4">
+      <div
+        className="w-full max-w-[480px] bg-white rounded-t-2xl px-4 pt-4 animate-in slide-in-from-bottom-4"
+        style={{ paddingBottom: `${keyboardOffset + 32}px` }}
+      >
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-semibold">{label} 입력</h3>
@@ -111,14 +146,37 @@ export function InputModal({
         {/* Weight */}
         {field === "weight" && (
           <div className="space-y-3">
+            {/* 슬라이더 */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-muted-foreground">{sliderMin}kg</span>
+                <span className="text-xl font-bold text-navy">
+                  {weightValue || weightAnchor.toFixed(1)} kg
+                </span>
+                <span className="text-xs text-muted-foreground">{sliderMax}kg</span>
+              </div>
+              <input
+                type="range"
+                min={sliderMin}
+                max={sliderMax}
+                step={0.1}
+                value={sliderValue}
+                onChange={(e) =>
+                  setWeightValue(
+                    String(Math.round(Number(e.target.value) * 10) / 10)
+                  )
+                }
+                className="w-full h-2 rounded-full appearance-none cursor-pointer accent-navy bg-secondary"
+              />
+            </div>
+            {/* 직접 입력 */}
             <div className="flex items-center gap-2">
               <input
                 type="number"
                 step="0.1"
-                placeholder="0.0"
+                placeholder="직접 입력"
                 value={weightValue}
                 onChange={(e) => setWeightValue(e.target.value)}
-                autoFocus
                 data-testid="modal-weight-input"
                 className="flex-1 px-4 py-3 text-lg text-right border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[52px]"
               />

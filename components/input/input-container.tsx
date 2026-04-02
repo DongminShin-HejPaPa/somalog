@@ -29,6 +29,7 @@ export function InputContainer() {
   const [currentLog, setCurrentLog] = useState<DailyLog | null>(null);
   const [modalField, setModalField] = useState<ItemKey | null>(null);
   const [pendingDays, setPendingDays] = useState(0);
+  const [prevWeight, setPrevWeight] = useState<number | null>(null);
 
   const loadLog = useCallback(async (date: string) => {
     let log = await actionGetDailyLog(date);
@@ -51,7 +52,12 @@ export function InputContainer() {
 
       setPendingDays(unclosed.length);
 
-      const targetDate = oldest?.date ?? formatDate(new Date());
+      // 가장 최근 체중 기록 (이전 날짜 기준)
+      const today = formatDate(new Date());
+      const withWeight = logs.filter((l) => l.weight !== null && l.date < today);
+      setPrevWeight(withWeight.length > 0 ? withWeight[0].weight : null);
+
+      const targetDate = oldest?.date ?? today;
       await loadLog(targetDate);
     };
     init();
@@ -120,7 +126,7 @@ export function InputContainer() {
       {currentLog.intensiveDay && (
         <div className="mx-4 mt-2 px-3 py-2 bg-coral-light border border-coral/30 rounded-lg flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-coral inline-block" />
-          <span className="text-xs font-semibold text-coral">Intensive Day</span>
+          <span className="text-xs font-semibold text-coral">Hard Reset Mode</span>
         </div>
       )}
 
@@ -159,6 +165,7 @@ export function InputContainer() {
         field={modalField}
         log={currentLog}
         waterGoal={settings.waterGoal}
+        prevWeight={prevWeight}
         onSave={handleModalSave}
         onClose={() => setModalField(null)}
       />

@@ -1,8 +1,6 @@
 export function formatDate(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+  // KST (Asia/Seoul, UTC+9) 기준 날짜 — 서버가 UTC여도 한국 날짜로 반환
+  return date.toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
 }
 
 export function isToday(date: string): boolean {

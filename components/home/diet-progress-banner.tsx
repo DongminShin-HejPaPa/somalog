@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 
 interface DietProgressBannerProps {
+  date: string;
   day: number;
   currentWeight: number | null;
   startWeight: number;
@@ -9,7 +10,13 @@ interface DietProgressBannerProps {
   isIntensiveDay: boolean;
 }
 
+function formatShortDate(dateStr: string) {
+  const d = new Date(dateStr + "T00:00:00");
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
 export function DietProgressBanner({
+  date,
   day,
   currentWeight,
   startWeight,
@@ -35,7 +42,10 @@ export function DietProgressBanner({
       )}
     >
       <div className="flex items-center justify-between mb-2">
-        <span className="text-lg font-bold text-navy">D+{day}</span>
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-lg font-bold text-navy">D+{day}</span>
+          <span className="text-sm text-muted-foreground">{formatShortDate(date)}</span>
+        </div>
         {isIntensiveDay && (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-coral text-white text-xs font-semibold">
             <span className="w-2 h-2 rounded-full bg-white inline-block" />

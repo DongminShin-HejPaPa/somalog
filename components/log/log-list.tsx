@@ -22,7 +22,7 @@ export function LogList({ logs, weeklyLogs }: LogListProps) {
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
 
   const filters = [
-    { key: "intensive", label: "Intensive Day" },
+    { key: "intensive", label: "Hard Reset Mode" },
     { key: "exercise", label: "운동한 날" },
     { key: "lateSnack", label: "야식 있는 날" },
   ];

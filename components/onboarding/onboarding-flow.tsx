@@ -62,6 +62,7 @@ export function OnboardingFlow() {
   const [targetWeight, setTargetWeight] = useState("");
   const [selectedPreset, setSelectedPreset] = useState("sustainable");
   const [targetMonths, setTargetMonths] = useState(12);
+  const [targetMonthsInput, setTargetMonthsInput] = useState("12");
 
   // Step 4
   const [waterGoal, setWaterGoal] = useState(2.8);
@@ -115,7 +116,17 @@ export function OnboardingFlow() {
   const handlePresetSelect = (value: string) => {
     setSelectedPreset(value);
     const preset = dietPresets.find((p) => p.value === value);
-    if (preset && value !== "custom") setTargetMonths(preset.months);
+    if (preset && value !== "custom") {
+      setTargetMonths(preset.months);
+      setTargetMonthsInput(String(preset.months));
+    }
+  };
+
+  const handleMonthsInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setTargetMonthsInput(raw);
+    const n = parseInt(raw, 10);
+    if (!isNaN(n) && n > 0) setTargetMonths(n);
   };
 
   const handleComplete = () => {
@@ -304,8 +315,8 @@ export function OnboardingFlow() {
                   <input
                     type="number"
                     placeholder="목표 기간"
-                    value={targetMonths}
-                    onChange={(e) => setTargetMonths(Number(e.target.value) || 12)}
+                    value={targetMonthsInput}
+                    onChange={handleMonthsInput}
                     className="flex-1 px-3 py-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[48px]"
                   />
                   <span className="text-sm text-muted-foreground w-12">개월</span>
@@ -390,6 +401,13 @@ export function OnboardingFlow() {
           {/* Step 6: Hard Reset Mode */}
           {step.id === 6 && (
             <div className="space-y-2">
+              {/* 구체적인 예시 카드 */}
+              <div className="px-3 py-2.5 bg-coral/5 border border-coral/20 rounded-xl text-xs space-y-1 mb-1">
+                <p className="font-semibold text-coral">예시</p>
+                <p className="text-muted-foreground">역대 최저 체중 <span className="font-semibold text-foreground">87.5 kg</span></p>
+                <p className="text-muted-foreground">오늘 체중 측정 <span className="font-semibold text-foreground">88.2 kg</span> → Hard Reset Mode 발동</p>
+                <p className="text-muted-foreground italic">코치: "87.5kg가 있는데 오늘 88.2kg? Hard Reset 날이야. 오늘 식단 전면 관리해."</p>
+              </div>
               {!showIntensiveCriteria ? (
                 <>
                   <button

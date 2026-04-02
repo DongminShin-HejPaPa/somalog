@@ -45,6 +45,7 @@ export function HomeContent({ todayLog, recentLogs }: HomeContentProps) {
   return (
     <>
       <DietProgressBanner
+        date={todayLog.date}
         day={todayLog.day}
         currentWeight={todayLog.weight}
         startWeight={settings.startWeight}

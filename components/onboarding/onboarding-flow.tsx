@@ -338,28 +338,37 @@ export function OnboardingFlow() {
 
               {/* 프리셋 선택 */}
               <div className="space-y-2">
-                {dietPresets.map((p) => (
-                  <button
-                    key={p.value}
-                    onClick={() => handlePresetSelect(p.value)}
-                    className={cn(
-                      "w-full px-4 py-3 rounded-xl border text-left min-h-[52px] transition-colors",
-                      selectedPreset === p.value
-                        ? "border-navy bg-navy/5"
-                        : "border-border"
-                    )}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">{p.label}</span>
-                      {p.badge && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-navy text-white">
-                          {p.badge}
-                        </span>
+                {dietPresets.map((p) => {
+                  const totalLoss = Number(weight) - Number(targetWeight);
+                  const months = p.value !== "custom" && totalLoss > 0
+                    ? calcMonths(totalLoss, p.ratePerMonth)
+                    : null;
+                  const desc = months != null
+                    ? `${months}개월 · 월 약 ${p.ratePerMonth}kg`
+                    : p.desc;
+                  return (
+                    <button
+                      key={p.value}
+                      onClick={() => handlePresetSelect(p.value)}
+                      className={cn(
+                        "w-full px-4 py-3 rounded-xl border text-left min-h-[52px] transition-colors",
+                        selectedPreset === p.value
+                          ? "border-navy bg-navy/5"
+                          : "border-border"
                       )}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-0.5">{p.desc}</p>
-                  </button>
-                ))}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">{p.label}</span>
+                        {"badge" in p && p.badge && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-navy text-white">
+                            {p.badge}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
+                    </button>
+                  );
+                })}
               </div>
 
               {/* custom 선택 시 기간 직접 입력 */}

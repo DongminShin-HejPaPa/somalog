@@ -44,6 +44,10 @@ export async function signup(
 
   const savedFields = { name, email, agreeTerms, agreePrivacy, agreeMarketing };
 
+  if (!agreeTerms || !agreePrivacy) {
+    return { error: "이용약관 및 개인정보 처리방침에 동의해주세요.", fields: savedFields };
+  }
+
   if (password !== passwordConfirm) {
     return { error: "비밀번호가 일치하지 않습니다.", fields: savedFields };
   }

@@ -110,7 +110,7 @@ export function InputModal({
     if (field === "weight") {
       setWeightValue(log.weight != null ? String(log.weight) : "");
     } else if (field === "water") {
-      setWaterValue(log.water);
+      setWaterValue(log.water ?? waterGoal);
     } else if (field === "breakfast") {
       setTextValue(log.breakfast ?? "");
     } else if (field === "lunch") {
@@ -155,7 +155,7 @@ export function InputModal({
     <div
       ref={overlayRef}
       onClick={handleOverlayClick}
-      className="fixed inset-0 bg-black/40 z-50 flex items-end justify-center"
+      className="fixed inset-0 bg-black/40 z-[60] flex items-end justify-center"
     >
       <div
         className="w-full max-w-[480px] bg-white rounded-t-2xl px-4 pt-4 animate-in slide-in-from-bottom-4"

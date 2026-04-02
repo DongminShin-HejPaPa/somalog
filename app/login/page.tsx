@@ -63,9 +63,9 @@ export default async function LoginPage({
 
             {/* 비밀번호 찾기 */}
             <div className="flex justify-end">
-              <button type="button" className="text-xs text-muted-foreground hover:text-navy transition-colors">
+              <Link href="/forgot-password" className="text-xs text-muted-foreground hover:text-navy transition-colors">
                 비밀번호를 잊으셨나요?
-              </button>
+              </Link>
             </div>
 
             {/* 로그인 버튼 */}

@@ -184,7 +184,7 @@ export function InputContainer() {
         field={modalField}
         log={currentLog}
         waterGoal={settings.waterGoal}
-        prevWeight={prevWeight}
+        prevWeight={prevWeight ?? (settings.currentWeight > 0 ? settings.currentWeight : null)}
         isSaving={isSaving}
         onSave={handleModalSave}
         onClose={() => setModalField(null)}

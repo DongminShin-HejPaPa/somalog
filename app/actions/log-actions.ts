@@ -7,7 +7,9 @@ import {
   closeDailyLog,
   getRecentDailyLogs,
 } from "@/lib/services/daily-log-service";
-import type { DailyLog, DailyLogUpdate } from "@/lib/types";
+import { getWeeklyLogs } from "@/lib/services/weekly-log-service";
+import { getLowestWeight } from "@/lib/services/stats-service";
+import type { DailyLog, DailyLogUpdate, WeeklyLog } from "@/lib/types";
 
 export async function actionGetDailyLog(
   date: string
@@ -40,4 +42,17 @@ export async function actionGetRecentDailyLogs(
   count: number
 ): Promise<DailyLog[]> {
   return getRecentDailyLogs(count);
+}
+
+export async function actionGetWeeklyLogs(
+  count: number
+): Promise<WeeklyLog[]> {
+  return getWeeklyLogs(count);
+}
+
+export async function actionGetLowestWeight(): Promise<{
+  weight: number;
+  date: string;
+}> {
+  return getLowestWeight();
 }

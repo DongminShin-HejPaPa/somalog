@@ -1,3 +1,5 @@
+import { unstable_cache, revalidateTag } from "next/cache";
+import { getAuthUser } from "@/lib/supabase/server";
 import { createClient } from "@/lib/supabase/server";
 import type { Settings, SettingsInput, SettingsUpdate } from "@/lib/types";
 import { formatDate } from "@/lib/utils/date-utils";
@@ -90,36 +92,42 @@ function settingsToRow(
   };
 }
 
+/**
+ * settings DB 쿼리를 요청 간 캐싱 (유저별 태그로 관리).
+ * updateSettings / initializeSettings 호출 시 revalidateTag()로 즉시 무효화.
+ */
+function makeCachedSettingsFetcher(userId: string) {
+  return unstable_cache(
+    async () => {
+      const supabase = await createClient();
+      const { data, error } = await supabase
+        .from("settings")
+        .select("*")
+        .eq("user_id", userId)
+        .single();
+      if (error || !data) return null;
+      return rowToSettings(data as Record<string, unknown>);
+    },
+    ["settings", userId],
+    { tags: [`settings-${userId}`], revalidate: 300 }
+  );
+}
+
 export async function getSettings(): Promise<Settings> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const user = await getAuthUser();
   if (!user) return createDefaultSettings();
-
-  const { data, error } = await supabase
-    .from("settings")
-    .select("*")
-    .eq("user_id", user.id)
-    .single();
-
-  if (error || !data) return createDefaultSettings();
-
-  return rowToSettings(data as Record<string, unknown>);
+  const fetchSettings = makeCachedSettingsFetcher(user.id);
+  return (await fetchSettings()) ?? createDefaultSettings();
 }
 
 export async function updateSettings(data: SettingsUpdate): Promise<Settings> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const user = await getAuthUser();
   if (!user) throw new Error("Unauthorized");
 
   const current = await getSettings();
   const merged: Settings = { ...current, ...data };
 
+  const supabase = await createClient();
   const row = settingsToRow(merged, user.id);
 
   const { data: upserted, error } = await supabase
@@ -130,20 +138,18 @@ export async function updateSettings(data: SettingsUpdate): Promise<Settings> {
 
   if (error || !upserted) throw new Error(error?.message ?? "upsert failed");
 
+  revalidateTag(`settings-${user.id}`);
   return rowToSettings(upserted as Record<string, unknown>);
 }
 
 export async function initializeSettings(
   data: SettingsInput
 ): Promise<Settings> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const user = await getAuthUser();
   if (!user) throw new Error("Unauthorized");
 
   const full: Settings = { ...data, onboardingComplete: true };
+  const supabase = await createClient();
   const row = settingsToRow(full, user.id);
 
   const { data: upserted, error } = await supabase
@@ -154,31 +160,28 @@ export async function initializeSettings(
 
   if (error || !upserted) throw new Error(error?.message ?? "upsert failed");
 
+  revalidateTag(`settings-${user.id}`);
   return rowToSettings(upserted as Record<string, unknown>);
 }
 
 export async function resetSettings(): Promise<void> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const user = await getAuthUser();
   if (!user) return;
 
+  const supabase = await createClient();
   await supabase.from("settings").delete().eq("user_id", user.id);
+  revalidateTag(`settings-${user.id}`);
 }
 
 export async function loadMockSettings(): Promise<void> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const user = await getAuthUser();
   if (!user) return;
 
+  const supabase = await createClient();
   const row = settingsToRow(mockSettings, user.id);
 
   await supabase
     .from("settings")
     .upsert(row, { onConflict: "user_id" });
+  revalidateTag(`settings-${user.id}`);
 }

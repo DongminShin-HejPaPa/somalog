@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useKeyboardOffset } from "@/lib/hooks/use-keyboard-offset";
 import type { DailyLog, DailyLogUpdate } from "@/lib/types";
 
 export type ItemKey =
@@ -80,29 +81,7 @@ export function InputModal({
   const [textValue, setTextValue] = useState("");
   const overlayRef = useRef<HTMLDivElement>(null);
 
-  // iOS 키보드 높이 감지 → 패널 bottom offset 조정
-  const [keyboardOffset, setKeyboardOffset] = useState(0);
-
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-
-    const update = () => {
-      const kbHeight = Math.max(
-        0,
-        window.innerHeight - vv.height - vv.offsetTop
-      );
-      setKeyboardOffset(kbHeight);
-    };
-
-    vv.addEventListener("resize", update);
-    vv.addEventListener("scroll", update);
-    return () => {
-      vv.removeEventListener("resize", update);
-      vv.removeEventListener("scroll", update);
-      setKeyboardOffset(0);
-    };
-  }, []);
+  const keyboardOffset = useKeyboardOffset();
 
   // Pre-fill existing values when modal opens
   useEffect(() => {
@@ -124,8 +103,8 @@ export function InputModal({
 
   // 체중 슬라이더 범위 계산
   const weightAnchor = log.weight ?? prevWeight ?? 70;
-  const sliderMin = Math.max(30, Math.round((weightAnchor - 10) * 10) / 10);
-  const sliderMax = Math.round((weightAnchor + 10) * 10) / 10;
+  const sliderMin = Math.max(30, Math.round((weightAnchor - 5) * 10) / 10);
+  const sliderMax = Math.round((weightAnchor + 5) * 10) / 10;
   const sliderValue = parseFloat(weightValue) || weightAnchor;
 
   const handleOverlayClick = (e: React.MouseEvent) => {

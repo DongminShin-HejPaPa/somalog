@@ -4,6 +4,7 @@ import { useState, useEffect, useActionState } from "react";
 import { X } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 import { updateAccountInfo, type AccountInfoState } from "@/app/actions/account-actions";
+import { useKeyboardOffset } from "@/lib/hooks/use-keyboard-offset";
 
 interface Props {
   isOpen: boolean;
@@ -14,6 +15,7 @@ const initial: AccountInfoState = {};
 
 export function AccountInfoDialog({ isOpen, onClose }: Props) {
   const [state, formAction, isPending] = useActionState(updateAccountInfo, initial);
+  const keyboardOffset = useKeyboardOffset();
 
   // 현재 유저 정보 (초기값)
   const [currentName, setCurrentName] = useState("");
@@ -63,8 +65,11 @@ export function AccountInfoDialog({ isOpen, onClose }: Props) {
         aria-hidden="true"
       />
 
-      {/* 바텀 시트 */}
-      <div className="relative bg-white rounded-t-2xl max-h-[90dvh] flex flex-col shadow-xl">
+      {/* 바텀 시트 — marginBottom으로 키보드 위로 밀어올림 */}
+      <div
+        className="relative bg-white rounded-t-2xl max-h-[90dvh] flex flex-col shadow-xl"
+        style={{ marginBottom: keyboardOffset }}
+      >
         {/* 헤더 */}
         <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-border shrink-0">
           <h2 className="text-base font-semibold">개인정보 변경</h2>

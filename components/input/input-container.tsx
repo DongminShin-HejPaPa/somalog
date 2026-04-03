@@ -10,6 +10,7 @@ import {
   actionCloseDailyLog,
   actionGetRecentDailyLogs,
 } from "@/app/actions/log-actions";
+import { actionParseFreText } from "@/app/actions/parse-actions";
 import { DateHeader } from "./date-header";
 import { InputChipList } from "./input-chip-list";
 import { InputModal, type ItemKey } from "./input-modal";
@@ -32,6 +33,7 @@ export function InputContainer() {
   const [prevWeight, setPrevWeight] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+  const [isFreeTextSaving, setIsFreeTextSaving] = useState(false);
 
   const loadLog = useCallback(async (date: string) => {
     let log = await actionGetDailyLog(date);
@@ -104,9 +106,17 @@ export function InputContainer() {
     }
   };
 
-  const handleFreeText = async (update: DailyLogUpdate) => {
-    const updated = await actionUpsertDailyLog(currentDate, update);
-    setCurrentLog(updated);
+  const handleFreeText = async (text: string) => {
+    setIsFreeTextSaving(true);
+    try {
+      const update = await actionParseFreText(text, currentLog?.weight ?? null, prevWeight);
+      if (Object.keys(update).length > 0) {
+        const updated = await actionUpsertDailyLog(currentDate, update);
+        setCurrentLog(updated);
+      }
+    } finally {
+      setIsFreeTextSaving(false);
+    }
   };
 
   if (!currentLog) {
@@ -178,7 +188,7 @@ export function InputContainer() {
         </button>
       </div>
 
-      <FreeTextInput onSave={handleFreeText} />
+      <FreeTextInput onSubmit={handleFreeText} isSaving={isFreeTextSaving} />
 
       <InputModal
         field={modalField}

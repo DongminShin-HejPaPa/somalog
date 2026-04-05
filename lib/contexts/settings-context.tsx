@@ -16,6 +16,37 @@ import {
   actionInitializeSettings,
 } from "@/app/actions/settings-actions";
 
+const SETTINGS_CACHE_KEY = "somalog-settings";
+
+function readCachedSettings(): Settings | null {
+  try {
+    const raw = localStorage.getItem(SETTINGS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed: Settings = JSON.parse(raw);
+    // onboardingComplete=false 이면 초기/손상된 상태로 판단 → 무시
+    if (!parsed.onboardingComplete) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedSettings(s: Settings): void {
+  try {
+    localStorage.setItem(SETTINGS_CACHE_KEY, JSON.stringify(s));
+  } catch {
+    // 저장 실패 무시 (용량 초과 등)
+  }
+}
+
+function clearCachedSettings(): void {
+  try {
+    localStorage.removeItem(SETTINGS_CACHE_KEY);
+  } catch {
+    // 무시
+  }
+}
+
 export const DEFAULT_SETTINGS: Settings = {
   coachName: "Soma",
   height: 0,
@@ -56,20 +87,37 @@ export function SettingsProvider({
   children: ReactNode;
   initialSettings?: Settings | null;
 }) {
-  const [settings, setSettings] = useState<Settings>(
-    initialSettings ?? DEFAULT_SETTINGS
-  );
+  const [settings, setSettings] = useState<Settings>(() => {
+    // SSR에서는 initialSettings 우선, 없으면 DEFAULT
+    return initialSettings ?? DEFAULT_SETTINGS;
+  });
   const [isLoaded, setIsLoaded] = useState(initialSettings != null);
 
   useEffect(() => {
-    // 서버에서 이미 settings를 받았으면 클라이언트 fetch 생략
-    if (initialSettings != null) return;
+    // 서버에서 이미 settings를 받았으면 localStorage에 쓰고 fetch 생략
+    if (initialSettings != null) {
+      if (initialSettings.onboardingComplete) {
+        writeCachedSettings(initialSettings);
+      }
+      return;
+    }
+
+    // 서버 데이터 없는 경우: localStorage 캐시 즉시 적용 → 빈 화면 최소화
+    const cached = readCachedSettings();
+    if (cached) {
+      setSettings(cached);
+      setIsLoaded(true);
+    }
+
     const loadSettings = async () => {
       try {
         const loaded = await actionGetSettings();
         setSettings(loaded);
+        if (loaded.onboardingComplete) {
+          writeCachedSettings(loaded);
+        }
       } catch {
-        setSettings(DEFAULT_SETTINGS);
+        if (!cached) setSettings(DEFAULT_SETTINGS);
       } finally {
         setIsLoaded(true);
       }
@@ -81,9 +129,14 @@ export function SettingsProvider({
     try {
       const updated = await actionUpdateSettings(data);
       setSettings(updated);
+      if (updated.onboardingComplete) writeCachedSettings(updated);
     } catch {
       // 실패 시 로컬 state만 업데이트 (낙관적 업데이트)
-      setSettings((prev) => ({ ...prev, ...data }));
+      setSettings((prev) => {
+        const next = { ...prev, ...data };
+        if (next.onboardingComplete) writeCachedSettings(next);
+        return next;
+      });
     }
   }, []);
 
@@ -91,13 +144,17 @@ export function SettingsProvider({
     try {
       const initialized = await actionInitializeSettings(data);
       setSettings(initialized);
+      writeCachedSettings(initialized);
     } catch {
-      setSettings({ ...data, onboardingComplete: true });
+      const fallback: Settings = { ...data, onboardingComplete: true };
+      setSettings(fallback);
+      writeCachedSettings(fallback);
     }
   }, []);
 
   /** 모든 설정을 DEFAULT_SETTINGS로 리셋 (실제 데이터 삭제는 settings-form에서 serverResetAllData 호출) */
   const resetAllSettings = useCallback(() => {
+    clearCachedSettings();
     setSettings(DEFAULT_SETTINGS);
   }, []);
 

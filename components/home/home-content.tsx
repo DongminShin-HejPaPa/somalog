@@ -21,7 +21,7 @@ export function HomeContent({ todayLog, recentLogs }: HomeContentProps) {
       <>
         <div className="px-4 mt-8 text-center">
           <p className="text-sm text-muted-foreground">
-            Input 탭에서 오늘의 기록을 시작해보세요
+            입력 탭에서 오늘의 기록을 시작해보세요
           </p>
         </div>
         {recentLogs.length > 0 && (

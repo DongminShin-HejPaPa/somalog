@@ -10,9 +10,12 @@ export default async function TabsLayout({
 }) {
   let initialSettings: Settings | null = null;
   try {
-    initialSettings = await getSettings();
+    const s = await getSettings();
+    // onboardingComplete=false 는 DB에 설정이 없거나 인증 일시 실패인 경우.
+    // null로 처리해 클라이언트가 localStorage 캐시 → actionGetSettings() 순으로 재시도하도록 함.
+    initialSettings = s.onboardingComplete ? s : null;
   } catch {
-    // 온보딩 미완료 사용자는 settings 없음 — context가 useEffect로 로드
+    // 온보딩 미완료 또는 오류 — context가 useEffect로 로드
   }
 
   return (

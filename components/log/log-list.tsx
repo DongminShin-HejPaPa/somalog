@@ -97,7 +97,7 @@ export function LogList({ logs, weeklyLogs }: LogListProps) {
         <div className="px-4 space-y-2">
           {filteredLogs.length === 0 ? (
             <div className="py-12 text-center text-sm text-muted-foreground">
-              {searchQuery || activeFilter ? "검색 결과가 없어요" : "아직 기록이 없어요. Input 탭에서 첫 번째 기록을 시작해보세요."}
+              {searchQuery || activeFilter ? "검색 결과가 없어요" : "아직 기록이 없어요. 입력 탭에서 첫 번째 기록을 시작해보세요."}
             </div>
           ) : (
             filteredLogs.map((log) => {

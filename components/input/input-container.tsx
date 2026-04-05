@@ -28,21 +28,28 @@ export function InputContainer() {
   const { settings } = useSettings();
   const [currentDate, setCurrentDate] = useState<string>(formatDate(new Date()));
   const [currentLog, setCurrentLog] = useState<DailyLog | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [modalField, setModalField] = useState<ItemKey | null>(null);
   const [pendingDays, setPendingDays] = useState(0);
   const [prevWeight, setPrevWeight] = useState<number | null>(null);
+  const [minDate, setMinDate] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [isFreeTextSaving, setIsFreeTextSaving] = useState(false);
 
   const loadLog = useCallback(async (date: string) => {
-    let log = await actionGetDailyLog(date);
-    // 오늘 로그가 없으면 빈 로그 자동 생성
-    if (!log && date === formatDate(new Date())) {
-      log = await actionUpsertDailyLog(date, {});
+    setIsLoading(true);
+    try {
+      let log = await actionGetDailyLog(date);
+      // 오늘 로그가 없으면 빈 로그 자동 생성
+      if (!log && date === formatDate(new Date())) {
+        log = await actionUpsertDailyLog(date, {});
+      }
+      setCurrentLog(log);
+      setCurrentDate(date);
+    } finally {
+      setIsLoading(false);
     }
-    setCurrentLog(log);
-    setCurrentDate(date);
   }, []);
 
   useEffect(() => {
@@ -56,6 +63,10 @@ export function InputContainer() {
 
       setPendingDays(unclosed.length);
 
+      // 네비게이션 하한선: 가장 오래된 로그 날짜
+      const dates = logs.map((l) => l.date).sort();
+      if (dates.length > 0) setMinDate(dates[0]);
+
       // 가장 최근 체중 기록 (이전 날짜 기준)
       const today = formatDate(new Date());
       const withWeight = logs.filter((l) => l.weight !== null && l.date < today);
@@ -67,16 +78,18 @@ export function InputContainer() {
     init();
   }, [loadLog]);
 
+  const today = formatDate(new Date());
+  const canGoPrev = !!minDate && currentDate > minDate;
+  const canGoNext = currentDate < today;
+
   const handlePrev = async () => {
+    if (!canGoPrev) return;
     await loadLog(addDays(currentDate, -1));
   };
 
   const handleNext = async () => {
-    const today = formatDate(new Date());
-    const next = addDays(currentDate, 1);
-    if (next <= today) {
-      await loadLog(next);
-    }
+    if (!canGoNext) return;
+    await loadLog(addDays(currentDate, 1));
   };
 
   const handleChipClick = (field: ItemKey) => {
@@ -101,6 +114,22 @@ export function InputContainer() {
     try {
       const updated = await actionCloseDailyLog(currentDate);
       if (updated) setCurrentLog(updated);
+
+      // 마감 후 다음 미완료 날짜로 이동
+      const logs = await actionGetRecentDailyLogs(30);
+      const unclosed = logs.filter((l) => !l.closed);
+      setPendingDays(unclosed.length);
+
+      // 날짜 하한선 갱신
+      const dates = logs.map((l) => l.date).sort();
+      if (dates.length > 0) setMinDate(dates[0]);
+
+      const nextTarget = unclosed.length > 0
+        ? unclosed[unclosed.length - 1]
+        : null;
+      if (nextTarget && nextTarget.date !== currentDate) {
+        await loadLog(nextTarget.date);
+      }
     } finally {
       setIsClosing(false);
     }
@@ -119,10 +148,30 @@ export function InputContainer() {
     }
   };
 
-  if (!currentLog) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
         로딩 중...
+      </div>
+    );
+  }
+
+  if (!currentLog) {
+    return (
+      <div className="pb-20">
+        <DateHeader
+          date={currentDate}
+          day={getDayNumber(currentDate, settings.dietStartDate)}
+          isClosed={false}
+          pendingDays={pendingDays}
+          canGoPrev={canGoPrev}
+          canGoNext={canGoNext}
+          onPrev={handlePrev}
+          onNext={handleNext}
+        />
+        <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
+          이 날짜의 기록이 없습니다
+        </div>
       </div>
     );
   }
@@ -141,6 +190,8 @@ export function InputContainer() {
         day={day}
         isClosed={currentLog.closed}
         pendingDays={pendingDays}
+        canGoPrev={canGoPrev}
+        canGoNext={canGoNext}
         onPrev={handlePrev}
         onNext={handleNext}
       />
@@ -175,7 +226,7 @@ export function InputContainer() {
               ? "bg-secondary text-muted-foreground cursor-default"
               : allCompleted
               ? "bg-navy text-white hover:bg-navy/90 ring-2 ring-navy/30"
-              : "bg-navy/70 text-white hover:bg-navy/80",
+              : "bg-navy text-white hover:bg-navy/90",
             isClosing && "opacity-60"
           )}
         >

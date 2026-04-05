@@ -1,12 +1,15 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Calendar } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface DateHeaderProps {
   date: string;
   day: number;
   isClosed: boolean;
   pendingDays?: number;
+  canGoPrev: boolean;
+  canGoNext: boolean;
   onPrev: () => void;
   onNext: () => void;
 }
@@ -26,16 +29,26 @@ export function DateHeader({
   day,
   isClosed,
   pendingDays,
+  canGoPrev,
+  canGoNext,
   onPrev,
   onNext,
 }: DateHeaderProps) {
+  const dayLabel = Number.isFinite(day) && day > 0 ? `D+${day}` : null;
+
   return (
     <div className="px-4 pt-4">
       <div className="flex items-center justify-between mb-2">
         <button
-          onClick={onPrev}
+          onClick={canGoPrev ? onPrev : undefined}
+          disabled={!canGoPrev}
           data-testid="date-prev"
-          className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-secondary"
+          className={cn(
+            "p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg transition-colors",
+            canGoPrev
+              ? "hover:bg-secondary text-foreground"
+              : "text-muted-foreground/30 cursor-default"
+          )}
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
@@ -44,10 +57,11 @@ export function DateHeader({
             <span>
               {formatDate(date)} {getDayOfWeek(date)}요일
             </span>
-            <span className="text-muted-foreground text-sm font-normal">
-              D+{day}
-            </span>
-            <Calendar className="w-4 h-4 text-muted-foreground" />
+            {dayLabel && (
+              <span className="text-muted-foreground text-sm font-normal">
+                {dayLabel}
+              </span>
+            )}
           </div>
           {isClosed && (
             <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
@@ -56,9 +70,15 @@ export function DateHeader({
           )}
         </div>
         <button
-          onClick={onNext}
+          onClick={canGoNext ? onNext : undefined}
+          disabled={!canGoNext}
           data-testid="date-next"
-          className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-secondary"
+          className={cn(
+            "p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg transition-colors",
+            canGoNext
+              ? "hover:bg-secondary text-foreground"
+              : "text-muted-foreground/30 cursor-default"
+          )}
         >
           <ChevronRight className="w-5 h-5" />
         </button>

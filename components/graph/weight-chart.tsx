@@ -189,7 +189,8 @@ export function WeightChart({
         ))}
       </div>
 
-      <div className="px-4 mb-2">
+      <div className="px-4 mb-2 space-y-1.5">
+        {/* 선 범례 */}
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
             <span className="w-4 h-0.5 bg-navy inline-block" /> 일별 체중
@@ -205,6 +206,33 @@ export function WeightChart({
           </span>
           <span className="flex items-center gap-1">
             <span className="w-4 h-0.5 bg-green-600 inline-block" /> 목표 체중
+          </span>
+        </div>
+        {/* 점 마커 범례 */}
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            {/* 별 = 역대 최저 */}
+            <svg width="12" height="12" viewBox="0 0 12 12">
+              <polygon
+                points="6,1 7.18,4.38 10.76,4.45 7.9,6.62 8.94,10.05 6,8 3.06,10.05 4.1,6.62 1.24,4.45 4.82,4.38"
+                fill="#1e3a5f"
+              />
+            </svg>
+            역대 최저
+          </span>
+          <span className="flex items-center gap-1.5">
+            {/* 빨간 원 = Hard Reset Day */}
+            <svg width="12" height="12" viewBox="0 0 12 12">
+              <circle cx="6" cy="6" r="4" fill="#f87171" stroke="white" strokeWidth="1.5" />
+            </svg>
+            Hard Reset Day
+          </span>
+          <span className="flex items-center gap-1.5">
+            {/* 사각형 = 전일 대비 1kg↑ */}
+            <svg width="12" height="12" viewBox="0 0 12 12">
+              <rect x="2" y="2" width="8" height="8" fill="#1e3a5f" />
+            </svg>
+            전일 대비 1kg↑
           </span>
         </div>
       </div>

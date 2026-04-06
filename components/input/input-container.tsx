@@ -44,8 +44,8 @@ export function InputContainer() {
     setIsLoading(true);
     try {
       let log = await actionGetDailyLog(date);
-      // 오늘 로그가 없으면 빈 로그 자동 생성
-      if (!log && date === formatDate(new Date())) {
+      // 로그가 없으면 빈 로그 자동 생성 (오늘 포함, 과거 날짜도 동일하게 적용)
+      if (!log && date <= formatDate(new Date())) {
         log = await actionUpsertDailyLog(date, {});
       }
       setCurrentLog(log);

@@ -60,7 +60,7 @@ function rowToSettings(row: Record<string, unknown>): Settings {
       "strong",
     coachStyleExtra: (row.coach_style_extra as string[]) ?? [],
     defaultTab: (row.default_tab as "input" | "home") ?? "input",
-    onboardingComplete: (row.onboarding_complete as boolean) ?? false,
+    onboardingComplete: ((row.onboarding_complete as boolean) ?? false) || !!(row.diet_start_date as string),
   };
 }
 

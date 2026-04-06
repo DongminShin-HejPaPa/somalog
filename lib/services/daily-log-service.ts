@@ -295,6 +295,26 @@ export async function closeDailyLog(date: string): Promise<DailyLog | null> {
   return closedLog;
 }
 
+export async function reopenDailyLog(date: string): Promise<DailyLog | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return null;
+
+  const { data, error } = await supabase
+    .from("daily_logs")
+    .update({ closed: false })
+    .eq("user_id", user.id)
+    .eq("date", date)
+    .select()
+    .single();
+
+  if (error || !data) return null;
+  return rowToDailyLog(data as Record<string, unknown>);
+}
+
 export async function resetDailyLogs(): Promise<void> {
   const supabase = await createClient();
   const {

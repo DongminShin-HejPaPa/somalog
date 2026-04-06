@@ -8,6 +8,7 @@ import {
   actionGetDailyLog,
   actionUpsertDailyLog,
   actionCloseDailyLog,
+  actionReopenDailyLog,
   actionGetRecentDailyLogs,
 } from "@/app/actions/log-actions";
 import { actionParseFreText } from "@/app/actions/parse-actions";
@@ -106,6 +107,11 @@ export function InputContainer() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleReopen = async () => {
+    const updated = await actionReopenDailyLog(currentDate);
+    if (updated) setCurrentLog(updated);
   };
 
   const handleClose = async () => {
@@ -215,28 +221,36 @@ export function InputContainer() {
         coachName={settings.coachName}
       />
 
-      <div className="px-4 mt-4">
-        <button
-          onClick={!currentLog.closed ? handleClose : undefined}
-          disabled={isClosing}
-          data-testid="close-button"
-          className={cn(
-            "w-full py-3 rounded-xl font-semibold text-sm min-h-[48px] transition-colors flex items-center justify-center gap-2",
-            currentLog.closed
-              ? "bg-secondary text-muted-foreground cursor-default"
-              : allCompleted
-              ? "bg-navy text-white hover:bg-navy/90 ring-2 ring-navy/30"
-              : "bg-navy text-white hover:bg-navy/90",
-            isClosing && "opacity-60"
-          )}
-        >
-          {isClosing ? (
-            <>
-              <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-              마감 중...
-            </>
-          ) : currentLog.closed ? "마감 완료" : "마감하기"}
-        </button>
+      <div className="px-4 mt-4 flex gap-2">
+        {currentLog.closed ? (
+          <button
+            onClick={handleReopen}
+            data-testid="reopen-button"
+            className="flex-1 py-3 rounded-xl font-semibold text-sm min-h-[48px] border border-border text-muted-foreground hover:bg-secondary transition-colors"
+          >
+            수정하기
+          </button>
+        ) : (
+          <button
+            onClick={handleClose}
+            disabled={isClosing}
+            data-testid="close-button"
+            className={cn(
+              "flex-1 py-3 rounded-xl font-semibold text-sm min-h-[48px] transition-colors flex items-center justify-center gap-2",
+              allCompleted
+                ? "bg-navy text-white hover:bg-navy/90 ring-2 ring-navy/30"
+                : "bg-navy text-white hover:bg-navy/90",
+              isClosing && "opacity-60"
+            )}
+          >
+            {isClosing ? (
+              <>
+                <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                마감 중...
+              </>
+            ) : "마감하기"}
+          </button>
+        )}
       </div>
 
       <FreeTextInput onSubmit={handleFreeText} isSaving={isFreeTextSaving} />

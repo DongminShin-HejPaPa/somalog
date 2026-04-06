@@ -25,12 +25,14 @@ const dietPresets = [
   { value: "sustainable", label: "착실하게", desc: "12개월, ~1.7kg/월, 코칭 보통", badge: "추천" },
   { value: "medium", label: "집중해서", desc: "6개월, ~2.5kg/월, 코칭 높음" },
   { value: "intensive", label: "전력 질주", desc: "3개월, ~3.3kg/월, 코칭 최강" },
-  { value: "custom", label: "내가 정할게", desc: "목표 체중·기간 직접 입력" },
+  { value: "custom", label: "내가 정할게", desc: "목표 기간 직접 입력" },
 ];
 
 const presetMonths: Partial<Record<string, number>> = {
   easygoing: 18, sustainable: 12, medium: 6, intensive: 3,
 };
+
+const PRESET_CRITERIA = ["역대최저", "0.5kg", "1.0kg"];
 
 const intensiveCriteria = [
   { value: "역대최저", label: "역대 최저 체중 초과 시", desc: "가장 엄격 (추천)" },
@@ -78,6 +80,142 @@ function InputField({
   );
 }
 
+/** 루틴/코치스타일 추가 항목 리스트 — 추가/수정/삭제 지원 */
+function ExtraItemList({
+  items,
+  placeholder,
+  onChange,
+}: {
+  items: string[];
+  placeholder: string;
+  onChange: (items: string[]) => void;
+}) {
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editingValue, setEditingValue] = useState("");
+  const [isAdding, setIsAdding] = useState(false);
+  const [newValue, setNewValue] = useState("");
+
+  const handleEditStart = (i: number) => {
+    setEditingIndex(i);
+    setEditingValue(items[i]);
+  };
+
+  const handleEditSave = (i: number) => {
+    if (!editingValue.trim()) return;
+    const updated = [...items];
+    updated[i] = editingValue.trim();
+    onChange(updated);
+    setEditingIndex(null);
+  };
+
+  const handleEditCancel = () => {
+    setEditingIndex(null);
+    setEditingValue("");
+  };
+
+  const handleDelete = (i: number) => {
+    onChange(items.filter((_, idx) => idx !== i));
+    if (editingIndex === i) setEditingIndex(null);
+  };
+
+  const handleAddConfirm = () => {
+    if (!newValue.trim()) return;
+    onChange([...items, newValue.trim()]);
+    setIsAdding(false);
+    setNewValue("");
+  };
+
+  const handleAddCancel = () => {
+    setIsAdding(false);
+    setNewValue("");
+  };
+
+  return (
+    <div className="space-y-1.5 mt-2">
+      {items.map((item, i) =>
+        editingIndex === i ? (
+          <div key={i} className="flex items-center gap-2">
+            <input
+              type="text"
+              value={editingValue}
+              onChange={(e) => setEditingValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleEditSave(i);
+                if (e.key === "Escape") handleEditCancel();
+              }}
+              autoFocus
+              className="flex-1 px-2 py-1.5 text-sm border border-navy rounded-lg focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[36px]"
+            />
+            <button
+              onClick={() => handleEditSave(i)}
+              className="px-2 py-1 text-sm text-navy font-medium min-h-[36px]"
+            >
+              저장
+            </button>
+            <button
+              onClick={handleEditCancel}
+              className="px-2 py-1 text-sm text-muted-foreground min-h-[36px]"
+            >
+              취소
+            </button>
+          </div>
+        ) : (
+          <div key={i} className="flex items-center gap-2 py-1.5 px-3 bg-secondary rounded-lg">
+            <span className="flex-1 text-sm truncate">{item}</span>
+            <button
+              onClick={() => handleEditStart(i)}
+              className="text-xs text-navy px-2 py-1 rounded hover:bg-navy/10 transition-colors"
+            >
+              수정
+            </button>
+            <button
+              onClick={() => handleDelete(i)}
+              className="text-xs text-coral px-2 py-1 rounded hover:bg-coral/10 transition-colors"
+            >
+              삭제
+            </button>
+          </div>
+        )
+      )}
+      {isAdding ? (
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={newValue}
+            onChange={(e) => setNewValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleAddConfirm();
+              if (e.key === "Escape") handleAddCancel();
+            }}
+            placeholder={placeholder}
+            autoFocus
+            className="flex-1 px-2 py-1.5 text-sm border border-navy rounded-lg focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[36px]"
+          />
+          <button
+            onClick={handleAddConfirm}
+            className="px-2 py-1 text-sm text-navy font-medium min-h-[36px]"
+          >
+            추가
+          </button>
+          <button
+            onClick={handleAddCancel}
+            className="px-2 py-1 text-sm text-muted-foreground min-h-[36px]"
+          >
+            취소
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={() => setIsAdding(true)}
+          className="text-sm text-navy font-medium mt-1"
+        >
+          + 추가
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function SettingsForm() {
   const { settings, updateSettings, resetAllSettings, loadDemoSettings, isLoaded } = useSettings();
   const [form, setForm] = useState<Settings>(settings);
@@ -86,11 +224,18 @@ export function SettingsForm() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showAccountInfo, setShowAccountInfo] = useState(false);
   const [isPending, startTransition] = useTransition();
+  // 직접입력 기준 임시 입력값
+  const [customCriteria, setCustomCriteria] = useState("");
   const router = useRouter();
 
   useEffect(() => {
     if (isLoaded) {
       setForm(settings);
+      // 저장된 값이 프리셋이 아닌 경우 커스텀 값으로 복원
+      if (!PRESET_CRITERIA.includes(settings.intensiveDayCriteria) &&
+          settings.intensiveDayCriteria !== "직접입력") {
+        setCustomCriteria(settings.intensiveDayCriteria);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoaded]);
@@ -134,6 +279,18 @@ export function SettingsForm() {
       router.refresh();
     });
   };
+
+  // 직접입력 선택 여부: 저장된 값이 프리셋 중 하나가 아니면 직접입력 상태
+  const isCustomCriteriaSelected =
+    !PRESET_CRITERIA.includes(form.intensiveDayCriteria) &&
+    form.intensiveDayCriteria !== "직접입력";
+  const criteriaButtonValue = isCustomCriteriaSelected ? "직접입력" : form.intensiveDayCriteria;
+
+  // 수분 권장량 계산 (체중 × 0.033L)
+  const recommendedWater =
+    form.currentWeight > 0
+      ? Math.round(form.currentWeight * 0.033 * 10) / 10
+      : null;
 
   return (
     <div>
@@ -184,40 +341,50 @@ export function SettingsForm() {
       <Section title="다이어트 목표">
         <div className="space-y-2 mb-3">
           {dietPresets.map((p) => (
-            <button
-              key={p.value}
-              onClick={() => handlePresetChange(p.value as Settings["dietPreset"])}
-              className={cn(
-                "w-full flex items-center justify-between px-3 py-3 rounded-xl border text-left min-h-[52px] transition-colors",
-                form.dietPreset === p.value
-                  ? "border-navy bg-navy/5"
-                  : "border-border"
-              )}
-            >
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">{p.label}</span>
-                  {p.badge && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-navy text-white">
-                      {p.badge}
-                    </span>
-                  )}
-                </div>
-                <span className="text-xs text-muted-foreground">{p.desc}</span>
-              </div>
-              <div
+            <div key={p.value}>
+              <button
+                onClick={() => handlePresetChange(p.value as Settings["dietPreset"])}
                 className={cn(
-                  "w-5 h-5 rounded-full border-2 flex items-center justify-center",
+                  "w-full flex items-center justify-between px-3 py-3 rounded-xl border text-left min-h-[52px] transition-colors",
                   form.dietPreset === p.value
-                    ? "border-navy"
+                    ? "border-navy bg-navy/5"
                     : "border-border"
                 )}
               >
-                {form.dietPreset === p.value && (
-                  <div className="w-2.5 h-2.5 rounded-full bg-navy" />
-                )}
-              </div>
-            </button>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">{p.label}</span>
+                    {p.badge && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-navy text-white">
+                        {p.badge}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-xs text-muted-foreground">{p.desc}</span>
+                </div>
+                <div
+                  className={cn(
+                    "w-5 h-5 rounded-full border-2 flex items-center justify-center",
+                    form.dietPreset === p.value ? "border-navy" : "border-border"
+                  )}
+                >
+                  {form.dietPreset === p.value && (
+                    <div className="w-2.5 h-2.5 rounded-full bg-navy" />
+                  )}
+                </div>
+              </button>
+              {/* 내가 정할게 선택 시 목표기간 인라인 표시 */}
+              {p.value === "custom" && form.dietPreset === "custom" && (
+                <div className="mt-2 ml-2 pl-3 border-l-2 border-navy/30">
+                  <InputField
+                    label="목표 기간"
+                    value={form.targetMonths.toString()}
+                    suffix="개월"
+                    onChange={(v) => handleChange("targetMonths", Number(v) || 0)}
+                  />
+                </div>
+              )}
+            </div>
           ))}
         </div>
         <InputField
@@ -237,12 +404,15 @@ export function SettingsForm() {
           suffix="kg"
           onChange={(v) => handleChange("targetWeight", Number(v) || 0)}
         />
-        <InputField
-          label="목표 기간"
-          value={form.targetMonths.toString()}
-          suffix="개월"
-          onChange={(v) => handleChange("targetMonths", Number(v) || 0)}
-        />
+        {/* 커스텀이 아닌 경우에만 목표 기간 별도 표시 */}
+        {form.dietPreset !== "custom" && (
+          <InputField
+            label="목표 기간"
+            value={form.targetMonths.toString()}
+            suffix="개월"
+            onChange={(v) => handleChange("targetMonths", Number(v) || 0)}
+          />
+        )}
         <div className="flex items-center justify-between py-2">
           <span className="text-sm text-muted-foreground">총 감량 목표</span>
           <span className="text-sm font-medium">
@@ -268,8 +438,19 @@ export function SettingsForm() {
           onChange={(v) => handleChange("waterGoal", Number(v) || 0)}
         />
         <p className="text-xs text-muted-foreground mt-1">
-          신체 정보 기반 권장: 3.1L
-          <button className="ml-2 text-navy font-medium underline">권장값으로 변경</button>
+          {recommendedWater !== null ? (
+            <>
+              신체 정보 기반 권장: {recommendedWater}L
+              <button
+                onClick={() => handleChange("waterGoal", recommendedWater)}
+                className="ml-2 text-navy font-medium underline"
+              >
+                권장값으로 변경
+              </button>
+            </>
+          ) : (
+            "현재 체중을 입력하면 권장값을 계산해드려요"
+          )}
         </p>
       </Section>
 
@@ -284,35 +465,13 @@ export function SettingsForm() {
           value={form.routineEnergyTime}
           onChange={(v) => handleChange("routineEnergyTime", v)}
         />
-        {form.routineExtra.map((item, i) => (
-          <div key={i} className="flex items-center gap-2 py-1.5">
-            <input
-              type="text"
-              value={item}
-              placeholder="루틴 설명"
-              onChange={(e) => {
-                const updated = [...form.routineExtra];
-                updated[i] = e.target.value;
-                handleChange("routineExtra", updated);
-              }}
-              className="flex-1 px-2 py-1.5 text-sm border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[36px]"
-            />
-            <button
-              onClick={() => handleChange("routineExtra", form.routineExtra.filter((_, idx) => idx !== i))}
-              className="text-coral text-lg leading-none px-1"
-              aria-label="삭제"
-            >
-              ×
-            </button>
-          </div>
-        ))}
-        <button
-          onClick={() => handleChange("routineExtra", [...form.routineExtra, ""])}
-          className="text-sm text-navy font-medium mt-2"
-        >
-          + 루틴 추가
-        </button>
-        <p className="text-xs text-muted-foreground mt-2 p-2 bg-secondary rounded-lg">
+        <p className="text-xs text-muted-foreground mt-3 mb-1 font-medium">추가 루틴</p>
+        <ExtraItemList
+          items={form.routineExtra}
+          placeholder="루틴 설명 (예: 점심 후 10분 산책)"
+          onChange={(items) => handleChange("routineExtra", items)}
+        />
+        <p className="text-xs text-muted-foreground mt-3 p-2 bg-secondary rounded-lg">
           루틴 설정은 AI 코치 맥락 필터링에 사용됩니다. 잘못 설정하면 맥락에 맞지 않는 조언을 받을 수 있어요.
         </p>
       </Section>
@@ -339,18 +498,28 @@ export function SettingsForm() {
           {intensiveCriteria.map((c) => (
             <button
               key={c.value}
-              onClick={() =>
-                handleChange("intensiveDayCriteria", c.value as Settings["intensiveDayCriteria"])
-              }
+              onClick={() => {
+                if (c.value === "직접입력") {
+                  // 직접입력 선택 시: 기존 커스텀 값 유지, 아직 폼에 반영하지 않음
+                  handleChange("intensiveDayCriteria", customCriteria || "직접입력");
+                } else {
+                  handleChange("intensiveDayCriteria", c.value);
+                }
+              }}
               className={cn(
                 "w-full flex items-center justify-between px-3 py-2.5 rounded-xl border text-left min-h-[44px] transition-colors",
-                form.intensiveDayCriteria === c.value
+                criteriaButtonValue === c.value
                   ? "border-navy bg-navy/5"
                   : "border-border"
               )}
             >
               <div>
                 <span className="text-sm">{c.label}</span>
+                {c.value === "직접입력" && isCustomCriteriaSelected && (
+                  <span className="text-xs text-navy ml-2 font-medium">
+                    (현재: +{form.intensiveDayCriteria}kg)
+                  </span>
+                )}
                 {c.desc && (
                   <span className="text-xs text-muted-foreground ml-2">{c.desc}</span>
                 )}
@@ -358,18 +527,50 @@ export function SettingsForm() {
               <div
                 className={cn(
                   "w-4 h-4 rounded-full border-2 flex items-center justify-center",
-                  form.intensiveDayCriteria === c.value
-                    ? "border-navy"
-                    : "border-border"
+                  criteriaButtonValue === c.value ? "border-navy" : "border-border"
                 )}
               >
-                {form.intensiveDayCriteria === c.value && (
+                {criteriaButtonValue === c.value && (
                   <div className="w-2 h-2 rounded-full bg-navy" />
                 )}
               </div>
             </button>
           ))}
         </div>
+        {/* 직접입력 선택 시 커스텀 값 입력 */}
+        {criteriaButtonValue === "직접입력" && (
+          <div className="mt-3 p-3 bg-secondary rounded-xl">
+            <p className="text-xs text-muted-foreground mb-2">
+              최저 체중 대비 초과 기준 (kg)
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                value={customCriteria}
+                onChange={(e) => setCustomCriteria(e.target.value)}
+                placeholder="예: 1.5"
+                className="flex-1 px-3 py-2 text-sm border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[40px]"
+              />
+              <span className="text-sm text-muted-foreground">kg</span>
+              <button
+                onClick={() => {
+                  const val = parseFloat(customCriteria);
+                  if (!isNaN(val) && val >= 0) {
+                    handleChange("intensiveDayCriteria", customCriteria);
+                  }
+                }}
+                className="px-3 py-2 text-sm bg-navy text-white rounded-lg font-medium min-h-[40px]"
+              >
+                적용
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              예: 1.5 입력 시 최저 체중 +1.5kg 초과할 때 Hard Reset
+            </p>
+          </div>
+        )}
       </Section>
 
       <Section title="코치 스타일">
@@ -394,9 +595,7 @@ export function SettingsForm() {
               <div
                 className={cn(
                   "w-5 h-5 rounded-full border-2 flex items-center justify-center",
-                  form.coachStylePreset === s.value
-                    ? "border-navy"
-                    : "border-border"
+                  form.coachStylePreset === s.value ? "border-navy" : "border-border"
                 )}
               >
                 {form.coachStylePreset === s.value && (
@@ -406,34 +605,12 @@ export function SettingsForm() {
             </button>
           ))}
         </div>
-        {form.coachStyleExtra.map((item, i) => (
-          <div key={i} className="flex items-center gap-2 py-1.5">
-            <input
-              type="text"
-              value={item}
-              placeholder="예: 아침에는 부드럽게 말해줘"
-              onChange={(e) => {
-                const updated = [...form.coachStyleExtra];
-                updated[i] = e.target.value;
-                handleChange("coachStyleExtra", updated);
-              }}
-              className="flex-1 px-2 py-1.5 text-sm border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[36px]"
-            />
-            <button
-              onClick={() => handleChange("coachStyleExtra", form.coachStyleExtra.filter((_, idx) => idx !== i))}
-              className="text-coral text-lg leading-none px-1"
-              aria-label="삭제"
-            >
-              ×
-            </button>
-          </div>
-        ))}
-        <button
-          onClick={() => handleChange("coachStyleExtra", [...form.coachStyleExtra, ""])}
-          className="text-sm text-navy font-medium"
-        >
-          + 항목 추가
-        </button>
+        <p className="text-xs text-muted-foreground mb-1 font-medium">추가 지시사항</p>
+        <ExtraItemList
+          items={form.coachStyleExtra}
+          placeholder="예: 아침에는 부드럽게 말해줘"
+          onChange={(items) => handleChange("coachStyleExtra", items)}
+        />
         <p className="text-xs text-muted-foreground mt-2">
           10개 초과 시 조언 품질이 저하될 수 있어요
         </p>
@@ -495,7 +672,6 @@ export function SettingsForm() {
           데이터 관리
         </h3>
 
-        {/* 기본 버튼들 */}
         {dialog === "idle" && (
           <>
             <button
@@ -515,7 +691,6 @@ export function SettingsForm() {
           </>
         )}
 
-        {/* 데이터 초기화 확인 */}
         {dialog === "confirm-reset" && (
           <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
             <p className="text-sm font-semibold text-red-800 mb-1">
@@ -543,7 +718,6 @@ export function SettingsForm() {
           </div>
         )}
 
-        {/* 온보딩 재시작 여부 */}
         {dialog === "confirm-onboarding" && (
           <div className="p-4 bg-secondary border border-border rounded-xl">
             <p className="text-sm font-semibold mb-1">초기화 완료 ✓</p>
@@ -567,7 +741,6 @@ export function SettingsForm() {
           </div>
         )}
 
-        {/* 데모 데이터 확인 */}
         {dialog === "confirm-demo" && (
           <div className="p-4 bg-secondary border border-border rounded-xl">
             <p className="text-sm font-semibold mb-1">데모 데이터를 불러옵니다</p>
@@ -600,7 +773,6 @@ export function SettingsForm() {
           계정
         </h3>
 
-        {/* 개인정보 변경 */}
         <button
           type="button"
           onClick={() => setShowAccountInfo(true)}

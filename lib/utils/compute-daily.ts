@@ -39,17 +39,20 @@ export function computeAvgWeight3d(date: string, logs: DailyLog[]): number | nul
  */
 export function computeIntensiveDay(
   weight: number,
-  criteria: Settings["intensiveDayCriteria"],
+  criteria: string,
   lowestWeight: number
 ): boolean {
   if (lowestWeight === Infinity) return false;
-  const thresholdMap: Record<Settings["intensiveDayCriteria"], number> = {
-    역대최저: lowestWeight,
-    "0.5kg": lowestWeight + 0.5,
-    "1.0kg": lowestWeight + 1.0,
-    직접입력: lowestWeight,
-  };
-  return weight > thresholdMap[criteria];
+  switch (criteria) {
+    case "역대최저": return weight > lowestWeight;
+    case "0.5kg":   return weight > lowestWeight + 0.5;
+    case "1.0kg":   return weight > lowestWeight + 1.0;
+    default: {
+      // 직접입력 커스텀 값: 숫자 문자열 (e.g. "1.5")
+      const custom = parseFloat(criteria);
+      return !isNaN(custom) ? weight > lowestWeight + custom : weight > lowestWeight;
+    }
+  }
 }
 
 /**

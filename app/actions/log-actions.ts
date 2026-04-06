@@ -5,6 +5,7 @@ import {
   getDailyLog,
   upsertDailyLog,
   closeDailyLog,
+  reopenDailyLog,
   getRecentDailyLogs,
 } from "@/lib/services/daily-log-service";
 import { getWeeklyLogs } from "@/lib/services/weekly-log-service";
@@ -32,6 +33,16 @@ export async function actionCloseDailyLog(
   date: string
 ): Promise<DailyLog | null> {
   const result = await closeDailyLog(date);
+  revalidatePath("/home");
+  revalidatePath("/log");
+  revalidatePath("/graph");
+  return result;
+}
+
+export async function actionReopenDailyLog(
+  date: string
+): Promise<DailyLog | null> {
+  const result = await reopenDailyLog(date);
   revalidatePath("/home");
   revalidatePath("/log");
   revalidatePath("/graph");

@@ -43,7 +43,8 @@ export interface Settings {
   routineEnergyTime: string;
   routineExtra: string[];
   intensiveDayOn: boolean;
-  intensiveDayCriteria: "역대최저" | "0.5kg" | "1.0kg" | "직접입력";
+  // "역대최저" | "0.5kg" | "1.0kg" 는 프리셋, 그 외 숫자 문자열(e.g. "1.5")은 직접입력 커스텀 값
+  intensiveDayCriteria: string;
   coachStylePreset: "strong" | "balanced" | "empathy" | "data";
   coachStyleExtra: string[];
   defaultTab: "input" | "home";

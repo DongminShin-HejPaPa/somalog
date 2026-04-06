@@ -37,6 +37,8 @@ export function InputContainer() {
   const [isSaving, setIsSaving] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [isFreeTextSaving, setIsFreeTextSaving] = useState(false);
+  const [closeError, setCloseError] = useState<string | null>(null);
+  const [closeNavMessage, setCloseNavMessage] = useState<string | null>(null);
 
   const loadLog = useCallback(async (date: string) => {
     setIsLoading(true);
@@ -117,25 +119,32 @@ export function InputContainer() {
   const handleClose = async () => {
     if (!currentLog || isClosing) return;
     setIsClosing(true);
+    setCloseError(null);
     try {
       const updated = await actionCloseDailyLog(currentDate);
-      if (updated) setCurrentLog(updated);
+      if (!updated) {
+        setCloseError("마감에 실패했습니다. 잠시 후 다시 시도해주세요.");
+        return;
+      }
+      setCurrentLog(updated);
 
       // 마감 후 다음 미완료 날짜로 이동
       const logs = await actionGetRecentDailyLogs(30);
       const unclosed = logs.filter((l) => !l.closed);
       setPendingDays(unclosed.length);
 
-      // 날짜 하한선 갱신
       const dates = logs.map((l) => l.date).sort();
       if (dates.length > 0) setMinDate(dates[0]);
 
-      const nextTarget = unclosed.length > 0
-        ? unclosed[unclosed.length - 1]
-        : null;
-      if (nextTarget && nextTarget.date !== currentDate) {
-        await loadLog(nextTarget.date);
+      // 마감 후 다음 날짜(오늘 이하)로 이동
+      const nextDate = addDays(currentDate, 1);
+      if (nextDate <= today) {
+        setCloseNavMessage(`${nextDate.slice(5).replace("-", "/")} 로 이동합니다`);
+        setTimeout(() => setCloseNavMessage(null), 3000);
+        await loadLog(nextDate);
       }
+    } catch {
+      setCloseError("마감에 실패했습니다. 잠시 후 다시 시도해주세요.");
     } finally {
       setIsClosing(false);
     }
@@ -221,6 +230,16 @@ export function InputContainer() {
         coachName={settings.coachName}
       />
 
+      {closeNavMessage && (
+        <div className="mx-4 mt-3 px-3 py-2 bg-navy/10 border border-navy/20 rounded-lg text-xs text-navy font-medium text-center">
+          {closeNavMessage}
+        </div>
+      )}
+      {closeError && (
+        <div className="mx-4 mt-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600 text-center">
+          {closeError}
+        </div>
+      )}
       <div className="px-4 mt-4 flex gap-2">
         {currentLog.closed ? (
           <button

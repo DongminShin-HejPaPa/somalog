@@ -56,21 +56,35 @@ function InputField({
   suffix,
   onChange,
   testId,
+  inputMode,
+  type,
 }: {
   label: string;
   value: string;
   suffix?: string;
   onChange: (v: string) => void;
   testId?: string;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
+  type?: string;
 }) {
+  const [localVal, setLocalVal] = useState(value);
+
+  // 부모에서 value가 바뀌면 (예: 프리셋 선택) 동기화
+  useEffect(() => {
+    setLocalVal(value);
+  }, [value]);
+
   return (
     <div className="flex items-center justify-between py-2">
       <label className="text-sm text-muted-foreground">{label}</label>
       <div className="flex items-center gap-1">
         <input
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
+          type={type ?? "text"}
+          inputMode={inputMode}
+          value={localVal}
+          onChange={(e) => setLocalVal(e.target.value)}
+          onBlur={() => onChange(localVal)}
+          onKeyDown={(e) => { if (e.key === "Enter") onChange(localVal); }}
           data-testid={testId}
           className="w-24 text-right px-2 py-1.5 text-sm border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[36px]"
         />
@@ -255,8 +269,19 @@ export function SettingsForm() {
     setSaved(false);
   };
 
+  // 의미적 검증
+  const formErrors: string[] = [];
+  if (form.startWeight > 0 && form.targetWeight > 0 && form.targetWeight >= form.startWeight) {
+    formErrors.push("목표 체중이 시작 체중 이상입니다");
+  }
+  if (form.targetMonths <= 0) {
+    formErrors.push("목표 기간은 1개월 이상이어야 합니다");
+  }
+
   const handleSave = () => {
-    updateSettings(form);
+    if (formErrors.length > 0) return;
+    // currentWeight는 startWeight와 동기화 (설정에서는 startWeight만 노출)
+    updateSettings({ ...form, currentWeight: form.startWeight });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -286,10 +311,10 @@ export function SettingsForm() {
     form.intensiveDayCriteria !== "직접입력";
   const criteriaButtonValue = isCustomCriteriaSelected ? "직접입력" : form.intensiveDayCriteria;
 
-  // 수분 권장량 계산 (체중 × 0.033L)
+  // 수분 권장량 계산 (시작 체중 × 0.033L)
   const recommendedWater =
-    form.currentWeight > 0
-      ? Math.round(form.currentWeight * 0.033 * 10) / 10
+    form.startWeight > 0
+      ? Math.round(form.startWeight * 0.033 * 10) / 10
       : null;
 
   return (
@@ -309,13 +334,8 @@ export function SettingsForm() {
           label="키"
           value={form.height.toString()}
           suffix="cm"
+          inputMode="decimal"
           onChange={(v) => handleChange("height", Number(v) || 0)}
-        />
-        <InputField
-          label="현재 체중"
-          value={form.currentWeight.toString()}
-          suffix="kg"
-          onChange={(v) => handleChange("currentWeight", Number(v) || 0)}
         />
         <div className="flex items-center justify-between py-2">
           <label className="text-sm text-muted-foreground">성별</label>
@@ -390,28 +410,41 @@ export function SettingsForm() {
         <InputField
           label="시작일"
           value={form.dietStartDate}
+          type="date"
           onChange={(v) => handleChange("dietStartDate", v)}
         />
         <InputField
           label="시작 체중"
           value={form.startWeight.toString()}
           suffix="kg"
+          inputMode="decimal"
           onChange={(v) => handleChange("startWeight", Number(v) || 0)}
         />
         <InputField
           label="목표 체중"
           value={form.targetWeight.toString()}
           suffix="kg"
+          inputMode="decimal"
           onChange={(v) => handleChange("targetWeight", Number(v) || 0)}
         />
+        {form.startWeight > 0 && form.targetWeight > 0 && form.targetWeight >= form.startWeight && (
+          <p className="text-xs text-red-500 pb-1">목표 체중이 시작 체중 이상입니다</p>
+        )}
         {/* 커스텀이 아닌 경우에만 목표 기간 별도 표시 */}
         {form.dietPreset !== "custom" && (
           <InputField
             label="목표 기간"
             value={form.targetMonths.toString()}
             suffix="개월"
-            onChange={(v) => handleChange("targetMonths", Number(v) || 0)}
+            inputMode="numeric"
+            onChange={(v) => {
+              const n = Number(v);
+              if (n > 0) handleChange("targetMonths", n);
+            }}
           />
+        )}
+        {form.dietPreset !== "custom" && form.targetMonths <= 0 && (
+          <p className="text-xs text-red-500 pb-1">목표 기간은 1개월 이상이어야 합니다</p>
         )}
         <div className="flex items-center justify-between py-2">
           <span className="text-sm text-muted-foreground">총 감량 목표</span>
@@ -435,6 +468,7 @@ export function SettingsForm() {
           label="수분 목표"
           value={form.waterGoal.toString()}
           suffix="L"
+          inputMode="decimal"
           onChange={(v) => handleChange("waterGoal", Number(v) || 0)}
         />
         <p className="text-xs text-muted-foreground mt-1">

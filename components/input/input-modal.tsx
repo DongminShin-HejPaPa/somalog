@@ -182,6 +182,7 @@ export function InputModal({
             <div className="flex items-center gap-2">
               <input
                 type="number"
+                inputMode="decimal"
                 step="0.1"
                 placeholder="직접 입력"
                 value={weightValue}

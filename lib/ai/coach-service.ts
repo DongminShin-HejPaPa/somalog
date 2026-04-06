@@ -20,7 +20,7 @@ export async function generateAiFeedback(
   }
 
   try {
-    const abort = AbortSignal.timeout(8_000); // 8초 초과 시 fallback
+    const abort = AbortSignal.timeout(5_000); // 5초 초과 시 fallback (Vercel 10s 제한 대응)
     const { text } = await generateText({
       model: openrouter(MODEL),
       system: buildSystemPrompt(settings),
@@ -49,7 +49,7 @@ export async function generateAiOneLiner(
   }
 
   try {
-    const abort = AbortSignal.timeout(8_000); // 8초 초과 시 fallback
+    const abort = AbortSignal.timeout(5_000); // 5초 초과 시 fallback (Vercel 10s 제한 대응)
     const { text } = await generateText({
       model: openrouter(MODEL),
       system: buildSystemPrompt(settings),

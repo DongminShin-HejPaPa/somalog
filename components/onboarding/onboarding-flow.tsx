@@ -209,23 +209,25 @@ export function OnboardingFlow() {
     if (isCompleting) return;
     setIsCompleting(true);
     const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
+    // 지금까지 입력한 값을 반영하고, 나머지는 기본값 사용
+    const weightNum = Number(weight) || 0;
     await initializeSettings({
-      coachName: "Soma",
-      height: 0,
-      currentWeight: 0,
-      gender: "남성",
+      coachName: coachName || "Soma",
+      height: Number(height) || 0,
+      currentWeight: weightNum,
+      gender,
       dietStartDate: today,
-      startWeight: 0,
-      targetWeight: 0,
-      dietPreset: "sustainable",
-      targetMonths: 12,
-      waterGoal: 2.8,
-      routineWeightTime: "아침 기상 직후",
-      routineEnergyTime: "21:00",
+      startWeight: weightNum,
+      targetWeight: Number(targetWeight) || 0,
+      dietPreset: selectedPreset as Settings["dietPreset"],
+      targetMonths,
+      waterGoal,
+      routineWeightTime,
+      routineEnergyTime,
       routineExtra: [],
-      intensiveDayOn: true,
-      intensiveDayCriteria: "역대최저",
-      coachStylePreset: "strong",
+      intensiveDayOn,
+      intensiveDayCriteria,
+      coachStylePreset: selectedStyle as Settings["coachStylePreset"],
       coachStyleExtra: [],
       defaultTab: "input",
     });
@@ -644,7 +646,7 @@ export function OnboardingFlow() {
           <div className="bg-secondary rounded-xl p-4 text-left space-y-3">
             <p className="text-sm font-medium">온보딩에서 나갈까요?</p>
             <p className="text-xs text-muted-foreground">
-              모든 설정값이 기본값으로 지정돼요. 나중에 설정 탭에서 언제든지 바꿀 수 있어요.
+              지금까지 입력한 내용은 반영되고, 나머지는 기본값으로 시작해요. 나중에 설정 탭에서 언제든지 바꿀 수 있어요.
             </p>
             <div className="flex gap-2">
               <button

@@ -224,19 +224,20 @@ export async function closeDailyLog(date: string): Promise<DailyLog | null> {
 
   if (!user) return null;
 
-  const existing = await getDailyLog(date);
+  // getDailyLog + getSettings 병렬 실행 (네트워크 왕복 절약)
+  const [existing, settings] = await Promise.all([
+    getDailyLog(date),
+    getSettings(),
+  ]);
   if (!existing) return null;
 
-  const settings = await getSettings();
+  // 1. 총평 + 한줄 요약 생성 (AI 실패 시 fallback 사용)
+  const [dailySummary, oneLiner] = await Promise.all([
+    Promise.resolve(generateDailySummary(existing, settings.waterGoal)),
+    generateAiOneLiner(existing, settings), // 내부적으로 5s timeout + fallback 처리
+  ]);
 
-  // 1. 총평 + 한줄 요약 생성
-  const updated: DailyLog = {
-    ...existing,
-    dailySummary: generateDailySummary(existing, settings.waterGoal),
-    oneLiner: await generateAiOneLiner(existing, settings),
-    closed: true,
-  };
-
+  const updated: DailyLog = { ...existing, dailySummary, oneLiner, closed: true };
   const row = dailyLogToRow(updated, user.id);
 
   const { data: upserted, error } = await supabase
@@ -245,7 +246,7 @@ export async function closeDailyLog(date: string): Promise<DailyLog | null> {
     .select()
     .single();
 
-  if (error || !upserted) throw new Error(error?.message ?? "upsert failed");
+  if (error || !upserted) return null; // throw 대신 null 반환 → 클라이언트가 에러 표시
 
   const closedLog = rowToDailyLog(upserted as Record<string, unknown>);
 

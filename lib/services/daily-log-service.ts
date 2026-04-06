@@ -127,8 +127,14 @@ export async function upsertDailyLog(
 
   if (!user) throw new Error("Unauthorized");
 
-  // 1. 기존 로그 가져오기 (없으면 빈 객체)
-  const existing = await getDailyLog(date);
+  // 1. 기존 로그 가져오기 — 동일 supabase 클라이언트 재사용 (별도 createClient/getUser 호출 방지)
+  const { data: existingRow } = await supabase
+    .from("daily_logs")
+    .select("*")
+    .eq("user_id", user.id)
+    .eq("date", date)
+    .single();
+  const existing = existingRow ? rowToDailyLog(existingRow as Record<string, unknown>) : null;
 
   const merged: DailyLog = existing
     ? { ...existing, ...data }
@@ -216,7 +222,7 @@ export async function upsertDailyLog(
   return rowToDailyLog(upserted as Record<string, unknown>);
 }
 
-export async function closeDailyLog(date: string): Promise<DailyLog | null> {
+export async function closeDailyLog(date: string, existingLog?: DailyLog): Promise<DailyLog | null> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -224,9 +230,9 @@ export async function closeDailyLog(date: string): Promise<DailyLog | null> {
 
   if (!user) return null;
 
-  // getDailyLog + getSettings 병렬 실행 (네트워크 왕복 절약)
+  // 클라이언트에서 이미 로그를 갖고 있으면 재조회 불필요 (병목 제거)
   const [existing, settings] = await Promise.all([
-    getDailyLog(date),
+    existingLog ? Promise.resolve(existingLog) : getDailyLog(date),
     getSettings(),
   ]);
   if (!existing) return null;

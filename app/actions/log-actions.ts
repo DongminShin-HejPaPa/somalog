@@ -30,9 +30,10 @@ export async function actionUpsertDailyLog(
 }
 
 export async function actionCloseDailyLog(
-  date: string
+  date: string,
+  log?: DailyLog
 ): Promise<DailyLog | null> {
-  const result = await closeDailyLog(date);
+  const result = await closeDailyLog(date, log);
   revalidatePath("/home");
   revalidatePath("/log");
   revalidatePath("/graph");

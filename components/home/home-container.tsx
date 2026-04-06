@@ -6,6 +6,8 @@ import { createBrowserClient } from "@supabase/ssr";
 import { actionGetDailyLog, actionGetRecentDailyLogs } from "@/app/actions/log-actions";
 import { HomeContent } from "./home-content";
 import { formatDate } from "@/lib/utils/date-utils";
+import { getGreetingMessage } from "@/lib/utils/greeting-messages";
+import { useSettings } from "@/lib/contexts/settings-context";
 import type { DailyLog } from "@/lib/types";
 
 export function HomeContainer() {
@@ -13,6 +15,8 @@ export function HomeContainer() {
   const [displayName, setDisplayName] = useState<string | null | undefined>(undefined);
   const [todayLog, setTodayLog] = useState<DailyLog | null | undefined>(undefined);
   const [recentLogs, setRecentLogs] = useState<DailyLog[] | undefined>(undefined);
+  const [greeting, setGreeting] = useState<string | null>(null);
+  const { settings } = useSettings();
 
   useEffect(() => {
     // 로컬 세션에서 이름 읽기 (네트워크 호출 없음)
@@ -33,37 +37,49 @@ export function HomeContainer() {
     const today = formatDate(new Date());
     Promise.all([
       actionGetDailyLog(today),
-      actionGetRecentDailyLogs(14),
+      actionGetRecentDailyLogs(30),
     ]).then(([log, logs]) => {
       setTodayLog(log);
       setRecentLogs(logs);
     });
   }, []);
 
+  // 데이터 로드 완료 시 인사말 생성 (방문할 때마다 1회)
+  useEffect(() => {
+    if (displayName && todayLog !== undefined && recentLogs !== undefined && settings.onboardingComplete) {
+      const msg = getGreetingMessage(displayName, todayLog ?? null, recentLogs ?? [], settings);
+      setGreeting(msg);
+    }
+  }, [displayName, todayLog, recentLogs, settings]);
+
   const isLoading = todayLog === undefined || recentLogs === undefined;
 
   return (
     <div className="pb-6">
-      <header className="px-4 pt-4 pb-2 flex items-center justify-between">
-        <h1 className="text-lg font-bold">Soma Log</h1>
-        {displayName !== undefined && (
-          displayName ? (
-            <span className="text-xs text-muted-foreground">{displayName} 님</span>
-          ) : (
+      <header className="px-4 pt-4 pb-2">
+        <div className="flex items-center justify-between">
+          <h1 className="text-lg font-bold">Soma Log</h1>
+          {displayName !== undefined && !displayName && (
             <Link
               href="/login"
               className="px-3 py-1.5 rounded-lg border border-navy text-navy text-xs font-semibold hover:bg-navy hover:text-white active:scale-[0.97] transition-all"
             >
               로그인
             </Link>
-          )
+          )}
+        </div>
+        {greeting && (
+          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{greeting}</p>
+        )}
+        {!greeting && displayName && (
+          <p className="text-xs text-muted-foreground mt-1">{displayName} 님</p>
         )}
       </header>
 
       {isLoading ? (
         <HomeSkeleton />
       ) : (
-        <HomeContent todayLog={todayLog ?? null} recentLogs={recentLogs ?? []} />
+        <HomeContent todayLog={todayLog ?? null} recentLogs={(recentLogs ?? []).slice(0, 14)} />
       )}
     </div>
   );

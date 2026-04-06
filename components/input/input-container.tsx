@@ -50,6 +50,10 @@ export function InputContainer() {
       }
       setCurrentLog(log);
       setCurrentDate(date);
+    } catch {
+      // 로드 실패 시에도 날짜는 업데이트 (오늘 날짜 기준 재시도 가능하게)
+      setCurrentLog(null);
+      setCurrentDate(date);
     } finally {
       setIsLoading(false);
     }
@@ -121,7 +125,7 @@ export function InputContainer() {
     setIsClosing(true);
     setCloseError(null);
     try {
-      const updated = await actionCloseDailyLog(currentDate);
+      const updated = await actionCloseDailyLog(currentDate, currentLog ?? undefined);
       if (!updated) {
         setCloseError("마감에 실패했습니다. 잠시 후 다시 시도해주세요.");
         return;

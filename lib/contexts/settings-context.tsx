@@ -112,10 +112,11 @@ export function SettingsProvider({
     const loadSettings = async () => {
       try {
         const loaded = await actionGetSettings();
-        setSettings(loaded);
         if (loaded.onboardingComplete) {
+          setSettings(loaded);
           writeCachedSettings(loaded);
         }
+        // onboardingComplete=false → DB에 설정 없거나 인증 일시 실패 → 캐시 설정 유지
       } catch {
         if (!cached) setSettings(DEFAULT_SETTINGS);
       } finally {

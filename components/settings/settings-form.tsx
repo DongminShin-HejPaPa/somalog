@@ -400,6 +400,7 @@ export function SettingsForm() {
                     label="목표 기간"
                     value={form.targetMonths.toString()}
                     suffix="개월"
+                    inputMode="numeric"
                     onChange={(v) => handleChange("targetMonths", Number(v) || 0)}
                   />
                 </div>
@@ -580,6 +581,7 @@ export function SettingsForm() {
             <div className="flex items-center gap-2">
               <input
                 type="number"
+                inputMode="decimal"
                 step="0.1"
                 min="0"
                 value={customCriteria}

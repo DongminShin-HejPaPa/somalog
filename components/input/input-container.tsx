@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/lib/contexts/settings-context";
 import { formatDate, getDayNumber } from "@/lib/utils/date-utils";
@@ -32,8 +32,16 @@ export function InputContainer() {
   const [isLoading, setIsLoading] = useState(true);
   const [modalField, setModalField] = useState<ItemKey | null>(null);
   const [pendingDays, setPendingDays] = useState(0);
-  const [prevWeight, setPrevWeight] = useState<number | null>(null);
+  const [allLogs, setAllLogs] = useState<DailyLog[]>([]);
   const [minDate, setMinDate] = useState<string | null>(null);
+
+  // currentDate 기준 이전 최신 체중 (날짜 이동 시마다 자동 재계산)
+  const prevWeight = useMemo(() => {
+    const before = allLogs
+      .filter((l) => l.weight !== null && l.date < currentDate)
+      .sort((a, b) => b.date.localeCompare(a.date));
+    return before.length > 0 ? before[0].weight : null;
+  }, [allLogs, currentDate]);
   const [isSaving, setIsSaving] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [isFreeTextSaving, setIsFreeTextSaving] = useState(false);
@@ -68,9 +76,7 @@ export function InputContainer() {
 
       const today = formatDate(new Date());
 
-      // 가장 최근 체중 기록 (이전 날짜 기준)
-      const withWeight = logs.filter((l) => l.weight !== null && l.date < today);
-      setPrevWeight(withWeight.length > 0 ? withWeight[0].weight : null);
+      setAllLogs(logs);
 
       // 네비게이션 하한선: dietStartDate 우선, 없으면 가장 오래된 로그 날짜
       const dietStart = settings.dietStartDate;
@@ -125,6 +131,12 @@ export function InputContainer() {
     try {
       const updated = await actionUpsertDailyLog(currentDate, update);
       setCurrentLog(updated); // 서버 응답(계산 필드 포함)으로 교체
+      // prevWeight 파생값이 다음 날짜 이동 시 올바르도록 allLogs 동기화
+      setAllLogs((prev) => {
+        const exists = prev.some((l) => l.date === currentDate);
+        if (exists) return prev.map((l) => (l.date === currentDate ? updated : l));
+        return [...prev, updated].sort((a, b) => b.date.localeCompare(a.date));
+      });
     } catch {
       // 실패 시 롤백
       setCurrentLog(previousLog);
@@ -154,6 +166,7 @@ export function InputContainer() {
       const logs = await actionGetRecentDailyLogs(30);
       const unclosed = logs.filter((l) => !l.closed);
       setPendingDays(unclosed.length);
+      setAllLogs(logs);
 
       const dates = logs.map((l) => l.date).sort();
       if (dates.length > 0) setMinDate(dates[0]);

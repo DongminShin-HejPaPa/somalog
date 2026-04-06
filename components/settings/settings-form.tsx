@@ -467,7 +467,7 @@ export function SettingsForm() {
       <Section title="하루 수분 목표">
         <InputField
           label="수분 목표"
-          value={form.waterGoal.toString()}
+          value={form.waterGoal.toFixed(1)}
           suffix="L"
           inputMode="decimal"
           onChange={(v) => handleChange("waterGoal", Number(v) || 0)}
@@ -779,9 +779,9 @@ export function SettingsForm() {
 
         {dialog === "confirm-demo" && (
           <div className="p-4 bg-secondary border border-border rounded-xl">
-            <p className="text-sm font-semibold mb-1">데모 데이터를 불러옵니다</p>
+            <p className="text-sm font-semibold mb-1 text-coral">⚠️ 기존 데이터가 모두 삭제됩니다</p>
             <p className="text-xs text-muted-foreground mb-4">
-              현재 데이터가 샘플 데이터(약 2주치 기록)로 교체됩니다.
+              현재 설정과 모든 기록이 삭제되고, 데모 데이터(2주치 샘플)로 교체됩니다. 이 작업은 되돌릴 수 없어요.
             </p>
             <div className="flex gap-2">
               <button
@@ -804,7 +804,7 @@ export function SettingsForm() {
       </div>
 
       {/* 계정 */}
-      <div className="px-4 py-4 space-y-3 pb-10">
+      <div className="px-4 py-4 space-y-3 pb-24">
         <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
           계정
         </h3>

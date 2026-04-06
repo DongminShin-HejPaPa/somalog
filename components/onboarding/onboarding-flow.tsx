@@ -6,6 +6,7 @@ import { MessageCircle, ArrowRight, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/lib/contexts/settings-context";
 import type { Settings } from "@/lib/types";
+import { serverLoadDemoData } from "@/app/actions/data-actions";
 
 const coachStyles = [
   { value: "strong", label: "팩트 위주 / 강한 코치", desc: "위로보다 수치와 사실로 강하게", example: "\"어제 야식 먹고 오늘 체중 올랐잖아. 당연한 결과야. 오늘 저녁은 관리식단 필수.\"" },
@@ -112,6 +113,10 @@ export function OnboardingFlow() {
   // 온보딩 완료 처리 중 (더블클릭 방지)
   const [isCompleting, setIsCompleting] = useState(false);
 
+  // 데모 인트로 화면
+  const [showDemoIntro, setShowDemoIntro] = useState(true);
+  const [isDemoLoading, setIsDemoLoading] = useState(false);
+
   const step = steps[currentStep];
   const progress = ((currentStep + 1) / steps.length) * 100;
 
@@ -208,6 +213,17 @@ export function OnboardingFlow() {
     router.push("/input");
   };
 
+  const handleDemoChoice = async () => {
+    if (isDemoLoading) return;
+    setIsDemoLoading(true);
+    try {
+      await serverLoadDemoData();
+      router.push("/input");
+    } finally {
+      setIsDemoLoading(false);
+    }
+  };
+
   const handleSkip = async () => {
     if (isCompleting) return;
     setIsCompleting(true);
@@ -240,6 +256,37 @@ export function OnboardingFlow() {
   // step 3에서 다음으로 가려면 targetWeight가 입력되어야 함
   const step3CanProceed =
     Number(targetWeight) > 0 && Number(targetWeight) < Number(weight);
+
+  if (showDemoIntro) {
+    return (
+      <div className="min-h-dvh flex flex-col px-4 pt-12 pb-8">
+        <div className="flex items-start gap-3 mb-8">
+          <div className="w-10 h-10 rounded-full bg-navy flex items-center justify-center flex-shrink-0">
+            <MessageCircle className="w-5 h-5 text-white" />
+          </div>
+          <div className="bg-secondary rounded-2xl rounded-tl-md px-4 py-3 max-w-[85%]">
+            <p className="text-sm leading-relaxed">안녕! 나는 쏘마야. 본격적으로 시작하기 전에, 데모 데이터를 자동 입력해서 앱을 먼저 둘러볼 수 있어. 2주치 샘플 기록으로 앱 기능을 미리 체험해볼래?</p>
+          </div>
+        </div>
+        <div className="space-y-3 ml-[52px]">
+          <button
+            onClick={handleDemoChoice}
+            disabled={isDemoLoading}
+            className="w-full py-3 rounded-xl bg-navy text-white text-sm font-semibold min-h-[48px] disabled:opacity-60 transition-colors"
+          >
+            {isDemoLoading ? "데모 데이터 불러오는 중..." : "예, 데모 체험할게요"}
+          </button>
+          <button
+            onClick={() => setShowDemoIntro(false)}
+            disabled={isDemoLoading}
+            className="w-full py-3 rounded-xl bg-secondary text-foreground text-sm font-medium min-h-[48px] border border-border disabled:opacity-60 transition-colors"
+          >
+            아니오, 직접 설정할게요
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-dvh flex flex-col">

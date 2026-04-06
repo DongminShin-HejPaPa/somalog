@@ -18,8 +18,9 @@ export async function serverResetAllData(): Promise<void> {
   await Promise.all([resetSettings(), resetDailyLogs(), resetWeeklyLogs()]);
 }
 
-/** Supabase 데이터를 데모(mock) 데이터로 교체합니다 */
+/** Supabase 데이터를 데모(mock) 데이터로 교체합니다 (기존 데이터 초기화 후 로드) */
 export async function serverLoadDemoData(): Promise<void> {
+  await Promise.all([resetSettings(), resetDailyLogs(), resetWeeklyLogs()]);
   await Promise.all([
     loadMockSettings(),
     loadMockDailyLogs(),

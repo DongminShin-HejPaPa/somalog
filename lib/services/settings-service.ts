@@ -1,4 +1,5 @@
-import { unstable_cache, revalidateTag } from "next/cache";
+import { cache } from "react";
+import { revalidateTag } from "next/cache";
 import { getAuthUser } from "@/lib/supabase/server";
 import { createClient } from "@/lib/supabase/server";
 import type { Settings, SettingsInput, SettingsUpdate } from "@/lib/types";
@@ -93,31 +94,24 @@ function settingsToRow(
 }
 
 /**
- * settings DB 쿼리를 요청 간 캐싱 (유저별 태그로 관리).
- * updateSettings / initializeSettings 호출 시 revalidateTag()로 즉시 무효화.
+ * 동일 요청 내 중복 DB 호출 방지용 React.cache() 메모이제이션.
+ * unstable_cache는 내부에서 cookies()를 쓸 수 없어 Next.js 15에서 에러 발생 — React.cache()로 대체.
  */
-function makeCachedSettingsFetcher(userId: string) {
-  return unstable_cache(
-    async () => {
-      const supabase = await createClient();
-      const { data, error } = await supabase
-        .from("settings")
-        .select("*")
-        .eq("user_id", userId)
-        .single();
-      if (error || !data) return null;
-      return rowToSettings(data as Record<string, unknown>);
-    },
-    ["settings", userId],
-    { tags: [`settings-${userId}`], revalidate: 300 }
-  );
-}
+const fetchSettingsOnce = cache(async (userId: string): Promise<Settings | null> => {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("settings")
+    .select("*")
+    .eq("user_id", userId)
+    .single();
+  if (error || !data) return null;
+  return rowToSettings(data as Record<string, unknown>);
+});
 
 export async function getSettings(): Promise<Settings> {
   const user = await getAuthUser();
   if (!user) return createDefaultSettings();
-  const fetchSettings = makeCachedSettingsFetcher(user.id);
-  return (await fetchSettings()) ?? createDefaultSettings();
+  return (await fetchSettingsOnce(user.id)) ?? createDefaultSettings();
 }
 
 export async function updateSettings(data: SettingsUpdate): Promise<Settings> {

@@ -39,6 +39,7 @@ export function InputContainer() {
   const [isFreeTextSaving, setIsFreeTextSaving] = useState(false);
   const [closeError, setCloseError] = useState<string | null>(null);
   const [closeNavMessage, setCloseNavMessage] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const loadLog = useCallback(async (date: string) => {
     setIsLoading(true);
@@ -61,29 +62,39 @@ export function InputContainer() {
 
   useEffect(() => {
     const init = async () => {
-      // 가장 오래된 미완료(closed=false) 날짜 찾기
       const logs = await actionGetRecentDailyLogs(30);
       const unclosed = logs.filter((l) => !l.closed);
-      const oldest = unclosed.length > 0
-        ? unclosed[unclosed.length - 1]
-        : null;
-
       setPendingDays(unclosed.length);
 
-      // 네비게이션 하한선: 가장 오래된 로그 날짜
-      const dates = logs.map((l) => l.date).sort();
-      if (dates.length > 0) setMinDate(dates[0]);
+      const today = formatDate(new Date());
 
       // 가장 최근 체중 기록 (이전 날짜 기준)
-      const today = formatDate(new Date());
       const withWeight = logs.filter((l) => l.weight !== null && l.date < today);
       setPrevWeight(withWeight.length > 0 ? withWeight[0].weight : null);
 
-      const targetDate = oldest?.date ?? today;
+      // 네비게이션 하한선: dietStartDate 우선, 없으면 가장 오래된 로그 날짜
+      const dietStart = settings.dietStartDate;
+      const dates = logs.map((l) => l.date).sort();
+      const lowerBound = dietStart || (dates.length > 0 ? dates[0] : today);
+      setMinDate(lowerBound);
+
+      // 타겟 날짜: dietStart부터 시작해서 첫 번째 마감되지 않은 날짜
+      let targetDate = today;
+      if (dietStart) {
+        const closedDates = new Set(logs.filter((l) => l.closed).map((l) => l.date));
+        let candidate = dietStart;
+        while (candidate < today && closedDates.has(candidate)) {
+          candidate = addDays(candidate, 1);
+        }
+        targetDate = candidate;
+      } else {
+        targetDate = unclosed.length > 0 ? unclosed[unclosed.length - 1].date : today;
+      }
+
       await loadLog(targetDate);
     };
     init();
-  }, [loadLog]);
+  }, [loadLog]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const today = formatDate(new Date());
   const canGoPrev = !!minDate && currentDate > minDate;
@@ -105,13 +116,20 @@ export function InputContainer() {
   };
 
   const handleModalSave = async (update: DailyLogUpdate) => {
-    setIsSaving(true);
+    const previousLog = currentLog;
+
+    // 낙관적 업데이트: 모달 즉시 닫고 UI 먼저 반영
+    setCurrentLog(currentLog ? { ...currentLog, ...update } as DailyLog : null);
+    setModalField(null);
+
     try {
       const updated = await actionUpsertDailyLog(currentDate, update);
-      setCurrentLog(updated);
-      setModalField(null);
-    } finally {
-      setIsSaving(false);
+      setCurrentLog(updated); // 서버 응답(계산 필드 포함)으로 교체
+    } catch {
+      // 실패 시 롤백
+      setCurrentLog(previousLog);
+      setSaveError("저장에 실패했습니다. 다시 시도해주세요.");
+      setTimeout(() => setSaveError(null), 4000);
     }
   };
 
@@ -235,13 +253,23 @@ export function InputContainer() {
       />
 
       {closeNavMessage && (
-        <div className="mx-4 mt-3 px-3 py-2 bg-navy/10 border border-navy/20 rounded-lg text-xs text-navy font-medium text-center">
-          {closeNavMessage}
+        <div className="fixed bottom-20 inset-x-0 flex justify-center z-50 pointer-events-none px-4">
+          <div className="bg-navy text-white text-sm font-semibold px-5 py-2.5 rounded-full shadow-xl flex items-center gap-2">
+            <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none">
+              <path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <span>마감 완료 · {closeNavMessage}</span>
+          </div>
         </div>
       )}
       {closeError && (
         <div className="mx-4 mt-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600 text-center">
           {closeError}
+        </div>
+      )}
+      {saveError && (
+        <div className="mx-4 mt-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600 text-center">
+          {saveError}
         </div>
       )}
       <div className="px-4 mt-4 flex gap-2">

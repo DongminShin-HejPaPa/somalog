@@ -237,11 +237,14 @@ export async function closeDailyLog(date: string, existingLog?: DailyLog): Promi
   ]);
   if (!existing) return null;
 
-  // 1. 총평 + 한줄 요약 생성 (AI 실패 시 fallback 사용)
-  const [dailySummary, oneLiner] = await Promise.all([
-    Promise.resolve(generateDailySummary(existing, settings.waterGoal)),
-    generateAiOneLiner(existing, settings), // 내부적으로 5s timeout + fallback 처리
-  ]);
+  // 1. 총평 + 한줄 요약 생성 (AI 실패 시에도 반드시 upsert 진행)
+  const dailySummary = generateDailySummary(existing, settings.waterGoal);
+  let oneLiner: string;
+  try {
+    oneLiner = await generateAiOneLiner(existing, settings);
+  } catch {
+    oneLiner = "";
+  }
 
   const updated: DailyLog = { ...existing, dailySummary, oneLiner, closed: true };
   const row = dailyLogToRow(updated, user.id);

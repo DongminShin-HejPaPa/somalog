@@ -69,7 +69,7 @@ export function HomeContainer() {
           )}
         </div>
         {greeting && (
-          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{greeting}</p>
+          <p className="text-xs text-rose-500 mt-1 leading-relaxed">{greeting}</p>
         )}
         {!greeting && displayName && (
           <p className="text-xs text-muted-foreground mt-1">{displayName} 님</p>

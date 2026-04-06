@@ -90,6 +90,8 @@ export function OnboardingFlow() {
 
   // Step 4
   const [waterGoal, setWaterGoal] = useState(2.8);
+  const [showWaterDirectInput, setShowWaterDirectInput] = useState(false);
+  const [waterGoalInput, setWaterGoalInput] = useState("");
 
   // Step 5
   const [routineWeightTime, setRoutineWeightTime] = useState("아침 기상 직후");
@@ -159,6 +161,7 @@ export function OnboardingFlow() {
     if (currentStep > 0) {
       setShowIntensiveCriteria(false);
       setShowRoutineEdit(false);
+      setShowWaterDirectInput(false);
       setCurrentStep(currentStep - 1);
     }
   };
@@ -291,6 +294,7 @@ export function OnboardingFlow() {
               <div className="flex items-center gap-2">
                 <input
                   type="number"
+                  inputMode="decimal"
                   placeholder="키"
                   value={height}
                   onChange={(e) => setHeight(e.target.value)}
@@ -301,6 +305,7 @@ export function OnboardingFlow() {
               <div className="flex items-center gap-2">
                 <input
                   type="number"
+                  inputMode="decimal"
                   placeholder="현재 체중"
                   value={weight}
                   onChange={(e) => setWeight(e.target.value)}
@@ -334,6 +339,7 @@ export function OnboardingFlow() {
               <div className="flex items-center gap-2">
                 <input
                   type="number"
+                  inputMode="decimal"
                   placeholder="목표 체중"
                   value={targetWeight}
                   onChange={(e) => setTargetWeight(e.target.value)}
@@ -401,6 +407,7 @@ export function OnboardingFlow() {
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
+                    inputMode="numeric"
                     placeholder="목표 기간"
                     value={targetMonthsInput}
                     onChange={handleMonthsInput}
@@ -423,23 +430,44 @@ export function OnboardingFlow() {
                 </span>
               </div>
               <button
-                onClick={() => { setWaterGoal(2.8); nextStep(); }}
-                className="w-full px-4 py-3 rounded-xl border border-border text-sm text-left min-h-[48px] hover:border-navy/30 transition-colors"
-              >
-                2.8L로 할게 (기본값)
-              </button>
-              <button
                 onClick={() => { setWaterGoal(recommendedWater); nextStep(); }}
                 className="w-full px-4 py-3 rounded-xl border border-navy bg-navy/5 text-sm text-left min-h-[48px] transition-colors"
               >
                 권장량 ({recommendedWater.toFixed(1)}L)으로 할게
               </button>
-              <button
-                onClick={() => nextStep()}
-                className="w-full px-4 py-3 rounded-xl border border-border text-sm text-left min-h-[48px] hover:border-navy/30 transition-colors"
-              >
-                직접 입력
-              </button>
+              {!showWaterDirectInput ? (
+                <button
+                  onClick={() => { setWaterGoalInput(String(waterGoal)); setShowWaterDirectInput(true); }}
+                  className="w-full px-4 py-3 rounded-xl border border-border text-sm text-left min-h-[48px] hover:border-navy/30 transition-colors"
+                >
+                  직접 입력
+                </button>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      placeholder="수분 목표"
+                      value={waterGoalInput}
+                      onChange={(e) => setWaterGoalInput(e.target.value)}
+                      autoFocus
+                      className="flex-1 px-3 py-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[48px]"
+                    />
+                    <span className="text-sm text-muted-foreground w-4">L</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const n = parseFloat(waterGoalInput);
+                      if (!isNaN(n) && n > 0) setWaterGoal(n);
+                      nextStep();
+                    }}
+                    className="w-full py-3 rounded-xl bg-navy text-white text-sm font-medium min-h-[48px]"
+                  >
+                    확인
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

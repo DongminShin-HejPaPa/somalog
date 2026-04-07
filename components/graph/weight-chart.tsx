@@ -22,6 +22,7 @@ interface WeightChartProps {
   targetMonths: number;
   lowestWeight: number;
   lowestWeightDate: string;
+  intensiveDayOn: boolean;
 }
 
 type Period = "2w" | "1m" | "3m" | "all";
@@ -93,6 +94,7 @@ export function WeightChart({
   targetMonths,
   lowestWeight,
   lowestWeightDate,
+  intensiveDayOn,
 }: WeightChartProps) {
   const [period, setPeriod] = useState<Period>("all");
   const [show3dAvg, setShow3dAvg] = useState(true);
@@ -132,7 +134,7 @@ export function WeightChart({
       avg3d: log.avgWeight3d,
       isLowest: log.date === lowestWeightDate,
       isSurge: surge,
-      isIntensive: log.intensiveDay === true,
+      isIntensive: intensiveDayOn && log.intensiveDay === true,
       isMonday: new Date(log.date).getDay() === 1,
     };
   });

@@ -7,6 +7,8 @@ import {
   closeDailyLog,
   reopenDailyLog,
   getRecentDailyLogs,
+  getDailyLogsWithOffset,
+  getDailyLogsTotalCount,
   regenerateDailySummary,
 } from "@/lib/services/daily-log-service";
 import { getWeeklyLogs } from "@/lib/services/weekly-log-service";
@@ -57,6 +59,17 @@ export async function actionGetRecentDailyLogs(
   return getRecentDailyLogs(count);
 }
 
+export async function actionGetMoreDailyLogs(
+  count: number,
+  offset: number
+): Promise<DailyLog[]> {
+  return getDailyLogsWithOffset(count, offset);
+}
+
+export async function actionGetDailyLogsTotalCount(): Promise<number> {
+  return getDailyLogsTotalCount();
+}
+
 export async function actionGetWeeklyLogs(
   count: number
 ): Promise<WeeklyLog[]> {
@@ -71,5 +84,8 @@ export async function actionGetLowestWeight(): Promise<{
 }
 
 export async function actionRegenerateDailySummary(date: string): Promise<import("@/lib/types").DailyLog | null> {
-  return regenerateDailySummary(date);
+  const result = await regenerateDailySummary(date);
+  revalidatePath("/log");
+  revalidatePath("/home");
+  return result;
 }

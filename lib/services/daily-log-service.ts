@@ -402,3 +402,40 @@ export async function loadMockDailyLogs(): Promise<void> {
     .from("daily_logs")
     .upsert(rows, { onConflict: "user_id,date" });
 }
+
+export async function getDailyLogsWithOffset(count: number, offset: number): Promise<DailyLog[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from("daily_logs")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("date", { ascending: false })
+    .range(offset, offset + count - 1);
+
+  if (error || !data) return [];
+
+  return data.map((row) => rowToDailyLog(row as Record<string, unknown>));
+}
+
+export async function getDailyLogsTotalCount(): Promise<number> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return 0;
+
+  const { count, error } = await supabase
+    .from("daily_logs")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", user.id);
+
+  if (error) return 0;
+  return count ?? 0;
+}

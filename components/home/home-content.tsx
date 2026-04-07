@@ -51,7 +51,7 @@ export function HomeContent({ todayLog, recentLogs }: HomeContentProps) {
         startWeight={settings.startWeight}
         targetWeight={settings.targetWeight}
         weightChange={todayLog.weightChange}
-        isIntensiveDay={todayLog.intensiveDay === true}
+        isIntensiveDay={settings.intensiveDayOn && todayLog.intensiveDay === true}
       />
 
       <InputStatusChips log={todayLog} />

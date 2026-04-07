@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { useSettings } from "@/lib/contexts/settings-context";
 import type { Settings } from "@/lib/types";
 import { serverLoadDemoData } from "@/app/actions/data-actions";
+import { DIET_PRESETS, calcAllPresetMonths, computePresetMonths } from "@/lib/utils/diet-presets";
 
 const coachStyles = [
   { value: "strong", label: "팩트 위주 / 강한 코치", desc: "위로보다 수치와 사실로 강하게", example: "\"어제 야식 먹고 오늘 체중 올랐잖아. 당연한 결과야. 오늘 저녁은 관리식단 필수.\"" },
@@ -15,37 +16,7 @@ const coachStyles = [
   { value: "data", label: "데이터 리포터", desc: "감정 없이 수치와 트렌드만", example: "\"주간 평균 89.4kg. 전주 대비 +0.3kg. 운동 3/7일. 야식 2회.\"" },
 ];
 
-const dietPresets = [
-  { value: "easygoing", label: "여유롭게", desc: "월 약 1kg · 코칭 보통", ratePerMonth: 1 },
-  { value: "sustainable", label: "착실하게", desc: "월 약 2kg · 코칭 보통", badge: "추천", ratePerMonth: 2 },
-  { value: "medium", label: "집중해서", desc: "월 약 3kg · 코칭 높음", ratePerMonth: 3 },
-  { value: "intensive", label: "전력 질주", desc: "월 약 4kg · 코칭 최강", ratePerMonth: 4 },
-  { value: "custom", label: "내가 정할게", desc: "목표 체중·기간 직접 입력", ratePerMonth: 0 },
-];
-
-function calcMonths(totalLoss: number, rate: number): number {
-  if (totalLoss <= 0 || rate <= 0) return 1;
-  return Math.max(1, Math.round(totalLoss / rate));
-}
-
-/**
- * 전체 프리셋 개월 수를 한꺼번에 계산하고,
- * "빠른 프리셋 = 더 적은 개월" 순서를 보장하도록 후처리.
- * presets는 느린 순서(index 0)부터 빠른 순서(index n-1)로 전달.
- */
-function calcAllPresetMonths(
-  totalLoss: number,
-  rates: number[]
-): number[] {
-  const months = rates.map((r) => calcMonths(totalLoss, r));
-  // 빠른 쪽(뒤)부터 앞(느린 쪽)을 보정: 느린 프리셋은 항상 1 이상 더 많아야 함
-  for (let i = months.length - 2; i >= 0; i--) {
-    if (months[i] <= months[i + 1]) {
-      months[i] = months[i + 1] + 1;
-    }
-  }
-  return months;
-}
+const dietPresets = DIET_PRESETS;
 
 const intensiveCriteriaOptions = [
   { value: "역대최저", label: "역대 최저 체중 초과 시", desc: "가장 엄격 (추천)" },
@@ -418,9 +389,12 @@ export function OnboardingFlow() {
                   const actualRate = months != null && totalLoss > 0
                     ? (totalLoss / months).toFixed(1)
                     : null;
+                  const fallbackDesc = p.value === "custom"
+                    ? "목표 체중·기간 직접 입력"
+                    : `월 약 ${p.ratePerMonth}kg · ${p.coaching}`;
                   const desc = months != null
                     ? `${months}개월 · 월 약 ${actualRate}kg`
-                    : p.desc;
+                    : fallbackDesc;
                   return (
                     <button
                       key={p.value}

@@ -9,6 +9,7 @@ import Link from "next/link";
 import { LogOut, UserPen } from "lucide-react";
 import { serverResetAllData, serverLoadDemoData } from "@/app/actions/data-actions";
 import { mockSettings } from "@/lib/mock-data";
+import { DIET_PRESETS, computePresetMonths } from "@/lib/utils/diet-presets";
 import { logout } from "@/app/actions/auth-actions";
 import { AccountInfoDialog } from "./account-info-dialog";
 
@@ -21,41 +22,16 @@ const coachStyles = [
   { value: "data", label: "데이터 리포터", desc: "감정 없이 수치와 트렌드만" },
 ];
 
-const dietPresets = [
-  { value: "easygoing", label: "여유롭게", months: 18, coaching: "코칭 보통" },
-  { value: "sustainable", label: "착실하게", months: 12, coaching: "코칭 보통", badge: "추천" },
-  { value: "medium", label: "집중해서", months: 6, coaching: "코칭 높음" },
-  { value: "intensive", label: "전력 질주", months: 3, coaching: "코칭 최강" },
-  { value: "custom", label: "내가 정할게", months: 0, coaching: "" },
-];
-
-// 각 프리셋의 고정 월간 감량 속도 (kg/월)
-const presetRates: Partial<Record<string, number>> = {
-  easygoing: 0.5, sustainable: 0.75, medium: 1.5, intensive: 3.0,
-};
-
-function computePresetMonths(preset: string, startWeight: number, targetWeight: number): number {
-  const rate = presetRates[preset];
-  if (!rate || startWeight <= 0 || targetWeight <= 0 || targetWeight >= startWeight) {
-    const defaults: Record<string, number> = { easygoing: 18, sustainable: 12, medium: 6, intensive: 3 };
-    return defaults[preset] ?? 12;
-  }
-  return Math.max(1, Math.ceil((startWeight - targetWeight) / rate));
-}
+const dietPresets = DIET_PRESETS;
 
 function getDietPresetDesc(preset: typeof dietPresets[0], startWeight: number, targetWeight: number): string {
   if (preset.value === "custom") return "목표 기간 직접 입력";
-  const rate = presetRates[preset.value];
   const months = computePresetMonths(preset.value, startWeight, targetWeight);
   const hasValidWeights = startWeight > 0 && targetWeight > 0 && targetWeight < startWeight;
-  return hasValidWeights && rate
-    ? `${months}개월, ~${rate}kg/월, ${preset.coaching}`
+  return hasValidWeights
+    ? `${months}개월, ~${preset.ratePerMonth}kg/월, ${preset.coaching}`
     : `${months}개월, ${preset.coaching}`;
 }
-
-const presetMonths: Partial<Record<string, number>> = {
-  easygoing: 18, sustainable: 12, medium: 6, intensive: 3,
-};
 
 const PRESET_CRITERIA = ["역대최저", "0.5kg", "1.0kg"];
 

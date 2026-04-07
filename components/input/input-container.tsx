@@ -84,18 +84,17 @@ export function InputContainer() {
       const lowerBound = dietStart || (dates.length > 0 ? dates[0] : today);
       setMinDate(lowerBound);
 
-      // 타겟 날짜: dietStart부터 시작해서 첫 번째 마감되지 않은 날짜
+      // 타겟 날짜: 로드된 로그 중 가장 오래된 날짜부터 첫 번째 마감되지 않은 날짜
+      // (dietStart부터 검색하면 오래된 로그를 로드하지 않아 마감 여부 판단 불가)
       let targetDate = today;
-      if (dietStart) {
-        const closedDates = new Set(logs.filter((l) => l.closed).map((l) => l.date));
-        let candidate = dietStart;
-        while (candidate < today && closedDates.has(candidate)) {
-          candidate = addDays(candidate, 1);
-        }
-        targetDate = candidate;
-      } else {
-        targetDate = unclosed.length > 0 ? unclosed[unclosed.length - 1].date : today;
+      const closedDates = new Set(logs.filter((l) => l.closed).map((l) => l.date));
+      // 로드된 로그 중 가장 오래된 날짜부터 검색
+      const oldestLoadedDate = dates.length > 0 ? dates[0] : today;
+      let candidate = oldestLoadedDate;
+      while (candidate < today && closedDates.has(candidate)) {
+        candidate = addDays(candidate, 1);
       }
+      targetDate = candidate;
 
       await loadLog(targetDate);
     };
@@ -171,12 +170,14 @@ export function InputContainer() {
       const dates = logs.map((l) => l.date).sort();
       if (dates.length > 0) setMinDate(dates[0]);
 
-      // 마감 후 다음 날짜(오늘 이하)로 이동
-      const nextDate = addDays(currentDate, 1);
-      if (nextDate <= today) {
-        setCloseNavMessage(`${nextDate.slice(5).replace("-", "/")} 로 이동합니다`);
+      // 마감 후 다음 미완료 날짜로 이동 (단순 +1일이 아닌 실제 첫 미완료 날짜)
+      const sortedUnclosed = [...unclosed].sort((a, b) => a.date.localeCompare(b.date));
+      const afterCurrent = sortedUnclosed.find((l) => l.date > currentDate);
+      const nextTarget = afterCurrent?.date ?? today;
+      if (nextTarget <= today) {
+        setCloseNavMessage(`${nextTarget.slice(5).replace("-", "/")} 로 이동합니다`);
         setTimeout(() => setCloseNavMessage(null), 3000);
-        await loadLog(nextDate);
+        await loadLog(nextTarget);
       }
     } catch {
       setCloseError("마감에 실패했습니다. 잠시 후 다시 시도해주세요.");
@@ -218,6 +219,8 @@ export function InputContainer() {
           canGoNext={canGoNext}
           onPrev={handlePrev}
           onNext={handleNext}
+          minDate={minDate ?? undefined}
+          onDateSelect={loadLog}
         />
         <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
           이 날짜의 기록이 없습니다
@@ -244,6 +247,8 @@ export function InputContainer() {
         canGoNext={canGoNext}
         onPrev={handlePrev}
         onNext={handleNext}
+        minDate={minDate ?? undefined}
+        onDateSelect={loadLog}
       />
 
       {settings.intensiveDayOn && currentLog.intensiveDay && (
@@ -317,7 +322,7 @@ export function InputContainer() {
         )}
       </div>
 
-      <FreeTextInput onSubmit={handleFreeText} isSaving={isFreeTextSaving} />
+      <FreeTextInput onSubmit={handleFreeText} isSaving={isFreeTextSaving} isClosed={currentLog.closed} />
 
       <InputModal
         field={modalField}

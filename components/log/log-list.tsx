@@ -231,14 +231,12 @@ export function LogList({
                         </div>
 
                         {log.dailySummary && (
-                          <details className="group">
-                            <summary className="text-xs font-medium text-navy cursor-pointer py-1">
-                              코치의 총평
-                            </summary>
-                            <p className="text-sm leading-relaxed mt-1 text-muted-foreground">
+                          <div className="mt-2">
+                            <p className="text-xs font-medium text-navy mb-1">코치의 총평</p>
+                            <p className="text-sm leading-relaxed text-muted-foreground">
                               {log.dailySummary}
                             </p>
-                          </details>
+                          </div>
                         )}
 
                         {log.closed && (

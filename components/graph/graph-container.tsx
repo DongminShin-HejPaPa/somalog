@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSettings } from "@/lib/contexts/settings-context";
 import {
-  actionGetRecentDailyLogs,
+  actionGetAllDailyLogs,
   actionGetLowestWeight,
 } from "@/app/actions/log-actions";
 import { WeightChart } from "./weight-chart";
@@ -16,7 +16,7 @@ export function GraphContainer() {
 
   useEffect(() => {
     Promise.all([
-      actionGetRecentDailyLogs(90),
+      actionGetAllDailyLogs(),
       actionGetLowestWeight(),
     ]).then(([fetchedLogs, fetchedLowest]) => {
       setLogs(fetchedLogs);

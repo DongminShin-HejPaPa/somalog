@@ -11,9 +11,11 @@ import type { DailyLog } from "@/lib/types";
 interface HomeContentProps {
   todayLog: DailyLog | null;
   recentLogs: DailyLog[];
+  onCloseToday?: () => void;
+  isClosingToday?: boolean;
 }
 
-export function HomeContent({ todayLog, recentLogs }: HomeContentProps) {
+export function HomeContent({ todayLog, recentLogs, onCloseToday, isClosingToday }: HomeContentProps) {
   const { settings } = useSettings();
 
   if (!todayLog) {
@@ -54,7 +56,7 @@ export function HomeContent({ todayLog, recentLogs }: HomeContentProps) {
         isIntensiveDay={settings.intensiveDayOn && todayLog.intensiveDay === true}
       />
 
-      <InputStatusChips log={todayLog} />
+      <InputStatusChips log={todayLog} onCloseToday={onCloseToday} isClosingToday={isClosingToday} />
 
       {oneLiner && (
         <CoachOneLiner

@@ -159,8 +159,14 @@ export function WeightChart({
   const minW = Math.floor(Math.min(...allWeights) - 1);
   const maxW = Math.ceil(Math.max(...allWeights) + 1);
 
-  const currentWeight = allWeights[allWeights.length - 1] ?? startWeight;
-  const totalChange = currentWeight - startWeight;
+  // 카드 계산은 항상 전체 로그 기준 최신 체중 사용 (표시 기간과 무관)
+  const allSortedWeights = sortedLogs
+    .map((l) => l.weight)
+    .filter((w): w is number => w !== null);
+  const currentWeight =
+    allSortedWeights.length > 0
+      ? allSortedWeights[allSortedWeights.length - 1]
+      : startWeight;
   const remaining = currentWeight - targetWeight;
 
   const daysSoFar = Math.ceil(
@@ -323,18 +329,19 @@ export function WeightChart({
         <div className="p-3 bg-secondary rounded-xl">
           <p className="text-xs text-muted-foreground">시작 체중</p>
           <p className="text-lg font-bold">{startWeight} kg</p>
+          <p className="text-xs text-muted-foreground">{startDate.slice(5).replace("-", "/")}</p>
         </div>
         <div className="p-3 bg-secondary rounded-xl">
-          <p className="text-xs text-muted-foreground">현재 체중</p>
-          <p className="text-lg font-bold">{currentWeight} kg</p>
-          <p className={cn("text-xs font-medium", totalChange < 0 ? "text-success" : "text-coral")}>
-            {totalChange > 0 ? "+" : ""}{totalChange.toFixed(1)} kg
+          <p className="text-xs text-muted-foreground">목표 체중</p>
+          <p className="text-lg font-bold">{targetWeight} kg</p>
+          <p className="text-xs text-muted-foreground">
+            {targetEndDate.getFullYear()}/{targetEndDate.getMonth() + 1}/{targetEndDate.getDate()}
           </p>
         </div>
         <div className="p-3 bg-secondary rounded-xl">
           <p className="text-xs text-muted-foreground">역대 최저</p>
           <p className="text-lg font-bold">{lowestWeight} kg</p>
-          <p className="text-xs text-muted-foreground">{lowestWeightDate.slice(5)}</p>
+          <p className="text-xs text-muted-foreground">{lowestWeightDate.slice(5).replace("-", "/")}</p>
         </div>
         <div className="p-3 bg-secondary rounded-xl">
           <p className="text-xs text-muted-foreground">목표까지</p>

@@ -433,7 +433,7 @@ export async function autoCloseOldLogs(): Promise<number> {
 }
 
 /**
- * 오늘 이하 날짜 중 마감되지 않은 가장 오래된 로그 1건 반환.
+ * 오늘 이하 날짜 중 마감되지 않은 가장 최근 로그 1건 반환.
  * 입력탭 진입 시 초기 날짜 결정에 사용.
  */
 export async function getFirstUnclosedLog(): Promise<DailyLog | null> {
@@ -452,7 +452,7 @@ export async function getFirstUnclosedLog(): Promise<DailyLog | null> {
     .eq("user_id", user.id)
     .eq("closed", false)
     .lte("date", today)
-    .order("date", { ascending: true })
+    .order("date", { ascending: false })
     .limit(1)
     .maybeSingle();
 
@@ -495,4 +495,23 @@ export async function getDailyLogsTotalCount(): Promise<number> {
 
   if (error) return 0;
   return count ?? 0;
+}
+
+export async function getAllDailyLogs(): Promise<DailyLog[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from("daily_logs")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("date", { ascending: false });
+
+  if (error || !data) return [];
+
+  return data.map((row) => rowToDailyLog(row as Record<string, unknown>));
 }

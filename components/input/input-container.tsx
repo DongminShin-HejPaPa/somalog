@@ -198,10 +198,13 @@ export function InputContainer() {
       const dates = logs.map((l) => l.date).sort();
       if (dates.length > 0) setMinDate(dates[0]);
 
-      // 마감 후 다음 미마감 날짜로 이동
-      const sortedUnclosed = [...unclosed].sort((a, b) => a.date.localeCompare(b.date));
-      const afterCurrent = sortedUnclosed.find((l) => l.date > currentDate);
-      const nextTarget = afterCurrent?.date ?? today;
+      // 마감 후 가장 최근 미마감 날짜로 이동 (오래된 날짜 마감 후에도 최신 날짜로 이동)
+      const sortedUnclosed = [...unclosed]
+        .filter((l) => l.date <= today)
+        .sort((a, b) => a.date.localeCompare(b.date));
+      const nextTarget = sortedUnclosed.length > 0
+        ? sortedUnclosed[sortedUnclosed.length - 1].date
+        : today;
       if (nextTarget <= today) {
         setCloseNavMessage(`${nextTarget.slice(5).replace("-", "/")} 로 이동합니다`);
         setTimeout(() => setCloseNavMessage(null), 3000);

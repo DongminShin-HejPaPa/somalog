@@ -198,12 +198,12 @@ export function InputContainer() {
       const dates = logs.map((l) => l.date).sort();
       if (dates.length > 0) setMinDate(dates[0]);
 
-      // 마감 후 가장 최근 미마감 날짜로 이동 (오래된 날짜 마감 후에도 최신 날짜로 이동)
+      // 마감 후 가장 오래된 미마감 날짜로 이동
       const sortedUnclosed = [...unclosed]
         .filter((l) => l.date <= today)
         .sort((a, b) => a.date.localeCompare(b.date));
       const nextTarget = sortedUnclosed.length > 0
-        ? sortedUnclosed[sortedUnclosed.length - 1].date
+        ? sortedUnclosed[0].date
         : today;
       if (nextTarget <= today) {
         setCloseNavMessage(`${nextTarget.slice(5).replace("-", "/")} 로 이동합니다`);
@@ -277,7 +277,7 @@ export function InputContainer() {
               <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.5"/>
               <path d="M8 5v3.5M8 11v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
-            <span>오래된 미마감 날짜 {autoCloseToast}일을 자동 마감했어요</span>
+            <span>한 달 넘게 지난 미마감 날짜 {autoCloseToast}일을 자동 마감했어요</span>
           </div>
         </div>
       )}

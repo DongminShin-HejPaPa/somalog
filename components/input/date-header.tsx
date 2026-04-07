@@ -63,12 +63,14 @@ function CalendarPicker({
     }
   };
 
-  // Build day cells (pad start with nulls for day-of-week offset)
+  // Build day cells (pad start with nulls for day-of-week offset, always 6 rows)
   const firstDow = new Date(viewYear, viewMonth, 1).getDay(); // 0=Sun
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
   const cells: (number | null)[] = [];
   for (let i = 0; i < firstDow; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  // 항상 6행(42칸)으로 패딩 — 월 이동 시 달력 높이 고정
+  while (cells.length < 42) cells.push(null);
 
   // Year range from minDate year to maxDate year
   const minYear = new Date(minDate + "T00:00:00").getFullYear();

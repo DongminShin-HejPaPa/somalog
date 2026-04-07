@@ -34,6 +34,13 @@ const periodLabels: Record<Period, string> = {
   all: "전체",
 };
 
+function fmtCardDate(d: Date): string {
+  const yy = String(d.getFullYear()).slice(2);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yy}/${mm}/${dd}`;
+}
+
 interface CustomDotProps {
   cx?: number;
   cy?: number;
@@ -228,13 +235,15 @@ export function WeightChart({
             </svg>
             역대 최저
           </span>
-          <span className="flex items-center gap-1.5">
-            {/* 빨간 원 = Hard Reset Day */}
-            <svg width="12" height="12" viewBox="0 0 12 12">
-              <circle cx="6" cy="6" r="4" fill="#f87171" stroke="white" strokeWidth="1.5" />
-            </svg>
-            Hard Reset Day
-          </span>
+          {intensiveDayOn && (
+            <span className="flex items-center gap-1.5">
+              {/* 빨간 원 = Hard Reset Day */}
+              <svg width="12" height="12" viewBox="0 0 12 12">
+                <circle cx="6" cy="6" r="4" fill="#f87171" stroke="white" strokeWidth="1.5" />
+              </svg>
+              Hard Reset Day
+            </span>
+          )}
           <span className="flex items-center gap-1.5">
             {/* 사각형 = 전일 대비 1kg↑ */}
             <svg width="12" height="12" viewBox="0 0 12 12">
@@ -329,26 +338,24 @@ export function WeightChart({
         <div className="p-3 bg-secondary rounded-xl">
           <p className="text-xs text-muted-foreground">시작 체중</p>
           <p className="text-lg font-bold">{startWeight} kg</p>
-          <p className="text-xs text-muted-foreground">{startDate.slice(5).replace("-", "/")}</p>
+          <p className="text-xs text-muted-foreground">{fmtCardDate(new Date(startDate + "T00:00:00"))}</p>
         </div>
         <div className="p-3 bg-secondary rounded-xl">
           <p className="text-xs text-muted-foreground">목표 체중</p>
           <p className="text-lg font-bold">{targetWeight} kg</p>
-          <p className="text-xs text-muted-foreground">
-            {targetEndDate.getFullYear()}/{targetEndDate.getMonth() + 1}/{targetEndDate.getDate()}
-          </p>
+          <p className="text-xs text-muted-foreground">{fmtCardDate(targetEndDate)}</p>
         </div>
         <div className="p-3 bg-secondary rounded-xl">
           <p className="text-xs text-muted-foreground">역대 최저</p>
           <p className="text-lg font-bold">{lowestWeight} kg</p>
-          <p className="text-xs text-muted-foreground">{lowestWeightDate.slice(5).replace("-", "/")}</p>
+          <p className="text-xs text-muted-foreground">{fmtCardDate(new Date(lowestWeightDate + "T00:00:00"))}</p>
         </div>
         <div className="p-3 bg-secondary rounded-xl">
           <p className="text-xs text-muted-foreground">목표까지</p>
           <p className="text-lg font-bold">{remaining.toFixed(1)} kg</p>
           {estimatedDate && (
             <p className="text-xs text-muted-foreground">
-              예상 {estimatedDate.getFullYear()}/{estimatedDate.getMonth() + 1}/{estimatedDate.getDate()}
+              예상 {fmtCardDate(estimatedDate)}
             </p>
           )}
         </div>

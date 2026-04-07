@@ -781,7 +781,7 @@ export function SettingsForm() {
           <div className="p-4 bg-secondary border border-border rounded-xl">
             <p className="text-sm font-semibold mb-1 text-coral">⚠️ 기존 데이터가 모두 삭제됩니다</p>
             <p className="text-xs text-muted-foreground mb-4">
-              현재 설정과 모든 기록이 삭제되고, 데모 데이터(2주치 샘플)로 교체됩니다. 이 작업은 되돌릴 수 없어요.
+              현재 설정과 모든 기록이 삭제되고, 데모 데이터(3개월 97일 샘플)로 교체됩니다. 이 작업은 되돌릴 수 없어요.
             </p>
             <div className="flex gap-2">
               <button

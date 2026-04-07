@@ -7,6 +7,7 @@ import {
   closeDailyLog,
   reopenDailyLog,
   getRecentDailyLogs,
+  regenerateDailySummary,
 } from "@/lib/services/daily-log-service";
 import { getWeeklyLogs } from "@/lib/services/weekly-log-service";
 import { getLowestWeight } from "@/lib/services/stats-service";
@@ -67,4 +68,8 @@ export async function actionGetLowestWeight(): Promise<{
   date: string;
 }> {
   return getLowestWeight();
+}
+
+export async function actionRegenerateDailySummary(date: string): Promise<import("@/lib/types").DailyLog | null> {
+  return regenerateDailySummary(date);
 }

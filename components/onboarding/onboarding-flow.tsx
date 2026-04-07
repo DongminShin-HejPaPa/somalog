@@ -265,7 +265,7 @@ export function OnboardingFlow() {
             <MessageCircle className="w-5 h-5 text-white" />
           </div>
           <div className="bg-secondary rounded-2xl rounded-tl-md px-4 py-3 max-w-[85%]">
-            <p className="text-sm leading-relaxed">안녕! 나는 쏘마야. 본격적으로 시작하기 전에, 데모 데이터를 자동 입력해서 앱을 먼저 둘러볼 수 있어. 2주치 샘플 기록으로 앱 기능을 미리 체험해볼래?</p>
+            <p className="text-sm leading-relaxed">안녕! 나는 쏘마야. 본격적으로 시작하기 전에, 데모 데이터를 자동 입력해서 앱을 먼저 둘러볼 수 있어. 3개월치 샘플 기록으로 앱 기능을 미리 체험해볼래?</p>
           </div>
         </div>
         <div className="space-y-3 ml-[52px]">

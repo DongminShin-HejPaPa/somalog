@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Search, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { DailyLog, WeeklyLog } from "@/lib/types";
+import { actionRegenerateDailySummary } from "@/app/actions/log-actions";
 
 interface LogListProps {
   logs: DailyLog[];
@@ -15,6 +16,32 @@ function getDayOfWeek(dateStr: string) {
   return days[new Date(dateStr).getDay()];
 }
 
+function RegenerateButton({ date }: { date: string }) {
+  const [isLoading, setIsLoading] = useState(false);
+  const [done, setDone] = useState(false);
+  const handleClick = async () => {
+    if (isLoading || done) return;
+    setIsLoading(true);
+    try {
+      await actionRegenerateDailySummary(date);
+      setDone(true);
+      // Reload to show updated summary
+      window.location.reload();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  return (
+    <button
+      onClick={handleClick}
+      disabled={isLoading || done}
+      className="mt-2 text-xs text-navy font-medium underline disabled:opacity-50"
+    >
+      {isLoading ? "재생성 중..." : done ? "재생성 완료" : "총평 재생성"}
+    </button>
+  );
+}
+
 export function LogList({ logs, weeklyLogs }: LogListProps) {
   const [viewMode, setViewMode] = useState<"daily" | "weekly">("daily");
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
@@ -22,6 +49,7 @@ export function LogList({ logs, weeklyLogs }: LogListProps) {
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
 
   const filters = [
+    { key: "unclosed", label: "마감안한날" },
     { key: "intensive", label: "Hard Reset Mode" },
     { key: "exercise", label: "운동한 날" },
     { key: "lateSnack", label: "야식 있는 날" },
@@ -32,6 +60,7 @@ export function LogList({ logs, weeklyLogs }: LogListProps) {
       const meals = [log.breakfast, log.lunch, log.dinner].filter(Boolean).join(" ");
       if (!meals.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     }
+    if (activeFilter === "unclosed") return log.closed === false;
     if (activeFilter === "intensive") return log.intensiveDay === true;
     if (activeFilter === "exercise") return log.exercise === "Y";
     if (activeFilter === "lateSnack") return log.lateSnack === "Y";
@@ -121,8 +150,8 @@ export function LogList({ logs, weeklyLogs }: LogListProps) {
                           D+{log.day}
                         </span>
                       </div>
-                      {log.intensiveDay && (
-                        <span className="w-2 h-2 rounded-full bg-coral inline-block" />
+                      {!log.closed && (
+                        <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
                       )}
                     </div>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -163,6 +192,12 @@ export function LogList({ logs, weeklyLogs }: LogListProps) {
                           <span className="text-muted-foreground">체력</span>
                           <span>{log.energy ?? ""}</span>
                         </div>
+                        {log.intensiveDay && (
+                          <div className="col-span-2 flex items-center gap-1.5 mt-1">
+                            <span className="w-2 h-2 rounded-full bg-coral inline-block flex-shrink-0" />
+                            <span className="text-xs font-semibold text-coral">Hard Reset Mode</span>
+                          </div>
+                        )}
                       </div>
 
                       <div className="space-y-1 text-sm mb-3">
@@ -192,9 +227,7 @@ export function LogList({ logs, weeklyLogs }: LogListProps) {
                       )}
 
                       {log.closed && (
-                        <button className="mt-2 text-xs text-navy font-medium underline">
-                          총평 재생성
-                        </button>
+                        <RegenerateButton date={log.date} />
                       )}
                     </div>
                   )}

@@ -154,8 +154,8 @@ export function WeightChart({
   const allWeights = chartData
     .map((d) => d.weight)
     .filter((w): w is number => w !== null);
-  const minW = Math.floor(Math.min(...allWeights, targetWeight) - 1);
-  const maxW = Math.ceil(Math.max(...allWeights, startWeight) + 1);
+  const minW = Math.floor(Math.min(...allWeights) - 1);
+  const maxW = Math.ceil(Math.max(...allWeights) + 1);
 
   const currentWeight = allWeights[allWeights.length - 1] ?? startWeight;
   const totalChange = currentWeight - startWeight;
@@ -285,7 +285,7 @@ export function WeightChart({
               strokeWidth={1.5}
             />
             <Line
-              type="monotone"
+              type="linear"
               dataKey="goalWeight"
               stroke="#86efac"
               strokeWidth={1.5}

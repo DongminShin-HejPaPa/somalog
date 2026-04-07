@@ -305,6 +305,38 @@ export async function closeDailyLog(date: string, existingLog?: DailyLog): Promi
   return closedLog;
 }
 
+export async function regenerateDailySummary(date: string): Promise<DailyLog | null> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const [existing, settings] = await Promise.all([
+    getDailyLog(date),
+    getSettings(),
+  ]);
+  if (!existing || !existing.closed) return null;
+
+  const dailySummary = generateDailySummary(existing, settings.waterGoal);
+  let oneLiner: string;
+  try {
+    oneLiner = await generateAiOneLiner(existing, settings);
+  } catch {
+    oneLiner = existing.oneLiner ?? "";
+  }
+
+  const updated: DailyLog = { ...existing, dailySummary, oneLiner };
+  const row = dailyLogToRow(updated, user.id);
+
+  const { data: upserted, error } = await supabase
+    .from("daily_logs")
+    .upsert(row, { onConflict: "user_id,date" })
+    .select()
+    .single();
+
+  if (error || !upserted) return null;
+  return rowToDailyLog(upserted as Record<string, unknown>);
+}
+
 export async function reopenDailyLog(date: string): Promise<DailyLog | null> {
   const supabase = await createClient();
   const {

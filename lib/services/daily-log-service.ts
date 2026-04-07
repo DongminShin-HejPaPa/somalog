@@ -403,6 +403,63 @@ export async function loadMockDailyLogs(): Promise<void> {
     .upsert(rows, { onConflict: "user_id,date" });
 }
 
+/**
+ * 마감되지 않은 채 30일이 지난 로그를 일괄 마감 처리.
+ * 세션 시작 시 호출해 오래된 미마감 날짜를 정리한다.
+ * AI 피드백 생성 없이 closed=true 만 설정 (배치 처리).
+ */
+export async function autoCloseOldLogs(): Promise<number> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return 0;
+
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 30);
+  const cutoffDate = formatDate(cutoff);
+
+  const { data, error } = await supabase
+    .from("daily_logs")
+    .update({ closed: true })
+    .eq("user_id", user.id)
+    .eq("closed", false)
+    .lt("date", cutoffDate)
+    .select("date");
+
+  if (error || !data) return 0;
+  return data.length;
+}
+
+/**
+ * 오늘 이하 날짜 중 마감되지 않은 가장 오래된 로그 1건 반환.
+ * 입력탭 진입 시 초기 날짜 결정에 사용.
+ */
+export async function getFirstUnclosedLog(): Promise<DailyLog | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return null;
+
+  const today = formatDate(new Date());
+
+  const { data, error } = await supabase
+    .from("daily_logs")
+    .select("*")
+    .eq("user_id", user.id)
+    .eq("closed", false)
+    .lte("date", today)
+    .order("date", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return rowToDailyLog(data as Record<string, unknown>);
+}
+
 export async function getDailyLogsWithOffset(count: number, offset: number): Promise<DailyLog[]> {
   const supabase = await createClient();
   const {

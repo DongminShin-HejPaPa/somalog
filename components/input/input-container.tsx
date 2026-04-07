@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/lib/contexts/settings-context";
 import { formatDate, getDayNumber } from "@/lib/utils/date-utils";
@@ -10,6 +10,8 @@ import {
   actionCloseDailyLog,
   actionReopenDailyLog,
   actionGetRecentDailyLogs,
+  actionAutoCloseOldLogs,
+  actionGetFirstUnclosedLog,
 } from "@/app/actions/log-actions";
 import { actionParseFreText } from "@/app/actions/parse-actions";
 import { DateHeader } from "./date-header";
@@ -34,6 +36,10 @@ export function InputContainer() {
   const [pendingDays, setPendingDays] = useState(0);
   const [allLogs, setAllLogs] = useState<DailyLog[]>([]);
   const [minDate, setMinDate] = useState<string | null>(null);
+  const [autoCloseToast, setAutoCloseToast] = useState<number | null>(null);
+
+  // 세션 내 날짜 이동 캐시 — DB 재조회 없이 이미 로드한 날짜 즉시 표시
+  const logCache = useRef<Map<string, DailyLog>>(new Map());
 
   // currentDate 기준 이전 최신 체중 (날짜 이동 시마다 자동 재계산)
   const prevWeight = useMemo(() => {
@@ -42,6 +48,7 @@ export function InputContainer() {
       .sort((a, b) => b.date.localeCompare(a.date));
     return before.length > 0 ? before[0].weight : null;
   }, [allLogs, currentDate]);
+
   const [isSaving, setIsSaving] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [isFreeTextSaving, setIsFreeTextSaving] = useState(false);
@@ -49,7 +56,20 @@ export function InputContainer() {
   const [closeNavMessage, setCloseNavMessage] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  const updateCache = useCallback((log: DailyLog) => {
+    logCache.current.set(log.date, log);
+  }, []);
+
   const loadLog = useCallback(async (date: string) => {
+    // 캐시 히트: DB 없이 즉시 표시
+    const cached = logCache.current.get(date);
+    if (cached) {
+      setCurrentLog(cached);
+      setCurrentDate(date);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
       let log = await actionGetDailyLog(date);
@@ -57,10 +77,10 @@ export function InputContainer() {
       if (!log && date <= formatDate(new Date())) {
         log = await actionUpsertDailyLog(date, {});
       }
+      if (log) logCache.current.set(date, log);
       setCurrentLog(log);
       setCurrentDate(date);
     } catch {
-      // 로드 실패 시에도 날짜는 업데이트 (오늘 날짜 기준 재시도 가능하게)
       setCurrentLog(null);
       setCurrentDate(date);
     } finally {
@@ -70,32 +90,35 @@ export function InputContainer() {
 
   useEffect(() => {
     const init = async () => {
-      const logs = await actionGetRecentDailyLogs(30);
+      // 1. 30일 이상 된 미마감 날짜 일괄 자동 마감 (세션 시작 시 1회)
+      const autoClosedCount = await actionAutoCloseOldLogs();
+      if (autoClosedCount > 0) {
+        setAutoCloseToast(autoClosedCount);
+        setTimeout(() => setAutoCloseToast(null), 5000);
+      }
+
+      // 2. 최근 30개 로그 + 첫 미마감 날짜 병렬 조회
+      const today = formatDate(new Date());
+      const [logs, firstUnclosed] = await Promise.all([
+        actionGetRecentDailyLogs(30),
+        actionGetFirstUnclosedLog(),
+      ]);
+
       const unclosed = logs.filter((l) => !l.closed);
       setPendingDays(unclosed.length);
-
-      const today = formatDate(new Date());
-
       setAllLogs(logs);
 
-      // 네비게이션 하한선: dietStartDate 우선, 없으면 가장 오래된 로그 날짜
+      // 캐시 초기화 (로드된 30개 즉시 캐싱)
+      logs.forEach((l) => logCache.current.set(l.date, l));
+
+      // 네비게이션 하한선
       const dietStart = settings.dietStartDate;
       const dates = logs.map((l) => l.date).sort();
       const lowerBound = dietStart || (dates.length > 0 ? dates[0] : today);
       setMinDate(lowerBound);
 
-      // 타겟 날짜: 로드된 로그 중 가장 오래된 날짜부터 첫 번째 마감되지 않은 날짜
-      // (dietStart부터 검색하면 오래된 로그를 로드하지 않아 마감 여부 판단 불가)
-      let targetDate = today;
-      const closedDates = new Set(logs.filter((l) => l.closed).map((l) => l.date));
-      // 로드된 로그 중 가장 오래된 날짜부터 검색
-      const oldestLoadedDate = dates.length > 0 ? dates[0] : today;
-      let candidate = oldestLoadedDate;
-      while (candidate < today && closedDates.has(candidate)) {
-        candidate = addDays(candidate, 1);
-      }
-      targetDate = candidate;
-
+      // 타겟 날짜: DB에서 직접 조회한 첫 미마감 날짜 (없으면 오늘)
+      const targetDate = firstUnclosed?.date ?? today;
       await loadLog(targetDate);
     };
     init();
@@ -129,7 +152,8 @@ export function InputContainer() {
 
     try {
       const updated = await actionUpsertDailyLog(currentDate, update);
-      setCurrentLog(updated); // 서버 응답(계산 필드 포함)으로 교체
+      setCurrentLog(updated);
+      updateCache(updated);
       // prevWeight 파생값이 다음 날짜 이동 시 올바르도록 allLogs 동기화
       setAllLogs((prev) => {
         const exists = prev.some((l) => l.date === currentDate);
@@ -137,7 +161,6 @@ export function InputContainer() {
         return [...prev, updated].sort((a, b) => b.date.localeCompare(a.date));
       });
     } catch {
-      // 실패 시 롤백
       setCurrentLog(previousLog);
       setSaveError("저장에 실패했습니다. 다시 시도해주세요.");
       setTimeout(() => setSaveError(null), 4000);
@@ -146,7 +169,10 @@ export function InputContainer() {
 
   const handleReopen = async () => {
     const updated = await actionReopenDailyLog(currentDate);
-    if (updated) setCurrentLog(updated);
+    if (updated) {
+      setCurrentLog(updated);
+      updateCache(updated);
+    }
   };
 
   const handleClose = async () => {
@@ -160,17 +186,19 @@ export function InputContainer() {
         return;
       }
       setCurrentLog(updated);
+      updateCache(updated);
 
-      // 마감 후 다음 미완료 날짜로 이동
+      // 마감 후 상태 갱신
       const logs = await actionGetRecentDailyLogs(30);
       const unclosed = logs.filter((l) => !l.closed);
       setPendingDays(unclosed.length);
       setAllLogs(logs);
+      logs.forEach((l) => logCache.current.set(l.date, l));
 
       const dates = logs.map((l) => l.date).sort();
       if (dates.length > 0) setMinDate(dates[0]);
 
-      // 마감 후 다음 미완료 날짜로 이동 (단순 +1일이 아닌 실제 첫 미완료 날짜)
+      // 마감 후 다음 미마감 날짜로 이동
       const sortedUnclosed = [...unclosed].sort((a, b) => a.date.localeCompare(b.date));
       const afterCurrent = sortedUnclosed.find((l) => l.date > currentDate);
       const nextTarget = afterCurrent?.date ?? today;
@@ -193,6 +221,7 @@ export function InputContainer() {
       if (Object.keys(update).length > 0) {
         const updated = await actionUpsertDailyLog(currentDate, update);
         setCurrentLog(updated);
+        updateCache(updated);
       }
     } finally {
       setIsFreeTextSaving(false);
@@ -238,6 +267,18 @@ export function InputContainer() {
 
   return (
     <div className="pb-20">
+      {autoCloseToast && (
+        <div className="fixed top-16 inset-x-0 flex justify-center z-50 pointer-events-none px-4">
+          <div className="bg-foreground text-background text-sm font-medium px-4 py-2.5 rounded-full shadow-xl flex items-center gap-2 max-w-xs text-center">
+            <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.5"/>
+              <path d="M8 5v3.5M8 11v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            <span>오래된 미마감 날짜 {autoCloseToast}일을 자동 마감했어요</span>
+          </div>
+        </div>
+      )}
+
       <DateHeader
         date={currentDate}
         day={day}

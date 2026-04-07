@@ -10,6 +10,8 @@ import {
   getDailyLogsWithOffset,
   getDailyLogsTotalCount,
   regenerateDailySummary,
+  autoCloseOldLogs,
+  getFirstUnclosedLog,
 } from "@/lib/services/daily-log-service";
 import { getWeeklyLogs } from "@/lib/services/weekly-log-service";
 import { getLowestWeight } from "@/lib/services/stats-service";
@@ -81,6 +83,14 @@ export async function actionGetLowestWeight(): Promise<{
   date: string;
 }> {
   return getLowestWeight();
+}
+
+export async function actionAutoCloseOldLogs(): Promise<number> {
+  return autoCloseOldLogs();
+}
+
+export async function actionGetFirstUnclosedLog(): Promise<DailyLog | null> {
+  return getFirstUnclosedLog();
 }
 
 export async function actionRegenerateDailySummary(date: string): Promise<import("@/lib/types").DailyLog | null> {

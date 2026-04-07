@@ -8,6 +8,7 @@ import type { Settings } from "@/lib/types";
 import Link from "next/link";
 import { LogOut, UserPen } from "lucide-react";
 import { serverResetAllData, serverLoadDemoData } from "@/app/actions/data-actions";
+import { mockSettings } from "@/lib/mock-data";
 import { logout } from "@/app/actions/auth-actions";
 import { AccountInfoDialog } from "./account-info-dialog";
 
@@ -334,6 +335,7 @@ export function SettingsForm() {
     startTransition(async () => {
       await serverLoadDemoData();
       loadDemoSettings();
+      setForm({ ...mockSettings });
       setDialog("idle");
       router.refresh();
     });

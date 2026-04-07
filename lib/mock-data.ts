@@ -16,7 +16,7 @@ export const mockSettings: Settings = {
   dietStartDate: "2026-01-01",
   startWeight: 70.0,
   targetWeight: 59.0,
-  dietPreset: "sustainable",
+  dietPreset: "custom",
   targetMonths: 8,
   waterGoal: 2.2,
   routineWeightTime: "아침 기상 직후",

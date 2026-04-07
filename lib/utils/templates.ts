@@ -103,7 +103,7 @@ export function generateDailySummary(log: DailyLog, waterGoal: number): string {
 
   // 마무리
   if (log.intensiveDay) {
-    parts.push("Intensive Day였어 — 내일도 집중 유지해.");
+    parts.push("오늘은 체중 집중 관리가 필요한 날이었어 — 내일도 집중 유지해.");
   } else {
     parts.push("내일도 꾸준히.");
   }
@@ -116,10 +116,10 @@ export function generateDailySummary(log: DailyLog, waterGoal: number): string {
  */
 export function generateOneLiner(log: DailyLog): string {
   if (log.intensiveDay && log.exercise === "Y" && log.lateSnack === "N") {
-    return `Intensive Day에 운동까지 — 오늘 잘 버텼어.`;
+    return `집중 관리일에 운동까지 — 오늘 잘 버텼어.`;
   }
   if (log.intensiveDay && log.lateSnack === "Y") {
-    return `Intensive Day에 야식은 아쉬워 — 내일 만회하자.`;
+    return `집중 관리일에 야식은 아쉬워 — 내일 만회하자.`;
   }
   if (log.exercise === "Y" && log.lateSnack === "N") {
     return `운동하고 야식 안 먹은 하루 — 착실한 관리야.`;

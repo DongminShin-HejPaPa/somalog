@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
-import { actionGetDailyLog, actionGetRecentDailyLogs, actionCloseDailyLog } from "@/app/actions/log-actions";
+import { actionGetDailyLog, actionGetRecentDailyLogs, actionCloseDailyLog, actionGetFirstUnclosedLog } from "@/app/actions/log-actions";
 import { HomeContent } from "./home-content";
 import { formatDate } from "@/lib/utils/date-utils";
 import { getGreetingMessage } from "@/lib/utils/greeting-messages";
@@ -35,11 +35,13 @@ export function HomeContainer() {
 
     const today = formatDate(new Date());
     Promise.all([
-      actionGetDailyLog(today),
+      actionGetFirstUnclosedLog(),
       actionGetRecentDailyLogs(30),
-    ]).then(([log, logs]) => {
-      setActiveLog(log);
+      actionGetDailyLog(today),
+    ]).then(([firstUnclosed, logs, todayLog]) => {
       setRecentLogs(logs);
+      // 미마감 날짜 중 가장 오래된 날짜를 먼저 표시, 없으면 오늘
+      setActiveLog(firstUnclosed ?? todayLog);
     });
   }, []);
 
@@ -67,8 +69,10 @@ export function HomeContainer() {
       ]);
       setRecentLogs(updatedLogs);
 
-      // 날짜 제한 없이 가장 최근 미마감 (recentLogs는 내림차순 정렬)
-      const nextUnclosed = updatedLogs.find((l) => !l.closed);
+      // 마감 후 남은 미마감 중 가장 오래된 날짜로 이동
+      const nextUnclosed = [...updatedLogs]
+        .filter((l) => !l.closed && l.date <= today)
+        .sort((a, b) => a.date.localeCompare(b.date))[0] ?? null;
       setActiveLog(nextUnclosed ?? todayLog);
     } finally {
       setIsClosingDay(false);

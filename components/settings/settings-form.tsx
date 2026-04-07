@@ -28,14 +28,28 @@ const dietPresets = [
   { value: "custom", label: "내가 정할게", months: 0, coaching: "" },
 ];
 
+// 각 프리셋의 고정 월간 감량 속도 (kg/월)
+const presetRates: Partial<Record<string, number>> = {
+  easygoing: 0.5, sustainable: 0.75, medium: 1.5, intensive: 3.0,
+};
+
+function computePresetMonths(preset: string, startWeight: number, targetWeight: number): number {
+  const rate = presetRates[preset];
+  if (!rate || startWeight <= 0 || targetWeight <= 0 || targetWeight >= startWeight) {
+    const defaults: Record<string, number> = { easygoing: 18, sustainable: 12, medium: 6, intensive: 3 };
+    return defaults[preset] ?? 12;
+  }
+  return Math.max(1, Math.ceil((startWeight - targetWeight) / rate));
+}
+
 function getDietPresetDesc(preset: typeof dietPresets[0], startWeight: number, targetWeight: number): string {
   if (preset.value === "custom") return "목표 기간 직접 입력";
-  const loss = startWeight > 0 && targetWeight > 0 && targetWeight < startWeight
-    ? ((startWeight - targetWeight) / preset.months).toFixed(1)
-    : null;
-  return loss
-    ? `${preset.months}개월, ~${loss}kg/월, ${preset.coaching}`
-    : `${preset.months}개월, ${preset.coaching}`;
+  const rate = presetRates[preset.value];
+  const months = computePresetMonths(preset.value, startWeight, targetWeight);
+  const hasValidWeights = startWeight > 0 && targetWeight > 0 && targetWeight < startWeight;
+  return hasValidWeights && rate
+    ? `${months}개월, ~${rate}kg/월, ${preset.coaching}`
+    : `${months}개월, ${preset.coaching}`;
 }
 
 const presetMonths: Partial<Record<string, number>> = {
@@ -265,16 +279,26 @@ export function SettingsForm() {
   }, [isLoaded]);
 
   const handleChange = <K extends keyof Settings>(key: K, value: Settings[K]) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    setForm((prev) => {
+      const next = { ...prev, [key]: value };
+      // startWeight / targetWeight 변경 시 비커스텀 프리셋의 목표 기간 자동 재계산
+      if ((key === "startWeight" || key === "targetWeight") && prev.dietPreset !== "custom") {
+        const sw = key === "startWeight" ? (value as number) : prev.startWeight;
+        const tw = key === "targetWeight" ? (value as number) : prev.targetWeight;
+        next.targetMonths = computePresetMonths(prev.dietPreset, sw, tw);
+      }
+      return next;
+    });
     setSaved(false);
   };
 
   const handlePresetChange = (value: Settings["dietPreset"]) => {
-    const months = presetMonths[value];
     setForm((prev) => ({
       ...prev,
       dietPreset: value,
-      ...(months !== undefined ? { targetMonths: months } : {}),
+      ...(value !== "custom"
+        ? { targetMonths: computePresetMonths(value, prev.startWeight, prev.targetWeight) }
+        : {}),
     }));
     setSaved(false);
   };

@@ -15,6 +15,7 @@ import {
 import {
   generateAiFeedback,
   generateAiOneLiner,
+  generateAiDailySummary,
 } from "@/lib/ai/coach-service";
 import { getSettings } from "./settings-service";
 import { upsertWeeklyLog } from "./weekly-log-service";
@@ -316,11 +317,16 @@ export async function regenerateDailySummary(date: string): Promise<DailyLog | n
   ]);
   if (!existing || !existing.closed) return null;
 
-  const dailySummary = generateDailySummary(existing, settings.waterGoal);
+  // AI로 총평과 한줄 요약을 모두 재생성 (코치 스타일 반영)
+  let dailySummary: string;
   let oneLiner: string;
   try {
-    oneLiner = await generateAiOneLiner(existing, settings);
+    [dailySummary, oneLiner] = await Promise.all([
+      generateAiDailySummary(existing, settings),
+      generateAiOneLiner(existing, settings),
+    ]);
   } catch {
+    dailySummary = generateDailySummary(existing, settings.waterGoal);
     oneLiner = existing.oneLiner ?? "";
   }
 
@@ -433,8 +439,8 @@ export async function autoCloseOldLogs(): Promise<number> {
 }
 
 /**
- * 오늘 이하 날짜 중 마감되지 않은 가장 최근 로그 1건 반환.
- * 입력탭 진입 시 초기 날짜 결정에 사용.
+ * 오늘 이하 날짜 중 마감되지 않은 가장 오래된 로그 1건 반환.
+ * 입력탭·홈탭 진입 시 초기 날짜 결정에 사용.
  */
 export async function getFirstUnclosedLog(): Promise<DailyLog | null> {
   const supabase = await createClient();
@@ -452,7 +458,7 @@ export async function getFirstUnclosedLog(): Promise<DailyLog | null> {
     .eq("user_id", user.id)
     .eq("closed", false)
     .lte("date", today)
-    .order("date", { ascending: false })
+    .order("date", { ascending: true })
     .limit(1)
     .maybeSingle();
 

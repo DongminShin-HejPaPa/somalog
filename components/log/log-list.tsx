@@ -23,13 +23,11 @@ function getDayOfWeek(dateStr: string) {
 
 function RegenerateButton({ date, onRefresh }: { date: string; onRefresh?: () => Promise<void> }) {
   const [isLoading, setIsLoading] = useState(false);
-  const [done, setDone] = useState(false);
   const handleClick = async () => {
-    if (isLoading || done) return;
+    if (isLoading) return;
     setIsLoading(true);
     try {
       await actionRegenerateDailySummary(date);
-      setDone(true);
       if (onRefresh) {
         await onRefresh();
       }
@@ -40,10 +38,10 @@ function RegenerateButton({ date, onRefresh }: { date: string; onRefresh?: () =>
   return (
     <button
       onClick={handleClick}
-      disabled={isLoading || done}
+      disabled={isLoading}
       className="mt-2 text-xs text-navy font-medium underline disabled:opacity-50"
     >
-      {isLoading ? "재생성 중..." : done ? "재생성 완료" : "총평 재생성"}
+      {isLoading ? "재생성 중..." : "총평 재생성"}
     </button>
   );
 }

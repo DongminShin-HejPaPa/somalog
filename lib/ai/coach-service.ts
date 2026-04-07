@@ -1,6 +1,7 @@
 import { generateText } from "ai";
 import { openrouter, MODEL } from "./openrouter";
 import type { DailyLog, Settings } from "@/lib/types";
+import { generateDailySummary } from "@/lib/utils/templates";
 
 // ──────────────────────────────────────────────
 // Public API
@@ -33,6 +34,34 @@ export async function generateAiFeedback(
   } catch (err) {
     console.error("[coach-service] generateAiFeedback 실패:", err);
     return fallbackFeedback(log, prevWeight, settings.waterGoal);
+  }
+}
+
+/**
+ * 마감 / 총평 재생성 시 일일 총평 생성 (AI, 코치 스타일 반영)
+ */
+export async function generateAiDailySummary(
+  log: DailyLog,
+  settings: Settings
+): Promise<string> {
+  if (!process.env.OPENROUTER_API_KEY) {
+    return generateDailySummary(log, settings.waterGoal);
+  }
+
+  try {
+    const abort = AbortSignal.timeout(10_000);
+    const { text } = await generateText({
+      model: openrouter(MODEL),
+      system: buildSystemPrompt(settings),
+      prompt: `오늘 하루 기록:\n${buildContext(log, null, settings)}\n\n이 데이터를 바탕으로 3~4문장으로 오늘을 총평해줘. 수치 포함, 잘한 점·아쉬운 점·내일을 위한 한 마디를 담아.`,
+      maxOutputTokens: 200,
+      temperature: 0.7,
+      abortSignal: abort,
+    });
+    return text.trim();
+  } catch (err) {
+    console.error("[coach-service] generateAiDailySummary 실패:", err);
+    return generateDailySummary(log, settings.waterGoal);
   }
 }
 
@@ -142,7 +171,7 @@ function fallbackFeedback(
 
 function fallbackOneLiner(log: DailyLog): string {
   if (log.intensiveDay && log.exercise === "Y" && log.lateSnack === "N") {
-    return "Intensive Day에 운동까지 — 오늘 잘 버텼어.";
+    return "집중 관리일에 운동까지 — 오늘 잘 버텼어.";
   }
   if (log.exercise === "Y" && log.lateSnack === "N") {
     return "운동하고 야식 안 먹은 하루 — 착실한 관리야.";

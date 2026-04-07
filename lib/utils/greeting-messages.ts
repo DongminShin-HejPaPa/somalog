@@ -48,7 +48,7 @@ function getStreakDays(recentLogs: DailyLog[]): number {
       log.breakfast !== null ||
       log.lunch !== null ||
       log.dinner !== null ||
-      log.energy !== null;
+      log.lateSnack !== null;
     if (hasInput) streak++;
     else break;
   }
@@ -66,7 +66,7 @@ function getDaysSinceLastInput(recentLogs: DailyLog[]): number {
       log.breakfast !== null ||
       log.lunch !== null ||
       log.dinner !== null ||
-      log.energy !== null;
+      log.lateSnack !== null;
     if (hasInput) return i;
   }
   return recentLogs.length;
@@ -81,7 +81,7 @@ function todayInputCount(log: DailyLog | null): number {
   if (!log) return 0;
   return [
     log.weight, log.water, log.exercise, log.breakfast,
-    log.lunch, log.dinner, log.lateSnack, log.energy,
+    log.lunch, log.dinner, log.lateSnack,
   ].filter((v) => v !== null).length;
 }
 
@@ -352,17 +352,6 @@ const rules: GreetingRule[] = [
         `저녁으로 ${meal} 드셨군요, ${ctx.name}님! 맛있으셨길 바라요 🍽️`,
       ];
     },
-  },
-  {
-    condition: (ctx) => ctx.todayLog?.energy === "여유",
-    messages: (ctx) => [`${ctx.name}님, 오늘 체력이 여유롭군요! 이럴 때 운동 한 번 더 어때요? 🏃`],
-  },
-  {
-    condition: (ctx) => ctx.todayLog?.energy === "피곤",
-    messages: (ctx) => [
-      `${ctx.name}님, 오늘 피곤하셨군요. 잘 쉬시는 것도 다이어트예요 😴`,
-      `피곤한 날에도 기록한 ${ctx.name}님, 진짜 대단해요 💪`,
-    ],
   },
 
   // ── Hard Reset Day ──

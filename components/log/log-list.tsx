@@ -201,10 +201,6 @@ export function LogList({
                             <span className="text-muted-foreground">야식</span>
                             <span>{log.lateSnack ?? ""}</span>
                           </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">체력</span>
-                            <span>{log.energy ?? ""}</span>
-                          </div>
                           {settings.intensiveDayOn && log.intensiveDay && (
                             <div className="col-span-2 flex items-center gap-1.5 mt-1">
                               <span className="w-2 h-2 rounded-full bg-coral inline-block flex-shrink-0" />

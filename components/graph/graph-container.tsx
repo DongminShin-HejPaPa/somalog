@@ -43,7 +43,6 @@ export function GraphContainer() {
       targetMonths={settings.targetMonths}
       lowestWeight={lowest.weight}
       lowestWeightDate={lowest.date}
-      intensiveDayOn={settings.intensiveDayOn}
     />
   );
 }

@@ -59,7 +59,6 @@ export const DEFAULT_SETTINGS: Settings = {
   targetMonths: 12,
   waterGoal: 2.8,
   routineWeightTime: "아침 기상 직후",
-  routineEnergyTime: "21:00",
   routineExtra: [],
   intensiveDayOn: true,
   intensiveDayCriteria: "역대최저",

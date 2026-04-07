@@ -7,9 +7,14 @@ import {
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(),
+  getAuthUser: vi.fn(),
 }));
 
-import { createClient } from "@/lib/supabase/server";
+vi.mock("next/cache", () => ({
+  revalidateTag: vi.fn(),
+}));
+
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 import {
   getSettings,
   updateSettings,
@@ -24,6 +29,9 @@ function buildClient(opts: {
   upsertSingleData?: unknown;
   upsertSingleError?: unknown;
 }) {
+  const resolvedUser = opts.user !== undefined ? opts.user : mockUser;
+  vi.mocked(getAuthUser).mockResolvedValue(resolvedUser as any);
+
   const deleteMock = vi.fn().mockReturnValue({
     eq: vi.fn().mockResolvedValue({ error: null }),
   });
@@ -48,11 +56,6 @@ function buildClient(opts: {
     delete: deleteMock,
   });
   return {
-    auth: {
-      getUser: vi.fn().mockResolvedValue({
-        data: { user: opts.user !== undefined ? opts.user : mockUser },
-      }),
-    },
     from: fromMock,
   };
 }

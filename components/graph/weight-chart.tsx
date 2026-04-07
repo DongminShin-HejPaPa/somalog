@@ -22,7 +22,6 @@ interface WeightChartProps {
   targetMonths: number;
   lowestWeight: number;
   lowestWeightDate: string;
-  intensiveDayOn: boolean;
 }
 
 type Period = "2w" | "1m" | "3m" | "all";
@@ -49,7 +48,6 @@ interface CustomDotProps {
     weight: number | null;
     isLowest: boolean;
     isSurge: boolean;
-    isIntensive: boolean;
   };
 }
 
@@ -75,8 +73,8 @@ function CustomDot({ cx, cy, payload }: CustomDotProps) {
         y={cy - 4}
         width={8}
         height={8}
-        fill={payload.isIntensive ? "#f87171" : "#1e3a5f"}
-        stroke={payload.isIntensive ? "#f87171" : "#1e3a5f"}
+        fill="#1e3a5f"
+        stroke="#1e3a5f"
       />
     );
   }
@@ -86,7 +84,7 @@ function CustomDot({ cx, cy, payload }: CustomDotProps) {
       cx={cx}
       cy={cy}
       r={4}
-      fill={payload.isIntensive ? "#f87171" : "#1e3a5f"}
+      fill="#1e3a5f"
       stroke="white"
       strokeWidth={2}
     />
@@ -101,7 +99,6 @@ export function WeightChart({
   targetMonths,
   lowestWeight,
   lowestWeightDate,
-  intensiveDayOn,
 }: WeightChartProps) {
   const [period, setPeriod] = useState<Period>("all");
   const [show3dAvg, setShow3dAvg] = useState(true);
@@ -141,7 +138,6 @@ export function WeightChart({
       avg3d: log.avgWeight3d,
       isLowest: log.date === lowestWeightDate,
       isSurge: surge,
-      isIntensive: intensiveDayOn && log.intensiveDay === true,
       isMonday: new Date(log.date).getDay() === 1,
     };
   });
@@ -235,16 +231,7 @@ export function WeightChart({
             </svg>
             역대 최저
           </span>
-          {intensiveDayOn && (
-            <span className="flex items-center gap-1.5">
-              {/* 빨간 원 = Hard Reset Day */}
-              <svg width="12" height="12" viewBox="0 0 12 12">
-                <circle cx="6" cy="6" r="4" fill="#f87171" stroke="white" strokeWidth="1.5" />
-              </svg>
-              Hard Reset Day
-            </span>
-          )}
-          <span className="flex items-center gap-1.5">
+<span className="flex items-center gap-1.5">
             {/* 사각형 = 전일 대비 1kg↑ */}
             <svg width="12" height="12" viewBox="0 0 12 12">
               <rect x="2" y="2" width="8" height="8" fill="#1e3a5f" />

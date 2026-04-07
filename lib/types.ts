@@ -10,7 +10,6 @@ export interface DailyLog {
   lunch: string | null;
   dinner: string | null;
   lateSnack: "Y" | "N" | null;
-  energy: "여유" | "보통" | "피곤" | null;
   note: string | null;
   closed: boolean;
   intensiveDay: boolean | null;
@@ -40,7 +39,6 @@ export interface Settings {
   targetMonths: number;
   waterGoal: number;
   routineWeightTime: string;
-  routineEnergyTime: string;
   routineExtra: string[];
   intensiveDayOn: boolean;
   // "역대최저" | "0.5kg" | "1.0kg" 는 프리셋, 그 외 숫자 문자열(e.g. "1.5")은 직접입력 커스텀 값
@@ -60,7 +58,6 @@ export type DailyLogInput = Pick<
   | "lunch"
   | "dinner"
   | "lateSnack"
-  | "energy"
   | "note"
 >;
 

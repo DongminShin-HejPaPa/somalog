@@ -96,11 +96,6 @@ export function generateDailySummary(log: DailyLog, waterGoal: number): string {
     parts.push("야식 없음.");
   }
 
-  // 체력
-  if (log.energy) {
-    parts.push(`체력 ${log.energy}.`);
-  }
-
   // 마무리
   if (log.intensiveDay) {
     parts.push("오늘은 체중 집중 관리가 필요한 날이었어 — 내일도 집중 유지해.");

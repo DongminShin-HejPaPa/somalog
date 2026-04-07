@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/lib/contexts/settings-context";
 import { formatDate, getDayNumber } from "@/lib/utils/date-utils";
@@ -29,6 +30,7 @@ function addDays(dateStr: string, n: number): string {
 
 export function InputContainer() {
   const { settings } = useSettings();
+  const searchParams = useSearchParams();
   const [currentDate, setCurrentDate] = useState<string>(formatDate(new Date()));
   const [currentLog, setCurrentLog] = useState<DailyLog | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -231,6 +233,30 @@ export function InputContainer() {
     }
   };
 
+  // URL ?open= 파라미터로 모달 자동 열기
+  useEffect(() => {
+    const open = searchParams.get("open") as ItemKey | null;
+    if (open && !isLoading && currentLog && !currentLog.closed) {
+      setModalField(open);
+    }
+  }, [searchParams, isLoading, currentLog]);
+
+  // 7개 항목 모두 입력 시 자동 마감
+  const autoCloseRef = useRef(false);
+  useEffect(() => {
+    if (!currentLog || currentLog.closed || isLoading) return;
+    if (completedCount === 7 && !autoCloseRef.current) {
+      autoCloseRef.current = true;
+      const timer = setTimeout(() => {
+        handleClose();
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+    if (completedCount < 7) {
+      autoCloseRef.current = false;
+    }
+  }, [completedCount, currentLog, isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
@@ -262,10 +288,10 @@ export function InputContainer() {
   }
 
   const completedCount = (
-    ["weight", "water", "exercise", "breakfast", "lunch", "dinner", "lateSnack", "energy"] as ItemKey[]
+    ["weight", "water", "exercise", "breakfast", "lunch", "dinner", "lateSnack"] as ItemKey[]
   ).filter((k) => currentLog[k] != null).length;
 
-  const allCompleted = completedCount === 8;
+  const allCompleted = completedCount === 7;
   const day = getDayNumber(currentDate, settings.dietStartDate);
 
   return (

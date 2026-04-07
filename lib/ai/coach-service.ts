@@ -137,7 +137,6 @@ export function buildContext(
   if (log.lateSnack) {
     lines.push(`야식: ${log.lateSnack === "Y" ? "먹음" : "안 먹음"}`);
   }
-  if (log.energy) lines.push(`체력: ${log.energy}`);
   if (log.intensiveDay) lines.push(`오늘은 Hard Reset Mode`);
 
   return lines.join("\n");

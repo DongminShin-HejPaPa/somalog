@@ -246,19 +246,25 @@ export function InputContainer() {
         .filter((k) => currentLog[k] != null).length
     : 0;
 
-  // 7개 항목 모두 입력 시 자동 마감
-  const autoCloseRef = useRef(false);
+  // 로그가 로드(또는 재오픈)될 때의 completedCount를 기준으로 저장
+  // → 이미 7개가 채워진 상태로 열렸다면 자동 마감 비활성화
+  const loadTimeCountRef = useRef<number>(0);
+  const autoCloseFiredRef = useRef(false);
+  useEffect(() => {
+    if (isLoading || !currentLog) return;
+    loadTimeCountRef.current = completedCount;
+    autoCloseFiredRef.current = false;
+  }, [currentLog?.date, currentLog?.closed, isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 7개 항목 모두 입력 시 자동 마감 (로드 시점 기준값이 7 미만이었을 때만)
   useEffect(() => {
     if (!currentLog || currentLog.closed || isLoading) return;
-    if (completedCount === 7 && !autoCloseRef.current) {
-      autoCloseRef.current = true;
+    if (completedCount === 7 && !autoCloseFiredRef.current && loadTimeCountRef.current < 7) {
+      autoCloseFiredRef.current = true;
       const timer = setTimeout(() => {
         handleClose();
       }, 2000);
       return () => clearTimeout(timer);
-    }
-    if (completedCount < 7) {
-      autoCloseRef.current = false;
     }
   }, [completedCount, currentLog, isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 

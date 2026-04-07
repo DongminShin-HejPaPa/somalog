@@ -12,6 +12,8 @@ interface DateHeaderProps {
   canGoNext: boolean;
   onPrev: () => void;
   onNext: () => void;
+  minDate?: string;
+  onDateSelect?: (date: string) => void;
 }
 
 function getDayOfWeek(dateStr: string) {
@@ -33,8 +35,11 @@ export function DateHeader({
   canGoNext,
   onPrev,
   onNext,
+  minDate,
+  onDateSelect,
 }: DateHeaderProps) {
   const dayLabel = Number.isFinite(day) && day > 0 ? `D+${day}` : null;
+  const todayStr = new Date().toISOString().slice(0, 10);
 
   return (
     <div className="px-4 pt-4">
@@ -52,7 +57,7 @@ export function DateHeader({
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
-        <div data-testid="date-display" className="text-center">
+        <div data-testid="date-display" className="relative text-center">
           <div className="flex items-center gap-2 text-lg font-bold">
             <span>
               {formatDate(date)} {getDayOfWeek(date)}요일
@@ -67,6 +72,16 @@ export function DateHeader({
             <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
               마감됨
             </span>
+          )}
+          {onDateSelect && (
+            <input
+              type="date"
+              value={date}
+              min={minDate}
+              max={todayStr}
+              onChange={(e) => e.target.value && onDateSelect(e.target.value)}
+              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+            />
           )}
         </div>
         <button

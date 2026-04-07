@@ -246,7 +246,7 @@ export function InputContainer() {
         onNext={handleNext}
       />
 
-      {currentLog.intensiveDay && (
+      {settings.intensiveDayOn && currentLog.intensiveDay && (
         <div className="mx-4 mt-2 px-3 py-2 bg-coral-light border border-coral/30 rounded-lg flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-coral inline-block" />
           <span className="text-xs font-semibold text-coral">Hard Reset Mode</span>

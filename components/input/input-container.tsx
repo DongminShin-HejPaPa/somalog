@@ -241,6 +241,11 @@ export function InputContainer() {
     }
   }, [searchParams, isLoading, currentLog]);
 
+  const completedCount = currentLog
+    ? (["weight", "water", "exercise", "breakfast", "lunch", "dinner", "lateSnack"] as ItemKey[])
+        .filter((k) => currentLog[k] != null).length
+    : 0;
+
   // 7개 항목 모두 입력 시 자동 마감
   const autoCloseRef = useRef(false);
   useEffect(() => {
@@ -286,10 +291,6 @@ export function InputContainer() {
       </div>
     );
   }
-
-  const completedCount = (
-    ["weight", "water", "exercise", "breakfast", "lunch", "dinner", "lateSnack"] as ItemKey[]
-  ).filter((k) => currentLog[k] != null).length;
 
   const allCompleted = completedCount === 7;
   const day = getDayNumber(currentDate, settings.dietStartDate);

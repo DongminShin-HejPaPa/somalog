@@ -21,12 +21,22 @@ const coachStyles = [
 ];
 
 const dietPresets = [
-  { value: "easygoing", label: "여유롭게", desc: "18개월, ~1.2kg/월, 코칭 보통" },
-  { value: "sustainable", label: "착실하게", desc: "12개월, ~1.7kg/월, 코칭 보통", badge: "추천" },
-  { value: "medium", label: "집중해서", desc: "6개월, ~2.5kg/월, 코칭 높음" },
-  { value: "intensive", label: "전력 질주", desc: "3개월, ~3.3kg/월, 코칭 최강" },
-  { value: "custom", label: "내가 정할게", desc: "목표 기간 직접 입력" },
+  { value: "easygoing", label: "여유롭게", months: 18, coaching: "코칭 보통" },
+  { value: "sustainable", label: "착실하게", months: 12, coaching: "코칭 보통", badge: "추천" },
+  { value: "medium", label: "집중해서", months: 6, coaching: "코칭 높음" },
+  { value: "intensive", label: "전력 질주", months: 3, coaching: "코칭 최강" },
+  { value: "custom", label: "내가 정할게", months: 0, coaching: "" },
 ];
+
+function getDietPresetDesc(preset: typeof dietPresets[0], startWeight: number, targetWeight: number): string {
+  if (preset.value === "custom") return "목표 기간 직접 입력";
+  const loss = startWeight > 0 && targetWeight > 0 && targetWeight < startWeight
+    ? ((startWeight - targetWeight) / preset.months).toFixed(1)
+    : null;
+  return loss
+    ? `${preset.months}개월, ~${loss}kg/월, ${preset.coaching}`
+    : `${preset.months}개월, ${preset.coaching}`;
+}
 
 const presetMonths: Partial<Record<string, number>> = {
   easygoing: 18, sustainable: 12, medium: 6, intensive: 3,
@@ -380,7 +390,7 @@ export function SettingsForm() {
                       </span>
                     )}
                   </div>
-                  <span className="text-xs text-muted-foreground">{p.desc}</span>
+                  <span className="text-xs text-muted-foreground">{getDietPresetDesc(p, form.startWeight, form.targetWeight)}</span>
                 </div>
                 <div
                   className={cn(

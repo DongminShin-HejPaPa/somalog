@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
-import { actionGetDailyLog, actionGetRecentDailyLogs } from "@/app/actions/log-actions";
+import { actionGetDailyLog, actionGetRecentDailyLogs, actionCloseDailyLog } from "@/app/actions/log-actions";
 import { HomeContent } from "./home-content";
 import { formatDate } from "@/lib/utils/date-utils";
 import { getGreetingMessage } from "@/lib/utils/greeting-messages";
@@ -16,6 +16,7 @@ export function HomeContainer() {
   const [todayLog, setTodayLog] = useState<DailyLog | null | undefined>(undefined);
   const [recentLogs, setRecentLogs] = useState<DailyLog[] | undefined>(undefined);
   const [greeting, setGreeting] = useState<string | null>(null);
+  const [isClosingToday, setIsClosingToday] = useState(false);
   const { settings } = useSettings();
 
   useEffect(() => {
@@ -52,6 +53,18 @@ export function HomeContainer() {
     }
   }, [displayName, todayLog, recentLogs, settings]);
 
+  const handleCloseToday = async () => {
+    if (!todayLog || todayLog.closed || isClosingToday) return;
+    setIsClosingToday(true);
+    try {
+      const today = formatDate(new Date());
+      const updated = await actionCloseDailyLog(today, todayLog);
+      if (updated) setTodayLog(updated);
+    } finally {
+      setIsClosingToday(false);
+    }
+  };
+
   const isLoading = todayLog === undefined || recentLogs === undefined;
 
   return (
@@ -79,7 +92,12 @@ export function HomeContainer() {
       {isLoading ? (
         <HomeSkeleton />
       ) : (
-        <HomeContent todayLog={todayLog ?? null} recentLogs={(recentLogs ?? []).slice(0, 14)} />
+        <HomeContent
+          todayLog={todayLog ?? null}
+          recentLogs={(recentLogs ?? []).slice(0, 14)}
+          onCloseToday={handleCloseToday}
+          isClosingToday={isClosingToday}
+        />
       )}
     </div>
   );

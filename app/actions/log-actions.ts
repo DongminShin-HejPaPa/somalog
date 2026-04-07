@@ -9,6 +9,7 @@ import {
   getRecentDailyLogs,
   getDailyLogsWithOffset,
   getDailyLogsTotalCount,
+  getAllDailyLogs,
   regenerateDailySummary,
   autoCloseOldLogs,
   getFirstUnclosedLog,
@@ -91,6 +92,10 @@ export async function actionAutoCloseOldLogs(): Promise<number> {
 
 export async function actionGetFirstUnclosedLog(): Promise<DailyLog | null> {
   return getFirstUnclosedLog();
+}
+
+export async function actionGetAllDailyLogs(): Promise<DailyLog[]> {
+  return getAllDailyLogs();
 }
 
 export async function actionRegenerateDailySummary(date: string): Promise<import("@/lib/types").DailyLog | null> {

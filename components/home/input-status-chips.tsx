@@ -7,6 +7,8 @@ import type { DailyLog } from "@/lib/types";
 
 interface InputStatusChipsProps {
   log: DailyLog;
+  onCloseToday?: () => void;
+  isClosingToday?: boolean;
 }
 
 const items = [
@@ -20,7 +22,7 @@ const items = [
   { key: "energy", label: "체력" },
 ] as const;
 
-export function InputStatusChips({ log }: InputStatusChipsProps) {
+export function InputStatusChips({ log, onCloseToday, isClosingToday }: InputStatusChipsProps) {
   const completedCount = items.filter(
     (item) => log[item.key] !== null && log[item.key] !== undefined
   ).length;
@@ -63,12 +65,23 @@ export function InputStatusChips({ log }: InputStatusChipsProps) {
         />
       </div>
 
-      <Link
-        href="/input"
-        className="block mt-3 text-center py-2.5 rounded-lg bg-navy text-white text-sm font-medium min-h-[44px] flex items-center justify-center"
-      >
-        기록하기
-      </Link>
+      <div className="flex gap-2 mt-3">
+        <Link
+          href="/input"
+          className="flex-1 text-center py-2.5 rounded-lg bg-navy text-white text-sm font-medium min-h-[44px] flex items-center justify-center"
+        >
+          기록하기
+        </Link>
+        {!log.closed && onCloseToday && (
+          <button
+            onClick={onCloseToday}
+            disabled={isClosingToday}
+            className="flex-1 py-2.5 rounded-lg border border-navy text-navy text-sm font-medium min-h-[44px] transition-colors hover:bg-navy/5 disabled:opacity-60"
+          >
+            {isClosingToday ? "마감 중..." : "이날은 이대로 마감하기"}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

@@ -11,16 +11,15 @@ import { useSettings } from "@/lib/contexts/settings-context";
 import type { DailyLog } from "@/lib/types";
 
 export function HomeContainer() {
-  // undefined = 로딩 중
   const [displayName, setDisplayName] = useState<string | null | undefined>(undefined);
-  const [todayLog, setTodayLog] = useState<DailyLog | null | undefined>(undefined);
+  // activeLog: 홈에서 보여줄 로그 (초기=오늘, 마감 후=다음 미마감)
+  const [activeLog, setActiveLog] = useState<DailyLog | null | undefined>(undefined);
   const [recentLogs, setRecentLogs] = useState<DailyLog[] | undefined>(undefined);
   const [greeting, setGreeting] = useState<string | null>(null);
-  const [isClosingToday, setIsClosingToday] = useState(false);
+  const [isClosingDay, setIsClosingDay] = useState(false);
   const { settings } = useSettings();
 
   useEffect(() => {
-    // 로컬 세션에서 이름 읽기 (네트워크 호출 없음)
     const supabase = createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!
@@ -34,38 +33,49 @@ export function HomeContainer() {
       );
     });
 
-    // 로그 데이터 병렬 페치
     const today = formatDate(new Date());
     Promise.all([
       actionGetDailyLog(today),
       actionGetRecentDailyLogs(30),
     ]).then(([log, logs]) => {
-      setTodayLog(log);
+      setActiveLog(log);
       setRecentLogs(logs);
     });
   }, []);
 
-  // 데이터 로드 완료 시 인사말 생성 (방문할 때마다 1회)
   useEffect(() => {
-    if (displayName && todayLog !== undefined && recentLogs !== undefined && settings.onboardingComplete) {
-      const msg = getGreetingMessage(displayName, todayLog ?? null, recentLogs ?? [], settings);
+    if (displayName && activeLog !== undefined && recentLogs !== undefined && settings.onboardingComplete) {
+      const msg = getGreetingMessage(displayName, activeLog ?? null, recentLogs ?? [], settings);
       setGreeting(msg);
     }
-  }, [displayName, todayLog, recentLogs, settings]);
+  }, [displayName, activeLog, recentLogs, settings]);
 
-  const handleCloseToday = async () => {
-    if (!todayLog || todayLog.closed || isClosingToday) return;
-    setIsClosingToday(true);
+  /**
+   * "이날은 이대로 마감하기" — 마감 후 다음 미마감 날짜로 이동
+   * recentLogs(내림차순)에서 날짜 제한 없이 첫 번째 미마감 로그를 다음 활성 날짜로 설정
+   */
+  const handleCloseDay = async () => {
+    if (!activeLog || activeLog.closed || isClosingDay) return;
+    setIsClosingDay(true);
     try {
       const today = formatDate(new Date());
-      const updated = await actionCloseDailyLog(today, todayLog);
-      if (updated) setTodayLog(updated);
+      await actionCloseDailyLog(activeLog.date, activeLog);
+
+      const [updatedLogs, todayLog] = await Promise.all([
+        actionGetRecentDailyLogs(30),
+        actionGetDailyLog(today),
+      ]);
+      setRecentLogs(updatedLogs);
+
+      // 날짜 제한 없이 가장 최근 미마감 (recentLogs는 내림차순 정렬)
+      const nextUnclosed = updatedLogs.find((l) => !l.closed);
+      setActiveLog(nextUnclosed ?? todayLog);
     } finally {
-      setIsClosingToday(false);
+      setIsClosingDay(false);
     }
   };
 
-  const isLoading = todayLog === undefined || recentLogs === undefined;
+  const isLoading = activeLog === undefined || recentLogs === undefined;
 
   return (
     <div className="pb-6">
@@ -93,10 +103,10 @@ export function HomeContainer() {
         <HomeSkeleton />
       ) : (
         <HomeContent
-          todayLog={todayLog ?? null}
+          todayLog={activeLog ?? null}
           recentLogs={(recentLogs ?? []).slice(0, 14)}
-          onCloseToday={handleCloseToday}
-          isClosingToday={isClosingToday}
+          onCloseToday={handleCloseDay}
+          isClosingToday={isClosingDay}
         />
       )}
     </div>

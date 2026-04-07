@@ -80,7 +80,7 @@ describe("buildContext()", () => {
       null,
       mockSettings
     );
-    expect(result).toContain("Intensive Day");
+    expect(result).toContain("Hard Reset Mode");
   });
 
   it("null 값 항목은 컨텍스트에 포함되지 않는다", () => {

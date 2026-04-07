@@ -20,7 +20,6 @@ const items: { key: ItemKey; label: string }[] = [
   { key: "lunch", label: "점심" },
   { key: "dinner", label: "저녁" },
   { key: "lateSnack", label: "야식" },
-  { key: "energy", label: "체력" },
 ];
 
 function formatValue(key: ItemKey, value: unknown, waterGoal: number): string {
@@ -34,8 +33,6 @@ function formatValue(key: ItemKey, value: unknown, waterGoal: number): string {
       return value === "Y" ? "했음" : "안 했음";
     case "lateSnack":
       return value === "Y" ? "먹음" : "안 먹음";
-    case "energy":
-      return value as string;
     default:
       return value as string;
   }
@@ -102,12 +99,12 @@ export function InputChipList({
       <div className="mt-4">
         <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
           <span>진행률</span>
-          <span>{completedCount}/8</span>
+          <span>{completedCount}/7</span>
         </div>
         <div data-testid="progress-bar" className="w-full h-2 bg-secondary rounded-full overflow-hidden">
           <div
             className="h-full bg-navy rounded-full transition-all"
-            style={{ width: `${(completedCount / 8) * 100}%` }}
+            style={{ width: `${(completedCount / 7) * 100}%` }}
           />
         </div>
       </div>

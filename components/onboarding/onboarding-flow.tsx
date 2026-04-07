@@ -96,7 +96,6 @@ export function OnboardingFlow() {
 
   // Step 5
   const [routineWeightTime, setRoutineWeightTime] = useState("아침 기상 직후");
-  const [routineEnergyTime, setRoutineEnergyTime] = useState("21:00");
   const [showRoutineEdit, setShowRoutineEdit] = useState(false);
 
   // Step 6
@@ -201,7 +200,6 @@ export function OnboardingFlow() {
       targetMonths,
       waterGoal,
       routineWeightTime,
-      routineEnergyTime,
       routineExtra: [],
       intensiveDayOn,
       intensiveDayCriteria,
@@ -242,7 +240,6 @@ export function OnboardingFlow() {
       targetMonths,
       waterGoal,
       routineWeightTime,
-      routineEnergyTime,
       routineExtra: [],
       intensiveDayOn,
       intensiveDayCriteria,
@@ -545,17 +542,7 @@ export function OnboardingFlow() {
                       className="w-full px-3 py-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[48px]"
                     />
                   </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs font-medium text-muted-foreground">체력 기준 시각</label>
-                    <input
-                      type="text"
-                      value={routineEnergyTime}
-                      onChange={(e) => setRoutineEnergyTime(e.target.value)}
-                      placeholder="예: 21:00"
-                      className="w-full px-3 py-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[48px]"
-                    />
-                  </div>
-                  <button
+<button
                     onClick={nextStep}
                     className="w-full py-3 rounded-xl bg-navy text-white text-sm font-medium min-h-[48px]"
                   >

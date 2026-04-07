@@ -529,12 +529,7 @@ export function SettingsForm() {
           value={form.routineWeightTime}
           onChange={(v) => handleChange("routineWeightTime", v)}
         />
-        <InputField
-          label="체력 기준 시각"
-          value={form.routineEnergyTime}
-          onChange={(v) => handleChange("routineEnergyTime", v)}
-        />
-        <p className="text-xs text-muted-foreground mt-3 mb-1 font-medium">추가 루틴</p>
+<p className="text-xs text-muted-foreground mt-3 mb-1 font-medium">추가 루틴</p>
         <ExtraItemList
           items={form.routineExtra}
           placeholder="루틴 설명 (예: 점심 후 10분 산책)"

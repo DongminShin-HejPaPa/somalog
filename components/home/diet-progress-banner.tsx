@@ -43,8 +43,8 @@ export function DietProgressBanner({
     >
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-baseline gap-1.5">
-          <span className="text-lg font-bold text-navy">D+{day}</span>
           <span className="text-sm text-muted-foreground">{formatShortDate(date)}</span>
+          <span className="text-lg font-bold text-navy">D+{day}</span>
         </div>
         {isIntensiveDay && (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-coral text-white text-xs font-semibold">

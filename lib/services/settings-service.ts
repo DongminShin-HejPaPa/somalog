@@ -19,7 +19,6 @@ export function createDefaultSettings(): Settings {
     targetMonths: 12,
     waterGoal: 2.8,
     routineWeightTime: "아침 기상 직후",
-    routineEnergyTime: "21:00",
     routineExtra: [],
     intensiveDayOn: true,
     intensiveDayCriteria: "역대최저",
@@ -46,7 +45,6 @@ function rowToSettings(row: Record<string, unknown>): Settings {
     waterGoal: (row.water_goal as number) ?? 2.8,
     routineWeightTime:
       (row.routine_weight_time as string) ?? "아침 기상 직후",
-    routineEnergyTime: (row.routine_energy_time as string) ?? "21:00",
     routineExtra: (row.routine_extra as string[]) ?? [],
     intensiveDayOn: (row.intensive_day_on as boolean) ?? true,
     intensiveDayCriteria:
@@ -81,7 +79,6 @@ function settingsToRow(
     target_months: s.targetMonths,
     water_goal: s.waterGoal,
     routine_weight_time: s.routineWeightTime,
-    routine_energy_time: s.routineEnergyTime,
     routine_extra: s.routineExtra,
     intensive_day_on: s.intensiveDayOn,
     intensive_day_criteria: s.intensiveDayCriteria,

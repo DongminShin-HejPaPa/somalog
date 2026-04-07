@@ -13,8 +13,7 @@ export type ItemKey =
   | "breakfast"
   | "lunch"
   | "dinner"
-  | "lateSnack"
-  | "energy";
+  | "lateSnack";
 
 interface InputModalProps {
   field: ItemKey | null;
@@ -34,7 +33,6 @@ const fieldLabels: Record<ItemKey, string> = {
   lunch: "점심",
   dinner: "저녁",
   lateSnack: "야식",
-  energy: "체력",
 };
 
 const waterPresets = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5];
@@ -332,26 +330,6 @@ export function InputModal({
           </div>
         )}
 
-        {/* Energy */}
-        {field === "energy" && (
-          <div className="flex gap-3">
-            {(["여유", "보통", "피곤"] as const).map((e) => (
-              <button
-                key={e}
-                onClick={() => onSave({ energy: e })}
-                data-testid={`modal-energy-${e}`}
-                className={cn(
-                  "flex-1 py-4 rounded-xl text-sm font-semibold min-h-[60px] transition-colors",
-                  log.energy === e
-                    ? "bg-navy text-white"
-                    : "bg-secondary text-foreground border border-border"
-                )}
-              >
-                {e}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );

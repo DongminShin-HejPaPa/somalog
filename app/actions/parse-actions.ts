@@ -41,7 +41,6 @@ export async function actionParseFreText(
         lunch: string | null;
         dinner: string | null;
         lateSnack: "Y" | "N" | null;
-        energy: "여유" | "보통" | "피곤" | null;
       }>({
         type: "object",
         properties: {
@@ -75,13 +74,8 @@ export async function actionParseFreText(
             enum: ["Y", "N", null],
             description: "야식 여부. 먹었으면 Y, 안 먹었으면 N, 언급 없으면 null. 'ㅇㅇ'·'응'·긍정 이모티콘은 Y로 해석.",
           },
-          energy: {
-            type: ["string", "null"],
-            enum: ["여유", "보통", "피곤", null],
-            description: "체력/컨디션. 언급 없으면 null.",
-          },
         },
-        required: ["weight", "water", "exercise", "breakfast", "lunch", "dinner", "lateSnack", "energy"],
+        required: ["weight", "water", "exercise", "breakfast", "lunch", "dinner", "lateSnack"],
       }),
       system: `너는 한국어 다이어트 앱의 입력 파싱 도우미야.
 사용자가 자유롭게 입력한 텍스트에서 다이어트 일지 필드를 추출한다.
@@ -103,7 +97,6 @@ export async function actionParseFreText(
     if (object.lunch != null) update.lunch = object.lunch;
     if (object.dinner != null) update.dinner = object.dinner;
     if (object.lateSnack != null) update.lateSnack = object.lateSnack;
-    if (object.energy != null) update.energy = object.energy;
     return update;
   } catch (err) {
     console.error("[parse-actions] actionParseFreText 실패:", err);

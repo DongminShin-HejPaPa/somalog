@@ -18,7 +18,6 @@ const baseDailyLog: DailyLog = {
   lunch: "샐러드",
   dinner: "닭가슴살",
   lateSnack: "N",
-  energy: "보통",
   note: null,
   closed: false,
   intensiveDay: false,
@@ -174,10 +173,10 @@ describe("generateDailySummary", () => {
     expect(result).toContain("야식 있음.");
   });
 
-  it("21. intensiveDay=true → 'Intensive Day였어' 포함", () => {
+  it("21. intensiveDay=true → '체중 집중 관리가 필요한 날이었어' 포함", () => {
     const log: DailyLog = { ...baseDailyLog, intensiveDay: true };
     const result = generateDailySummary(log, waterGoal);
-    expect(result).toContain("Intensive Day였어");
+    expect(result).toContain("체중 집중 관리가 필요한 날이었어");
   });
 
   it("22. intensiveDay=false → '내일도 꾸준히.' 포함", () => {
@@ -191,7 +190,7 @@ describe("generateDailySummary", () => {
 // generateOneLiner
 // ─────────────────────────────────────────────
 describe("generateOneLiner", () => {
-  it("23. intensiveDay=true, exercise=Y, lateSnack=N → 'Intensive Day에 운동까지' 포함 (1순위)", () => {
+  it("23. intensiveDay=true, exercise=Y, lateSnack=N → '집중 관리일에 운동까지' 포함 (1순위)", () => {
     const log: DailyLog = {
       ...baseDailyLog,
       intensiveDay: true,
@@ -199,17 +198,17 @@ describe("generateOneLiner", () => {
       lateSnack: "N",
     };
     const result = generateOneLiner(log);
-    expect(result).toContain("Intensive Day에 운동까지");
+    expect(result).toContain("집중 관리일에 운동까지");
   });
 
-  it("24. intensiveDay=true, lateSnack=Y → 'Intensive Day에 야식은 아쉬워' 포함 (2순위)", () => {
+  it("24. intensiveDay=true, lateSnack=Y → '집중 관리일에 야식은 아쉬워' 포함 (2순위)", () => {
     const log: DailyLog = {
       ...baseDailyLog,
       intensiveDay: true,
       lateSnack: "Y",
     };
     const result = generateOneLiner(log);
-    expect(result).toContain("Intensive Day에 야식은 아쉬워");
+    expect(result).toContain("집중 관리일에 야식은 아쉬워");
   });
 
   it("25. exercise=Y, lateSnack=N → '운동하고 야식 안 먹은 하루' 포함 (3순위)", () => {

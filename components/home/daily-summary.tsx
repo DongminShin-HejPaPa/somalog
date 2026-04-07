@@ -34,7 +34,6 @@ export function DailySummary({
               <th className="py-2 px-1 text-left font-medium text-muted-foreground">점심</th>
               <th className="py-2 px-1 text-left font-medium text-muted-foreground">저녁</th>
               <th className="py-2 px-1 text-center font-medium text-muted-foreground">야식</th>
-              <th className="py-2 px-1 text-center font-medium text-muted-foreground">체력</th>
             </tr>
           </thead>
           <tbody>
@@ -56,7 +55,6 @@ export function DailySummary({
                 <td className="py-1.5 px-1 truncate max-w-[60px]">{log.lunch ?? ""}</td>
                 <td className="py-1.5 px-1 truncate max-w-[60px]">{log.dinner ?? ""}</td>
                 <td className="py-1.5 px-1 text-center">{log.lateSnack ?? ""}</td>
-                <td className="py-1.5 px-1 text-center">{log.energy ?? ""}</td>
               </tr>
             ))}
           </tbody>

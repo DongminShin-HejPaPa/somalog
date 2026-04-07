@@ -22,7 +22,6 @@ function makeLog(date: string, weight: number | null): DailyLog {
     lunch: null,
     dinner: null,
     lateSnack: null,
-    energy: null,
     note: null,
     closed: false,
     intensiveDay: null,

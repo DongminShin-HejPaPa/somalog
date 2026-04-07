@@ -19,7 +19,6 @@ const items = [
   { key: "lunch", label: "점심" },
   { key: "dinner", label: "저녁" },
   { key: "lateSnack", label: "야식" },
-  { key: "energy", label: "체력" },
 ] as const;
 
 export function InputStatusChips({ log, onCloseToday, isClosingToday }: InputStatusChipsProps) {
@@ -32,7 +31,7 @@ export function InputStatusChips({ log, onCloseToday, isClosingToday }: InputSta
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold text-sm">오늘 입력 현황</h3>
         <span className="text-xs text-muted-foreground">
-          {completedCount}/8 완료
+          {completedCount}/7 완료
         </span>
       </div>
 
@@ -43,7 +42,7 @@ export function InputStatusChips({ log, onCloseToday, isClosingToday }: InputSta
           return (
             <Link
               key={item.key}
-              href="/input"
+              href={`/input?open=${item.key}`}
               className={cn(
                 "flex items-center justify-center gap-1 px-2 py-2.5 rounded-lg text-xs font-medium min-h-[44px] transition-colors",
                 completed
@@ -61,7 +60,7 @@ export function InputStatusChips({ log, onCloseToday, isClosingToday }: InputSta
       <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
         <div
           className="h-full bg-navy rounded-full transition-all"
-          style={{ width: `${(completedCount / 8) * 100}%` }}
+          style={{ width: `${(completedCount / 7) * 100}%` }}
         />
       </div>
 

@@ -34,7 +34,6 @@ function rowToDailyLog(row: Record<string, unknown>): DailyLog {
     lunch: (row.lunch as string | null) ?? null,
     dinner: (row.dinner as string | null) ?? null,
     lateSnack: (row.late_snack as "Y" | "N" | null) ?? null,
-    energy: (row.energy as "여유" | "보통" | "피곤" | null) ?? null,
     note: (row.note as string | null) ?? null,
     closed: (row.closed as boolean) ?? false,
     intensiveDay: (row.intensive_day as boolean | null) ?? null,
@@ -61,7 +60,6 @@ function dailyLogToRow(
   if (log.lunch !== undefined) row.lunch = log.lunch;
   if (log.dinner !== undefined) row.dinner = log.dinner;
   if (log.lateSnack !== undefined) row.late_snack = log.lateSnack;
-  if (log.energy !== undefined) row.energy = log.energy;
   if (log.note !== undefined) row.note = log.note;
   if (log.closed !== undefined) row.closed = log.closed;
   if (log.intensiveDay !== undefined) row.intensive_day = log.intensiveDay;
@@ -151,7 +149,6 @@ export async function upsertDailyLog(
         lunch: null,
         dinner: null,
         lateSnack: null,
-        energy: null,
         note: null,
         closed: false,
         intensiveDay: null,
@@ -395,7 +392,6 @@ export async function loadMockDailyLogs(): Promise<void> {
     lunch: log.lunch,
     dinner: log.dinner,
     late_snack: log.lateSnack,
-    energy: log.energy,
     note: log.note,
     closed: log.closed,
     intensive_day: log.intensiveDay,

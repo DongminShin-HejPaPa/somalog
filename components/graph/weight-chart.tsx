@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import { Expand, X } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -102,6 +103,59 @@ export function WeightChart({
 }: WeightChartProps) {
   const [period, setPeriod] = useState<Period>("all");
   const [show3dAvg, setShow3dAvg] = useState(true);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement && !(document as any).webkitFullscreenElement) {
+        setIsFullscreen(false);
+        screen.orientation?.unlock?.();
+      }
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+    };
+  }, []);
+
+  const toggleFullscreen = async () => {
+    if (!isFullscreen) {
+      if (containerRef.current) {
+        try {
+          if (containerRef.current.requestFullscreen) {
+            await containerRef.current.requestFullscreen();
+          } else if ((containerRef.current as any).webkitRequestFullscreen) {
+            await ((containerRef.current as any).webkitRequestFullscreen)();
+          }
+          if (screen.orientation && screen.orientation.lock) {
+            await screen.orientation.lock("landscape").catch(() => {});
+          }
+        } catch (err) {
+          console.warn("Fullscreen API failed", err);
+        }
+      }
+      setIsFullscreen(true);
+    } else {
+      try {
+        if (document.fullscreenElement || (document as any).webkitFullscreenElement) {
+          if (document.exitFullscreen) {
+            await document.exitFullscreen();
+          } else if ((document as any).webkitExitFullscreen) {
+            await ((document as any).webkitExitFullscreen)();
+          }
+        }
+        if (screen.orientation && screen.orientation.unlock) {
+          screen.orientation.unlock();
+        }
+      } catch (err) {
+        console.warn("Exit Fullscreen API failed", err);
+      }
+      setIsFullscreen(false);
+    }
+  };
 
   const hasData = logs.some((log) => log.weight !== null);
 
@@ -182,25 +236,41 @@ export function WeightChart({
     : null;
 
   return (
-    <div data-testid="graph-weight-chart">
-      <div className="px-4 mb-3 flex gap-1.5">
-        {(Object.keys(periodLabels) as Period[]).map((p) => (
-          <button
-            key={p}
-            onClick={() => setPeriod(p)}
-            className={cn(
-              "px-3 py-1.5 rounded-full text-xs font-medium transition-colors min-h-[36px]",
-              period === p
-                ? "bg-navy text-white"
-                : "bg-secondary text-muted-foreground"
-            )}
-          >
-            {periodLabels[p]}
-          </button>
-        ))}
+    <div
+      data-testid="graph-weight-chart"
+      ref={containerRef}
+      className={cn(
+        "bg-background transition-all",
+        isFullscreen ? "fixed inset-0 z-[100] flex flex-col p-4 sm:p-6 overflow-y-auto w-full h-[100dvh]" : ""
+      )}
+    >
+      <div className="px-4 mb-3 flex items-center justify-between flex-shrink-0">
+        <div className="flex gap-1.5">
+          {(Object.keys(periodLabels) as Period[]).map((p) => (
+            <button
+              key={p}
+              onClick={() => setPeriod(p)}
+              className={cn(
+                "px-3 py-1.5 rounded-full text-xs font-medium transition-colors min-h-[36px]",
+                period === p
+                  ? "bg-navy text-white"
+                  : "bg-secondary text-muted-foreground"
+              )}
+            >
+              {periodLabels[p]}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={toggleFullscreen}
+          className="p-2 -mr-2 text-muted-foreground hover:bg-secondary rounded-full transition-colors"
+          aria-label={isFullscreen ? "전체화면 종료" : "전체화면 확대"}
+        >
+          {isFullscreen ? <X size={20} /> : <Expand size={20} />}
+        </button>
       </div>
 
-      <div className="px-4 mb-2 space-y-1.5">
+      <div className="px-4 mb-2 space-y-1.5 flex-shrink-0">
         {/* 선 범례 */}
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
@@ -241,7 +311,7 @@ export function WeightChart({
         </div>
       </div>
 
-      <div className="px-2 h-[300px]">
+      <div className={cn("px-2", isFullscreen ? "flex-1 min-h-[300px]" : "h-[300px]")}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={chartData.map((d, i) => ({

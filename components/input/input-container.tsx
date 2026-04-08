@@ -220,13 +220,16 @@ export function InputContainer() {
       const sortedUnclosed = [...unclosed]
         .filter((l) => l.date <= today)
         .sort((a, b) => a.date.localeCompare(b.date));
-      const nextTarget = sortedUnclosed.length > 0
-        ? sortedUnclosed[0].date
-        : today;
-      if (nextTarget <= today) {
+      if (sortedUnclosed.length > 0) {
+        const nextTarget = sortedUnclosed[0].date;
         setCloseNavMessage(`${nextTarget.slice(5).replace("-", "/")} 로 이동합니다`);
         setTimeout(() => setCloseNavMessage(null), 3000);
         await loadLog(nextTarget);
+      } else {
+        // 모든 날 마감 완료
+        setCloseNavMessage("모든 날을 마감했습니다! 오늘 하루도 수고 많으셨어요 🎉");
+        setTimeout(() => setCloseNavMessage(null), 4000);
+        await loadLog(today);
       }
     } catch {
       setCloseError("마감에 실패했습니다. 잠시 후 다시 시도해주세요.");
@@ -238,7 +241,16 @@ export function InputContainer() {
   const handleFreeText = async (text: string) => {
     setIsFreeTextSaving(true);
     try {
-      const update = await actionParseFreText(text, currentLog?.weight ?? null, prevWeight);
+      const update = await actionParseFreText(
+        text,
+        currentLog?.weight ?? null,
+        prevWeight,
+        {
+          todayBreakfast: currentLog?.breakfast ?? null,
+          todayLunch: currentLog?.lunch ?? null,
+          todayDinner: currentLog?.dinner ?? null,
+        }
+      );
       if (Object.keys(update).length > 0) {
         const updated = await actionUpsertDailyLog(currentDate, update);
         setCurrentLog(updated);

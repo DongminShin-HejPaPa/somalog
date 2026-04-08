@@ -150,7 +150,7 @@ export function InputModal({
           </button>
         </div>
 
-        {/* Weight */}
+        {/* 체중 슬라이더 */}
         {field === "weight" && (
           <div className="space-y-3">
             {/* 슬라이더 */}
@@ -175,6 +175,25 @@ export function InputModal({
                 }
                 className="w-full h-2 rounded-full appearance-none cursor-pointer accent-navy bg-secondary"
               />
+              {/* 이전 체중 대비 +- 표시 */}
+              {prevWeight != null && (() => {
+                const current = parseFloat(weightValue);
+                if (isNaN(current)) return null;
+                const delta = Math.round((current - prevWeight) * 10) / 10;
+                const sign = delta > 0 ? "+" : "";
+                const isPositive = delta > 0;
+                const isNeutral = delta === 0;
+                return (
+                  <div className="flex justify-end mt-1">
+                    <span className={cn(
+                      "text-xs font-semibold",
+                      isNeutral ? "text-muted-foreground" : isPositive ? "text-coral" : "text-emerald-500"
+                    )}>
+                      {sign}{delta}kg
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
             {/* 직접 입력 */}
             <div className="flex items-center gap-2">

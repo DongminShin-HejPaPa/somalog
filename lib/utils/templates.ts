@@ -1,8 +1,7 @@
 import type { DailyLog } from "@/lib/types";
 
 /**
- * 체중 입력 시 즉시 피드백 생성
- * 체중 변화, Intensive Day 여부, 수분 진행률 중심
+ * 체중 입력 시 즉시 피드백 생성 (Hard Reset 편향 없이, 오늘 행동 중심)
  */
 export function generateFeedback(
   log: DailyLog,
@@ -13,117 +12,129 @@ export function generateFeedback(
   const parts: string[] = [];
 
   if (log.weight !== null) {
-    // 체중 변화
     if (prevWeight !== null) {
       const diff = Math.round((log.weight - prevWeight) * 10) / 10;
       const sign = diff > 0 ? "+" : "";
-      parts.push(`체중 ${log.weight}kg (어제 대비 ${sign}${diff}kg).`);
+      if (diff < 0) {
+        parts.push(`체중 ${log.weight}kg, 전날 대비 ${sign}${diff}kg. 좋은 흐름이야.`);
+      } else if (diff > 0) {
+        parts.push(`체중 ${log.weight}kg, 전날 대비 ${sign}${diff}kg. 등락은 자연스러운 거야.`);
+      } else {
+        parts.push(`체중 ${log.weight}kg, 전날과 동일. 안정적이야.`);
+      }
     } else {
-      parts.push(`체중 ${log.weight}kg.`);
+      parts.push(`체중 ${log.weight}kg 기록 완료.`);
     }
 
-    // 역대 최저 대비
-    if (lowestWeight !== Infinity && log.weight > lowestWeight) {
-      const diff = Math.round((log.weight - lowestWeight) * 10) / 10;
-      parts.push(`역대 최저(${lowestWeight}kg)보다 ${diff}kg 높은 상태야.`);
-    } else if (lowestWeight !== Infinity && log.weight <= lowestWeight) {
-      parts.push(`역대 최저 기록이야!`);
+    if (lowestWeight !== Infinity && log.weight <= lowestWeight) {
+      parts.push(`역대 최저 기록 갱신! 🎉`);
     }
   }
 
-  // 수분 진행률
-  if (log.water !== null) {
+  if (log.water !== null && waterGoal > 0) {
     const pct = Math.round((log.water / waterGoal) * 100);
     const remaining = Math.round((waterGoal - log.water) * 10) / 10;
-    if (remaining > 0) {
-      parts.push(`수분은 목표의 ${pct}%, ${remaining}L 남았어.`);
-    } else {
+    if (remaining <= 0) {
       parts.push(`수분 목표 달성!`);
+    } else {
+      parts.push(`수분 ${pct}%, ${remaining}L 남았어.`);
     }
   }
 
-  // 동기 메시지
+  if (log.exercise === "Y") {
+    parts.push("오늘 운동까지 했어? 👍");
+  }
+
+  if (log.lateSnack === "N" && log.exercise === "N") {
+    parts.push("야식 참은 것만으로도 오늘 잘 한 거야.");
+  }
+
+  // Hard Reset Mode는 하나의 맥락 정보로만 활용
   if (log.intensiveDay) {
-    parts.push("오늘 식단 관리가 핵심이야.");
-  } else {
-    parts.push("이 흐름 유지해.");
+    parts.push("오늘은 Hard Reset Mode — 식단 신경 쓰자.");
+  } else if (parts.length === 0) {
+    parts.push("기록 완료. 이 흐름 이어가자.");
   }
 
   return parts.join(" ");
 }
 
 /**
- * 마감 시 일일 총평 생성
+ * 마감 시 일일 총평 생성 — 데이터 나열 아닌 전문가 코칭 관점
  */
 export function generateDailySummary(log: DailyLog, waterGoal: number): string {
-  const parts: string[] = [];
+  const lines: string[] = [];
 
-  // 체중
+  // 체중 평가
   if (log.weight !== null) {
-    const change =
-      log.weightChange !== null
-        ? ` (시작 대비 ${log.weightChange > 0 ? "+" : ""}${log.weightChange}kg)`
-        : "";
-    parts.push(`체중 ${log.weight}kg${change}.`);
+    const change = log.weightChange ?? 0;
+    if (change < -0.5) {
+      lines.push(`오늘 체중 ${log.weight}kg — 시작 대비 ${Math.abs(change)}kg 빠졌어. 착실히 가고 있는 거야.`);
+    } else if (change > 0.5) {
+      lines.push(`오늘 체중 ${log.weight}kg — 시작 대비 ${change}kg 올랐어. 아직 여유 있어, 지금부터 잡으면 돼.`);
+    } else {
+      lines.push(`오늘 체중 ${log.weight}kg — 크게 변동 없어. 안정 구간이야.`);
+    }
   }
 
-  // 수분
-  if (log.water !== null) {
-    parts.push(`수분 ${log.water}/${waterGoal}L.`);
+  // 식단 패턴 평가
+  const mealCount = [log.breakfast, log.lunch, log.dinner].filter(Boolean).length;
+  if (mealCount === 3) {
+    lines.push("세 끼 다 챙겼네 — 규칙적인 식사 패턴이 다이어트의 기본이야.");
+  } else if (mealCount === 0) {
+    lines.push("오늘 식사 기록이 없어 — 내일은 최소 한 끼라도 적어봐.");
   }
 
-  // 식단
-  const meals = [
-    log.breakfast && `아침: ${log.breakfast}`,
-    log.lunch && `점심: ${log.lunch}`,
-    log.dinner && `저녁: ${log.dinner}`,
-  ].filter(Boolean);
-  if (meals.length > 0) {
-    parts.push(meals.join(", ") + ".");
+  // 운동+야식 복합 평가
+  if (log.exercise === "Y" && log.lateSnack === "N") {
+    lines.push("운동하고 야식도 참았어 — 오늘 하루 완벽하게 관리했어. 이런 날이 쌓여야 결과가 나와.");
+  } else if (log.exercise === "Y" && log.lateSnack === "Y") {
+    lines.push("운동한 건 좋은데, 야식이 그 효과를 일부 상쇄했어. 내일은 야식을 이겨내보자.");
+  } else if (log.exercise === "N" && log.lateSnack === "Y") {
+    lines.push("운동도 야식도 아쉬운 하루야. 하지만 기록한 것만으로 내일을 바꿀 수 있어.");
+  } else if (log.exercise === "N" && log.lateSnack === "N") {
+    lines.push("야식은 참았어 — 운동 없이도 절제한 건 충분히 가치 있는 행동이야.");
   }
 
-  // 운동
-  if (log.exercise === "Y") {
-    parts.push("운동 완료.");
-  } else if (log.exercise === "N") {
-    parts.push("운동 미수행.");
+  // 수분 평가
+  if (log.water !== null && waterGoal > 0) {
+    if (log.water >= waterGoal) {
+      lines.push("수분도 목표를 채웠어. 대사 효율에 직접 영향을 줘 — 계속 유지해.");
+    } else if (log.water < waterGoal * 0.5) {
+      lines.push(`수분이 목표의 절반도 안 됐어. 내일은 의식적으로 물을 더 마셔봐.`);
+    }
   }
 
-  // 야식
-  if (log.lateSnack === "Y") {
-    parts.push("야식 있음.");
-  } else if (log.lateSnack === "N") {
-    parts.push("야식 없음.");
-  }
-
-  // 마무리
+  // Hard Reset Mode는 하나의 맥락으로만
   if (log.intensiveDay) {
-    parts.push("오늘은 체중 집중 관리가 필요한 날이었어 — 내일도 집중 유지해.");
+    lines.push("오늘은 Hard Reset Mode였어 — 이 시기를 잘 버티면 다음 단계로 넘어갈 수 있어.");
   } else {
-    parts.push("내일도 꾸준히.");
+    lines.push("내일도 오늘처럼 꾸준하게.");
   }
 
-  return parts.join(" ");
+  return lines.join("\n");
 }
 
 /**
- * 총평 기반 한줄 요약 생성 (Home 탭 코치 한마디용)
+ * 홈 탭 코치 한마디 (oneLiner) 생성
  */
 export function generateOneLiner(log: DailyLog): string {
-  if (log.intensiveDay && log.exercise === "Y" && log.lateSnack === "N") {
-    return `집중 관리일에 운동까지 — 오늘 잘 버텼어.`;
-  }
-  if (log.intensiveDay && log.lateSnack === "Y") {
-    return `집중 관리일에 야식은 아쉬워 — 내일 만회하자.`;
-  }
   if (log.exercise === "Y" && log.lateSnack === "N") {
+    if (log.intensiveDay) return `Hard Reset Mode에 운동까지 — 오늘 정말 잘 버텼어.`;
     return `운동하고 야식 안 먹은 하루 — 착실한 관리야.`;
   }
+  if (log.exercise === "Y" && log.lateSnack === "Y") {
+    return `운동했지만 야식은 아쉬웠어 — 그래도 움직인 것 자체가 의미 있어.`;
+  }
+  if (log.exercise === "N" && log.lateSnack === "N") {
+    return `운동은 없었지만 야식 절제 — 작은 승리가 쌓이는 거야.`;
+  }
   if (log.exercise === "N" && log.lateSnack === "Y") {
+    if (log.intensiveDay) return `Hard Reset Mode인데 야식까지 — 내일은 반드시 만회하자.`;
     return `운동도 야식도 아쉬운 하루 — 내일 반드시 만회해.`;
   }
-  if (log.weight !== null && log.weightChange !== null && log.weightChange < -3) {
-    return `체중 ${log.weight}kg, 시작 대비 ${Math.abs(log.weightChange)}kg 감량 — 순항 중이야.`;
+  if (log.weight !== null && (log.weightChange ?? 0) < -1) {
+    return `체중 ${log.weight}kg, 시작 대비 ${Math.abs(log.weightChange!)}kg 감량 — 순항 중이야.`;
   }
   return `오늘 하루 수고했어 — 내일도 이 흐름 이어가자.`;
 }

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
-import { actionGetDailyLog, actionGetRecentDailyLogs, actionCloseDailyLog, actionGetFirstUnclosedLog, actionGetWeeklyLogs, actionGetDailyLogsTotalCount, actionGetAllDailyLogs, actionGetLowestWeight, actionAutoCloseOldLogs } from "@/app/actions/log-actions";
+import { actionGetDailyLog, actionUpsertDailyLog, actionGetRecentDailyLogs, actionCloseDailyLog, actionGetFirstUnclosedLog, actionGetWeeklyLogs, actionGetDailyLogsTotalCount, actionGetAllDailyLogs, actionGetLowestWeight, actionAutoCloseOldLogs } from "@/app/actions/log-actions";
 import { HomeContent } from "./home-content";
 import { formatDate } from "@/lib/utils/date-utils";
 import { getGreetingMessage } from "@/lib/utils/greeting-messages";
@@ -55,6 +55,10 @@ export function HomeContainer() {
         logs = fetchedLogs;
         firstUnclosed = fetchedFirst;
         todayLog = fetchedToday;
+        // 오늘 로그가 없으면 빈 로그 자동 생성 (시험 일자 동일 처리)
+        if (!todayLog) {
+          todayLog = await actionUpsertDailyLog(today, {});
+        }
         logStore.setRecentLogs(logs);
         if (todayLog) logStore.setLog(todayLog);
       }

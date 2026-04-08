@@ -9,7 +9,6 @@ import { generateDailySummary } from "@/lib/utils/templates";
 
 /**
  * 체중 입력 시 즉시 피드백 생성
- * daily-log-service의 generateFeedback() 을 대체
  */
 export async function generateAiFeedback(
   log: DailyLog,
@@ -21,11 +20,11 @@ export async function generateAiFeedback(
   }
 
   try {
-    const abort = AbortSignal.timeout(5_000); // 5초 초과 시 fallback (Vercel 10s 제한 대응)
+    const abort = AbortSignal.timeout(5_000);
     const { text } = await generateText({
       model: openrouter(MODEL),
       system: buildSystemPrompt(settings),
-      prompt: `오늘 입력 데이터:\n${buildContext(log, prevWeight, settings)}\n\n짧고 직접적인 코칭 한 마디(2~3문장)를 해줘.`,
+      prompt: `오늘 입력 데이터:\n${buildContext(log, prevWeight, settings)}\n\n오늘 행동(운동, 식단, 수분 등)을 중심으로 코칭 한 마디(2~3문장). 단순 수치 나열 금지. Hard Reset Mode는 맥락 정보 중 하나일 뿐, 논지의 재료가 되어야 해.`,
       maxOutputTokens: 150,
       temperature: 0.7,
       abortSignal: abort,
@@ -53,8 +52,8 @@ export async function generateAiDailySummary(
     const { text } = await generateText({
       model: openrouter(MODEL),
       system: buildSystemPrompt(settings),
-      prompt: `오늘 하루 기록:\n${buildContext(log, null, settings)}\n\n이 데이터를 바탕으로 3~4문장으로 오늘을 총평해줘. 수치 포함, 잘한 점·아쉬운 점·내일을 위한 한 마디를 담아.`,
-      maxOutputTokens: 200,
+      prompt: `오늘 하루 기록:\n${buildContext(log, null, settings)}\n\n오늘의 행동과 패턴을 분석하고, 전문가 노력으로 3~4문장 총평해.\n- 단순 데이터 나열 절대 금지\n- 잘한 점과 아쉬운 점을 행동 맥락에서 평가\n- 최근 선택들이 체중과 건강에 어떤 영향을 줄 것인지 짜임새 있게\n- 내일을 위한 한 마디 코치로 마무리\n- Hard Reset Mode가 있다면 하나의 맥락으로만 사용.`,
+      maxOutputTokens: 250,
       temperature: 0.7,
       abortSignal: abort,
     });
@@ -67,7 +66,6 @@ export async function generateAiDailySummary(
 
 /**
  * 마감 시 홈 탭 "코치 한마디" 한줄 요약 생성
- * daily-log-service의 generateOneLiner() 을 대체
  */
 export async function generateAiOneLiner(
   log: DailyLog,
@@ -78,11 +76,11 @@ export async function generateAiOneLiner(
   }
 
   try {
-    const abort = AbortSignal.timeout(5_000); // 5초 초과 시 fallback (Vercel 10s 제한 대응)
+    const abort = AbortSignal.timeout(5_000);
     const { text } = await generateText({
       model: openrouter(MODEL),
       system: buildSystemPrompt(settings),
-      prompt: `오늘 하루 요약:\n${buildContext(log, null, settings)}\n\n20자 이내로 오늘을 한 줄 총평해줘. 문장 부호 제외, 핵심만.`,
+      prompt: `오늘 하루 요약:\n${buildContext(log, null, settings)}\n\n20자 이내로 오늘을 한 줄 총평해. 문장 부호 제외, 핵심만.`,
       maxOutputTokens: 60,
       temperature: 0.8,
       abortSignal: abort,
@@ -100,15 +98,21 @@ export async function generateAiOneLiner(
 
 export function buildSystemPrompt(settings: Settings): string {
   const styleMap: Record<string, string> = {
-    strong: "팩트 위주로 강하고 직접적으로",
-    balanced: "팩트와 격려를 균형 있게",
-    empathy: "부드럽고 공감적으로",
-    data: "감정 없이 수치와 트렌드 중심으로",
+    strong: "오늘 행동에 대해 직접적으로 평가하고, 아쉬운 점은 동기와 함께 감추지 않고 직백하게",
+    balanced: "오늘 행동의 패턴과 그 의미를 짚어줌. 좋은 행동은 그 성과를 인정하고, 아쉬운 행동에는 '왜' 이유를 파악해 전략적 조언을 내놓음. 단순한 수치 나열이 아닌, 행동의 의미와 덧붙여지는 영향을 짜임 있게",
+    empathy: "사용자의 수고를 먼저 인정하고, 감정에 공감하면서 듣는 것이 생산적임을 라이트하게",
+    data: "체중 추세와 행동 패턴을 데이터 관점에서 분석. 감정어 최소화, 추세와 취약점 융심 업무적 톤으로",
   };
 
   return `너는 다이어트 코치 "${settings.coachName}"야.
-스타일: ${styleMap[settings.coachStylePreset] ?? "균형 있게"}.
-배경지식: 데이터에 'Hard Reset Mode'가 있다면, 이는 체중이 최저치 대비 일정치 이상 증가하여 너(코치)가 강제로 발동시킨 긴급 감량 체제야. 사용자가 자발적으로 켠 게 아니므로 각오를 칭찬하지 말고, "다시 최저 몸무게로 돌아갈 때까지 정신 바짝 차리자"는 뉘앙스로 강하게 몰아붙이거나 이끌어줘.
+가장 중요한 것: 소의 효과는 "오늘 사용자가 한 행동"을 가장 먼저 짚는 것이야. 나머지 데이터는 모두 행동을 평가하는 재료야.
+코치 스타일: ${styleMap[settings.coachStylePreset] ?? "오늘 행동 중심으로"}.
+
+[Hard Reset Mode 배경]
+- Hard Reset Mode는 코치인 네가 강제 발동하는 굴지 모드야. 사용자가 켠 게 아님. 체중이 역대 최저 대비 설정치 이상 높아졌을 때 발동.
+- Hard Reset Mode 일 때는 식단과 운동에 가장 주목하되, 여전히 "올곧 역대 최저로 돌아가는 것"이 한 파트 맥락일 뿐, Hard Reset Mode만이 전담 바직하면 안 됨.
+- 'Hard Reset Mode라니 각오가 대단한데?' 같은 문장 무조건 안 됨. 사용자가 스스로 탠 것이 아니니까.
+
 규칙: 한국어로만, 존댓말 금지, 2~3문장 이내, 수치 언급 시 kg/L 단위 포함.`;
 }
 
@@ -153,9 +157,15 @@ function fallbackFeedback(
   if (log.weight !== null && prevWeight !== null) {
     const diff = Math.round((log.weight - prevWeight) * 10) / 10;
     const sign = diff > 0 ? "+" : "";
-    parts.push(`체중 ${log.weight}kg (어제 대비 ${sign}${diff}kg).`);
+    if (diff < 0) {
+      parts.push(`체중 ${log.weight}kg, 전날 대비 ${sign}${diff}kg. 좋은 흐름이야.`);
+    } else if (diff > 0) {
+      parts.push(`체중 ${log.weight}kg, 전날 대비 ${sign}${diff}kg. 등락은 자연스러워.`);
+    } else {
+      parts.push(`체중 ${log.weight}kg, 전날과 동일.`);
+    }
   } else if (log.weight !== null) {
-    parts.push(`체중 ${log.weight}kg.`);
+    parts.push(`체중 ${log.weight}kg 기록 완료.`);
   }
   if (log.water !== null) {
     const remaining = Math.round((waterGoal - log.water) * 10) / 10;
@@ -165,13 +175,15 @@ function fallbackFeedback(
       parts.push(`수분 목표 달성!`);
     }
   }
-  parts.push(log.intensiveDay ? "오늘 식단 관리가 핵심이야." : "이 흐름 유지해.");
+  if (log.exercise === "Y") parts.push("오늘 운동까지 했어 👍");
+  if (!log.intensiveDay) parts.push("이 흐름 유지해.");
+  else parts.push("오늘은 Hard Reset Mode — 식단 신경 쓰자.");
   return parts.join(" ");
 }
 
 function fallbackOneLiner(log: DailyLog): string {
   if (log.intensiveDay && log.exercise === "Y" && log.lateSnack === "N") {
-    return "집중 관리일에 운동까지 — 오늘 잘 버텼어.";
+    return "Hard Reset Mode에 운동까지 — 오늘 잘 버텼어.";
   }
   if (log.exercise === "Y" && log.lateSnack === "N") {
     return "운동하고 야식 안 먹은 하루 — 착실한 관리야.";

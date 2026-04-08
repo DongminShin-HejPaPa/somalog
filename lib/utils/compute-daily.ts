@@ -11,6 +11,12 @@ export function computeWeightChange(weight: number, startWeight: number): number
   return Math.round((weight - startWeight) * 10) / 10;
 }
 
+/** 신체 정보 기반 권장 수분량 계산 (남성: 체중 × 35ml, 여성: 체중 × 31ml) */
+export function computeRecommendedWater(weight: number, gender: "남성" | "여성" | string): number {
+  const ml = gender === "남성" ? weight * 35 : weight * 31;
+  return Math.round(ml / 100) / 10;
+}
+
 /**
  * 3일 이동평균 (오늘 포함 최근 3 달력일, weight !== null인 것만)
  * logs: 최신순 정렬 (date desc)

@@ -403,11 +403,18 @@ const rules: GreetingRule[] = [
     ],
   },
 
+  // ── 시간제한 기본 메세지 (오전 5시 ~ 오후 6시) ──
+  {
+    condition: (ctx) => getHour(ctx.now) >= 5 && getHour(ctx.now) < 18,
+    messages: (ctx) => [
+      `${ctx.name}님, 오늘도 잘 해내실 거예요 😊`,
+    ],
+  },
+
   // ── 기본 메세지 (항상 매칭) ──
   {
     condition: () => true,
     messages: (ctx) => [
-      `${ctx.name}님, 오늘도 잘 해내실 거예요 😊`,
       `안녕하세요, ${ctx.name}님! 오늘도 파이팅이에요 💪`,
       `${ctx.name}님, 기록이 습관이 되면 다이어트는 자연스럽게 따라와요 📝`,
       `${ctx.name}님, 오늘의 기록이 미래의 나를 만들어요 ✨`,

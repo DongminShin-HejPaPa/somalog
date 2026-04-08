@@ -98,6 +98,12 @@ export function InputContainer() {
           const updatedLogs = await actionGetRecentDailyLogs(30);
           logStore.setRecentLogs(updatedLogs);
           setAllLogs(updatedLogs);
+          
+          // 방금 강제 마감된 날짜를 유저가 띄워놓고 보고 있을 수 있으므로, 
+          // 새롭게 갱신된 내역 기준으로 "다음번 미마감 날짜"로 자동 이동시킴
+          const newFirstUnclosed = logStore.getFirstUnclosedLog();
+          const newTargetDate = newFirstUnclosed?.date ?? formatDate(new Date());
+          await loadLog(newTargetDate);
         }
       }).catch(() => {});
 

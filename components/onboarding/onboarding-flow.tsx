@@ -176,10 +176,9 @@ export function OnboardingFlow() {
       intensiveDayCriteria,
       coachStylePreset: selectedStyle as Settings["coachStylePreset"],
       coachStyleExtra: [],
-      defaultTab: "input",
     });
 
-    router.push("/input");
+    router.push("/home");
   };
 
   const handleDemoChoice = async () => {
@@ -187,7 +186,7 @@ export function OnboardingFlow() {
     setIsDemoLoading(true);
     try {
       await serverLoadDemoData();
-      router.push("/input");
+      router.push("/home");
     } finally {
       setIsDemoLoading(false);
     }
@@ -216,9 +215,8 @@ export function OnboardingFlow() {
       intensiveDayCriteria,
       coachStylePreset: selectedStyle as Settings["coachStylePreset"],
       coachStyleExtra: [],
-      defaultTab: "input",
     });
-    router.push("/input");
+    router.push("/home");
   };
 
   // step 3에서 다음으로 가려면 targetWeight가 입력되어야 함

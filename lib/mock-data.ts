@@ -26,7 +26,6 @@ export const mockSettings: Settings = {
   intensiveDayCriteria: "역대최저",
   coachStylePreset: "balanced",
   coachStyleExtra: [],
-  defaultTab: "input",
   onboardingComplete: true,
 };
 

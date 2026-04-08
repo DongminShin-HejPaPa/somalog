@@ -22,7 +22,6 @@ export const mockSettings: Settings = {
   intensiveDayCriteria: "역대최저",
   coachStylePreset: "strong",
   coachStyleExtra: [],
-  defaultTab: "input",
   onboardingComplete: true,
 };
 
@@ -45,7 +44,6 @@ export const mockSettingsRow: Record<string, unknown> = {
   intensive_day_criteria: "역대최저",
   coach_style_preset: "strong",
   coach_style_extra: [],
-  default_tab: "input",
   onboarding_complete: true,
 };
 

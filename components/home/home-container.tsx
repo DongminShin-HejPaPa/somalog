@@ -3,12 +3,13 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
-import { actionGetDailyLog, actionGetRecentDailyLogs, actionCloseDailyLog, actionGetFirstUnclosedLog } from "@/app/actions/log-actions";
+import { actionGetDailyLog, actionGetRecentDailyLogs, actionCloseDailyLog, actionGetFirstUnclosedLog, actionGetWeeklyLogs, actionGetDailyLogsTotalCount } from "@/app/actions/log-actions";
 import { HomeContent } from "./home-content";
 import { formatDate } from "@/lib/utils/date-utils";
 import { getGreetingMessage } from "@/lib/utils/greeting-messages";
 import { useSettings } from "@/lib/contexts/settings-context";
 import type { DailyLog } from "@/lib/types";
+import { logStore } from "@/lib/stores/log-store";
 
 export function HomeContainer() {
   const [displayName, setDisplayName] = useState<string | null | undefined>(undefined);
@@ -33,15 +34,48 @@ export function HomeContainer() {
       );
     });
 
-    const today = formatDate(new Date());
-    Promise.all([
-      actionGetFirstUnclosedLog(),
-      actionGetRecentDailyLogs(30),
-      actionGetDailyLog(today),
-    ]).then(([firstUnclosed, logs, todayLog]) => {
+    const init = async () => {
+      const today = formatDate(new Date());
+      
+      let logs: DailyLog[];
+      let firstUnclosed: DailyLog | null = null;
+      let todayLog: DailyLog | null = null;
+
+      if (!logStore.isStale() && logStore.getRecentLogs()) {
+        logs = logStore.getRecentLogs()!;
+        firstUnclosed = logStore.getFirstUnclosedLog();
+        todayLog = logStore.getLog(today) ?? await actionGetDailyLog(today);
+        if (todayLog) logStore.setLog(todayLog);
+      } else {
+        const [fetchedFirst, fetchedLogs, fetchedToday] = await Promise.all([
+          actionGetFirstUnclosedLog(),
+          actionGetRecentDailyLogs(30),
+          actionGetDailyLog(today),
+        ]);
+        logs = fetchedLogs;
+        firstUnclosed = fetchedFirst;
+        todayLog = fetchedToday;
+        logStore.setRecentLogs(logs);
+        if (todayLog) logStore.setLog(todayLog);
+      }
+
       setRecentLogs(logs);
-      // 미마감 날짜 중 가장 오래된 날짜를 먼저 표시, 없으면 오늘
       setActiveLog(firstUnclosed ?? todayLog);
+    };
+
+    init().then(() => {
+      // 백그라운드 프리페치: Records 탭 데이터 (1초 지연으로 렌더링 블록 방지)
+      setTimeout(() => {
+        if (!logStore.getWeeklyLogs() || logStore.getTotalCount() === null) {
+          Promise.all([
+            actionGetWeeklyLogs(4),
+            actionGetDailyLogsTotalCount(),
+          ]).then(([weekly, count]) => {
+            logStore.setWeeklyLogs(weekly);
+            logStore.setTotalCount(count);
+          }).catch(() => {});
+        }
+      }, 1000);
     });
   }, []);
 
@@ -67,6 +101,8 @@ export function HomeContainer() {
         actionGetRecentDailyLogs(30),
         actionGetDailyLog(today),
       ]);
+      logStore.setRecentLogs(updatedLogs);
+      if (todayLog) logStore.setLog(todayLog);
       setRecentLogs(updatedLogs);
 
       // 마감 후 남은 미마감 중 가장 오래된 날짜로 이동

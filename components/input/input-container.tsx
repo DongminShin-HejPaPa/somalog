@@ -21,6 +21,7 @@ import { InputModal, type ItemKey } from "./input-modal";
 import { FeedbackArea } from "./feedback-area";
 import { FreeTextInput } from "./free-text-input";
 import type { DailyLog, DailyLogUpdate } from "@/lib/types";
+import { logStore } from "@/lib/stores/log-store";
 
 function addDays(dateStr: string, n: number): string {
   const d = new Date(dateStr + "T00:00:00");
@@ -40,9 +41,6 @@ export function InputContainer() {
   const [minDate, setMinDate] = useState<string | null>(null);
   const [autoCloseToast, setAutoCloseToast] = useState<number | null>(null);
 
-  // 세션 내 날짜 이동 캐시 — DB 재조회 없이 이미 로드한 날짜 즉시 표시
-  const logCache = useRef<Map<string, DailyLog>>(new Map());
-
   // currentDate 기준 이전 최신 체중 (날짜 이동 시마다 자동 재계산)
   const prevWeight = useMemo(() => {
     const before = allLogs
@@ -59,12 +57,12 @@ export function InputContainer() {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const updateCache = useCallback((log: DailyLog) => {
-    logCache.current.set(log.date, log);
+    logStore.setLog(log);
   }, []);
 
   const loadLog = useCallback(async (date: string) => {
-    // 캐시 히트: DB 없이 즉시 표시
-    const cached = logCache.current.get(date);
+    // 글로벌 캐시 히트
+    const cached = logStore.getLog(date);
     if (cached) {
       setCurrentLog(cached);
       setCurrentDate(date);
@@ -79,7 +77,7 @@ export function InputContainer() {
       if (!log && date <= formatDate(new Date())) {
         log = await actionUpsertDailyLog(date, {});
       }
-      if (log) logCache.current.set(date, log);
+      if (log) logStore.setLog(log);
       setCurrentLog(log);
       setCurrentDate(date);
     } catch {
@@ -99,19 +97,27 @@ export function InputContainer() {
         setTimeout(() => setAutoCloseToast(null), 5000);
       }
 
-      // 2. 최근 30개 로그 + 첫 미마감 날짜 병렬 조회
+      // 2. 글로벌 캐시 유효성 확인
       const today = formatDate(new Date());
-      const [logs, firstUnclosed] = await Promise.all([
-        actionGetRecentDailyLogs(30),
-        actionGetFirstUnclosedLog(),
-      ]);
+      let logs: DailyLog[];
+      let firstUnclosed: DailyLog | null;
+
+      if (!logStore.isStale() && logStore.getRecentLogs()) {
+        logs = logStore.getRecentLogs()!;
+        firstUnclosed = logStore.getFirstUnclosedLog();
+      } else {
+        const [fetchedLogs, fetchedFirstUnclosed] = await Promise.all([
+          actionGetRecentDailyLogs(30),
+          actionGetFirstUnclosedLog(),
+        ]);
+        logs = fetchedLogs;
+        firstUnclosed = fetchedFirstUnclosed;
+        logStore.setRecentLogs(logs);
+      }
 
       const unclosed = logs.filter((l) => !l.closed);
       setPendingDays(unclosed.length);
       setAllLogs(logs);
-
-      // 캐시 초기화 (로드된 30개 즉시 캐싱)
-      logs.forEach((l) => logCache.current.set(l.date, l));
 
       // 네비게이션 하한선
       const dietStart = settings.dietStartDate;
@@ -192,10 +198,10 @@ export function InputContainer() {
 
       // 마감 후 상태 갱신
       const logs = await actionGetRecentDailyLogs(30);
+      logStore.setRecentLogs(logs);
       const unclosed = logs.filter((l) => !l.closed);
       setPendingDays(unclosed.length);
       setAllLogs(logs);
-      logs.forEach((l) => logCache.current.set(l.date, l));
 
       const dates = logs.map((l) => l.date).sort();
       if (dates.length > 0) setMinDate(dates[0]);

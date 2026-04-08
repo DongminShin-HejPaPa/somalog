@@ -9,6 +9,7 @@ import {
 } from "@/app/actions/log-actions";
 import { LogList } from "./log-list";
 import type { DailyLog, WeeklyLog } from "@/lib/types";
+import { logStore } from "@/lib/stores/log-store";
 
 const PAGE_SIZE = 30;
 
@@ -19,11 +20,23 @@ export function LogContainer() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   const fetchInitial = useCallback(async () => {
+    if (!logStore.isStale() && logStore.getRecentLogs() && logStore.getWeeklyLogs() && logStore.getTotalCount() !== null) {
+      setLogs(logStore.getRecentLogs()!);
+      setWeeklyLogs(logStore.getWeeklyLogs()!);
+      setTotalCount(logStore.getTotalCount()!);
+      return;
+    }
+
     const [fetchedLogs, fetchedWeekly, count] = await Promise.all([
       actionGetRecentDailyLogs(PAGE_SIZE),
       actionGetWeeklyLogs(4),
       actionGetDailyLogsTotalCount(),
     ]);
+    
+    logStore.setRecentLogs(fetchedLogs);
+    logStore.setWeeklyLogs(fetchedWeekly);
+    logStore.setTotalCount(count);
+    
     setLogs(fetchedLogs);
     setWeeklyLogs(fetchedWeekly);
     setTotalCount(count);
@@ -46,14 +59,19 @@ export function LogContainer() {
 
   const handleRefresh = useCallback(async () => {
     if (!logs) return;
-    // Re-fetch the same number of logs currently loaded (to get updated data)
     const count = Math.max(logs.length, PAGE_SIZE);
-    const [refreshedLogs, refreshedWeekly] = await Promise.all([
+    const [refreshedLogs, refreshedWeekly, newTotalCount] = await Promise.all([
       actionGetRecentDailyLogs(count),
       actionGetWeeklyLogs(4),
+      actionGetDailyLogsTotalCount(),
     ]);
+    logStore.setRecentLogs(refreshedLogs);
+    logStore.setWeeklyLogs(refreshedWeekly);
+    logStore.setTotalCount(newTotalCount);
+    
     setLogs(refreshedLogs);
     setWeeklyLogs(refreshedWeekly);
+    setTotalCount(newTotalCount);
   }, [logs]);
 
   if (logs === undefined || weeklyLogs === undefined) {

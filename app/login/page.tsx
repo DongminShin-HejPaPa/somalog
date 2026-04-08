@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { login } from "./actions";
+import { SubmitButton } from "./submit-button";
 
 export default async function LoginPage({
   searchParams,
@@ -69,13 +70,7 @@ export default async function LoginPage({
             </div>
 
             {/* 로그인 버튼 */}
-            <button
-              type="submit"
-              data-testid="login-submit"
-              className="w-full h-11 mt-1 rounded-lg bg-navy text-white text-sm font-semibold hover:bg-navy/90 active:scale-[0.98] transition-all"
-            >
-              로그인
-            </button>
+            <SubmitButton />
           </form>
         </div>
       </main>

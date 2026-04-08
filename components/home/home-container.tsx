@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
-import { actionGetDailyLog, actionGetRecentDailyLogs, actionCloseDailyLog, actionGetFirstUnclosedLog, actionGetWeeklyLogs, actionGetDailyLogsTotalCount, actionGetAllDailyLogs, actionGetLowestWeight } from "@/app/actions/log-actions";
+import { actionGetDailyLog, actionGetRecentDailyLogs, actionCloseDailyLog, actionGetFirstUnclosedLog, actionGetWeeklyLogs, actionGetDailyLogsTotalCount, actionGetAllDailyLogs, actionGetLowestWeight, actionAutoCloseOldLogs } from "@/app/actions/log-actions";
 import { HomeContent } from "./home-content";
 import { formatDate } from "@/lib/utils/date-utils";
 import { getGreetingMessage } from "@/lib/utils/greeting-messages";
@@ -86,9 +86,22 @@ export function HomeContainer() {
             })
           );
         }
-
         Promise.all(promises).catch(() => {});
       }, 1000);
+
+      // 백그라운드 구형 로그 마감 처리 (이곳에서도 처리하여 홈뷰 마감 일치성 달성)
+      actionAutoCloseOldLogs()
+        .then(async (count) => {
+          if (count > 0) {
+            const updatedLogs = await actionGetRecentDailyLogs(30);
+            logStore.setRecentLogs(updatedLogs);
+            setRecentLogs(updatedLogs);
+
+            const newFirstUnclosed = logStore.getFirstUnclosedLog();
+            setActiveLog(newFirstUnclosed ?? logStore.getLog(formatDate(new Date())));
+          }
+        })
+        .catch(() => {});
     });
   }, []);
 

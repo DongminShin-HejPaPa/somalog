@@ -670,29 +670,6 @@ export function SettingsForm() {
         </p>
       </Section>
 
-      <Section title="앱 진입 기본 탭">
-        <div className="flex gap-2">
-          {(
-            [
-              { value: "input", label: "입력 탭" },
-              { value: "home", label: "홈 탭" },
-            ] as const
-          ).map((t) => (
-            <button
-              key={t.value}
-              onClick={() => handleChange("defaultTab", t.value)}
-              className={cn(
-                "flex-1 py-2.5 rounded-xl text-sm font-medium min-h-[44px] transition-colors",
-                form.defaultTab === t.value
-                  ? "bg-navy text-white"
-                  : "bg-secondary text-muted-foreground border border-border"
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </Section>
 
       {/* 저장 버튼 */}
       <div className="px-4 py-4 border-b border-border">

@@ -45,7 +45,6 @@ export interface Settings {
   intensiveDayCriteria: string;
   coachStylePreset: "strong" | "balanced" | "empathy" | "data";
   coachStyleExtra: string[];
-  defaultTab: "input" | "home";
   onboardingComplete: boolean;
 }
 

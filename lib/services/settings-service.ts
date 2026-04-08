@@ -24,7 +24,6 @@ export function createDefaultSettings(): Settings {
     intensiveDayCriteria: "역대최저",
     coachStylePreset: "strong",
     coachStyleExtra: [],
-    defaultTab: "input",
     onboardingComplete: false,
   };
 }
@@ -57,7 +56,6 @@ function rowToSettings(row: Record<string, unknown>): Settings {
       (row.coach_style_preset as "strong" | "balanced" | "empathy" | "data") ??
       "strong",
     coachStyleExtra: (row.coach_style_extra as string[]) ?? [],
-    defaultTab: (row.default_tab as "input" | "home") ?? "input",
     onboardingComplete: ((row.onboarding_complete as boolean) ?? false) || !!(row.diet_start_date as string),
   };
 }
@@ -84,7 +82,6 @@ function settingsToRow(
     intensive_day_criteria: s.intensiveDayCriteria,
     coach_style_preset: s.coachStylePreset,
     coach_style_extra: s.coachStyleExtra,
-    default_tab: s.defaultTab,
     onboarding_complete:
       "onboardingComplete" in s ? s.onboardingComplete : false,
   };

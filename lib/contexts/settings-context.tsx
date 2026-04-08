@@ -64,7 +64,6 @@ export const DEFAULT_SETTINGS: Settings = {
   intensiveDayCriteria: "역대최저",
   coachStylePreset: "strong",
   coachStyleExtra: [],
-  defaultTab: "input",
   onboardingComplete: false,
 };
 

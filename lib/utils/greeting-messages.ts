@@ -55,10 +55,17 @@ function getStreakDays(recentLogs: DailyLog[]): number {
   return streak;
 }
 
-/** 마지막으로 입력한 날로부터 며칠 지났는지 */
-function getDaysSinceLastInput(recentLogs: DailyLog[]): number {
-  for (let i = 0; i < recentLogs.length; i++) {
-    const log = recentLogs[i];
+/** 마지막으로 입력한 날로부터 며칠 지났는지 (오늘 입력 시 0, 어제 입력 시 1, 그저께 입력 시 2(어제 하루 쉼)) */
+function getDaysSinceLastInput(ctx: GreetingContext): number {
+  if (ctx.recentLogs.length === 0) return 0;
+  
+  // 한국 시간(KST) 기준 날짜 문자열 만들기
+  const utcMs = ctx.now.getTime() + ctx.now.getTimezoneOffset() * 60_000;
+  const kst = new Date(utcMs + 9 * 3_600_000);
+  const todayStr = `${kst.getFullYear()}-${String(kst.getMonth() + 1).padStart(2, '0')}-${String(kst.getDate()).padStart(2, '0')}`;
+  const todayTime = new Date(todayStr + "T00:00:00Z").getTime();
+
+  for (const log of ctx.recentLogs) {
     const hasInput =
       log.weight !== null ||
       log.water !== null ||
@@ -67,9 +74,13 @@ function getDaysSinceLastInput(recentLogs: DailyLog[]): number {
       log.lunch !== null ||
       log.dinner !== null ||
       log.lateSnack !== null;
-    if (hasInput) return i;
+
+    if (hasInput) {
+      const logTime = new Date(log.date + "T00:00:00Z").getTime();
+      return Math.max(0, Math.floor((todayTime - logTime) / 86400000));
+    }
   }
-  return recentLogs.length;
+  return 999;
 }
 
 function isWeekend(now: Date): boolean {
@@ -244,23 +255,23 @@ const rules: GreetingRule[] = [
 
   // ── 최근 미입력 (독려) ──
   {
-    condition: (ctx) => getDaysSinceLastInput(ctx.recentLogs) === 1,
+    condition: (ctx) => getDaysSinceLastInput(ctx) === 2,
     messages: (ctx) => [`${ctx.name}님, 어제 하루 쉬셨네요. 오늘은 꼭 기록해요!`],
   },
   {
-    condition: (ctx) => getDaysSinceLastInput(ctx.recentLogs) === 2,
+    condition: (ctx) => getDaysSinceLastInput(ctx) === 3,
     messages: (ctx) => [`${ctx.name}님, 이틀째 기록이 없어요. 작은 것부터 다시 시작해봐요 💪`],
   },
   {
-    condition: (ctx) => getDaysSinceLastInput(ctx.recentLogs) === 3,
+    condition: (ctx) => getDaysSinceLastInput(ctx) === 4,
     messages: (ctx) => [`${ctx.name}님, 3일째 기록 없어요 😢 오늘 하나만 입력해봐요!`],
   },
   {
-    condition: (ctx) => getDaysSinceLastInput(ctx.recentLogs) >= 4 && getDaysSinceLastInput(ctx.recentLogs) < 7,
-    messages: (ctx) => [`${ctx.name}님, ${getDaysSinceLastInput(ctx.recentLogs)}일째 잠수 중... 살짝 걱정돼요. 돌아와요!`],
+    condition: (ctx) => getDaysSinceLastInput(ctx) >= 5 && getDaysSinceLastInput(ctx) < 8,
+    messages: (ctx) => [`${ctx.name}님, ${getDaysSinceLastInput(ctx) - 1}일째 잠수 중... 살짝 걱정돼요. 돌아와요!`],
   },
   {
-    condition: (ctx) => getDaysSinceLastInput(ctx.recentLogs) >= 7,
+    condition: (ctx) => getDaysSinceLastInput(ctx) >= 8,
     messages: (ctx) => [`${ctx.name}님, 오랜만이에요! 일주일 이상 비웠지만 지금 돌아온 거잖아요. 환영해요 🎉`],
   },
 

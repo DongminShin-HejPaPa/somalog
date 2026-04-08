@@ -105,6 +105,16 @@ export function WeightChart({
   const [show3dAvg, setShow3dAvg] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isPortrait, setIsPortrait] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const handleResize = () => setIsPortrait(window.innerHeight > window.innerWidth);
+      handleResize();
+      window.addEventListener("resize", handleResize);
+      return () => window.removeEventListener("resize", handleResize);
+    }
+  }, []);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -241,9 +251,27 @@ export function WeightChart({
       ref={containerRef}
       className={cn(
         "bg-background transition-all",
-        isFullscreen ? "fixed inset-0 z-[100] flex flex-col p-4 sm:p-6 overflow-y-auto w-full h-[100dvh]" : ""
+        isFullscreen ? "fixed inset-0 z-[100] flex flex-col bg-background w-full h-[100dvh] overflow-hidden" : ""
       )}
     >
+      {isFullscreen && isPortrait && (
+        <div className="absolute inset-0 z-[200] flex flex-col items-center justify-center bg-background/95 backdrop-blur-md px-6 text-center">
+          <svg className="w-16 h-16 mb-6 text-primary animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          <h3 className="text-xl font-bold mb-2">화면을 가로로 눕혀주세요</h3>
+          <p className="text-sm text-muted-foreground mb-8 leading-relaxed">
+            일부 모바일 환경에서는 자동 회전이 지원되지 않습니다.<br/>기기를 직접 돌리시면 꽉 찬 차트가 나타납니다.
+          </p>
+          <button 
+            onClick={toggleFullscreen}
+            className="px-6 py-2.5 bg-secondary text-foreground font-medium rounded-full"
+          >
+            전체화면 닫기
+          </button>
+        </div>
+      )}
+
       {!isFullscreen && (
         <div className="px-4 mb-3 flex gap-1.5 flex-shrink-0">
           {(Object.keys(periodLabels) as Period[]).map((p) => (
@@ -264,11 +292,12 @@ export function WeightChart({
       )}
 
       <div className={cn(
-        "space-y-1.5",
-        isFullscreen ? "absolute top-4 left-4 right-20 z-20 pointer-events-none bg-background/60 p-2 rounded-lg backdrop-blur-sm" : "px-4 mb-2 flex-shrink-0"
+        isFullscreen 
+          ? "absolute top-6 left-6 right-20 z-20 flex flex-wrap gap-x-4 gap-y-1.5 pointer-events-none bg-background/60 p-2.5 rounded-lg backdrop-blur-sm" 
+          : "px-4 mb-2 space-y-1.5 flex-shrink-0"
       )}>
         {/* 선 범례 */}
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-muted-foreground pointer-events-auto">
+        <div className={cn("flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-muted-foreground pointer-events-auto", isFullscreen && "contents")}>
           <span className="flex items-center gap-1">
             <span className="w-4 h-0.5 bg-navy inline-block" /> 일별 체중
           </span>
@@ -286,7 +315,7 @@ export function WeightChart({
           </span>
         </div>
         {/* 점 마커 범례 */}
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-muted-foreground pointer-events-auto">
+        <div className={cn("flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-muted-foreground pointer-events-auto", isFullscreen && "contents")}>
           <span className="flex items-center gap-1.5">
             {/* 별 = 역대 최저 */}
             <svg width="12" height="12" viewBox="0 0 12 12">
@@ -297,7 +326,7 @@ export function WeightChart({
             </svg>
             역대 최저
           </span>
-<span className="flex items-center gap-1.5">
+          <span className="flex items-center gap-1.5">
             {/* 사각형 = 전일 대비 1kg↑ */}
             <svg width="12" height="12" viewBox="0 0 12 12">
               <rect x="2" y="2" width="8" height="8" fill="#1e3a5f" />

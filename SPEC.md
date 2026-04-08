@@ -2,15 +2,15 @@
 
 ## Context
 
-UI/UX 구현과 Supabase Auth 연동이 완료된 상태에서, 각 탭의 실제 인터랙션(CRUD, 상태 관리, 탭 간 데이터 흐름)을 구현하기 위한 단계별 계획입니다. DB는 아직 사용하지 않고 mock 데이터 기반의 서비스 레이어로 진행합니다.
+UI/UX 구현, Supabase Auth 연동 및 **Supabase Database (CRUD) 연동까지 모두 완료**된 상태입니다. 아래의 단계별 계획들은 초기 Mock 데이터 단계를 거쳐 현재는 완전히 **실제 DB를 바라보는 서비스 레이어**로 교체 및 구현이 끝났음을 나타냅니다. 
 
 ## 현재 상태
 
 - [x] 5개 탭 UI + 온보딩 + 로그인/회원가입 완성
 - [x] Supabase Auth 동작 (로그인/회원가입/미들웨어)
-- [x] 모든 탭이 `mockDailyLogs`, `mockSettings` 직접 import → 서비스 레이어로 교체 필요
-- [x] 입력/저장/수정 기능 구현
-- [x] 탭 간 데이터 동기화
+- [x] 모든 탭의 데이터 소스를 Mock에서 실제 Supabase 연동 서비스 레이어(`lib/services/`) 및 Server Actions(`app/actions/`)로 교체 완료
+- [x] 입력/저장/수정 기능 실제 DB 연동 구현
+- [x] 탭 간 데이터 동기화 완료
 
 ## 접근법: 하이브리드 레이어-탭 분리
 
@@ -49,10 +49,10 @@ Phase 0 ████████
 
 ---
 
-## Phase 0: 공유 기반 레이어
+## Phase 0: 공유 기반 레이어 (완료)
 
 ### 오버뷰
-모든 후속 Phase에서 사용할 타입 시스템과 데이터 서비스 인터페이스를 구축합니다. 현재 `lib/mock-data.ts`에 혼재된 타입과 데이터를 분리하고, async 서비스 함수를 만들어 나중에 Supabase로 교체할 수 있는 구조를 잡습니다.
+모든 타입 시스템(`lib/types.ts`)과 데이터 서비스 인터페이스(`lib/services/`)가 구축되었습니다. 초기에는 Mock 데이터를 바라보았으나, 현재는 해당 서비스 함수들이 모두 실제 Supabase DB 호출을 수행하도록 진화 및 완성되었습니다.
 
 ### 구현 체크리스트
 
@@ -78,10 +78,10 @@ Phase 0 ████████
 
 ---
 
-## Phase 1: Settings CRUD + 온보딩 저장
+## Phase 1: Settings CRUD + 온보딩 저장 (완료)
 
 ### 오버뷰
-Settings는 모든 탭에서 참조하는 전역 설정입니다. Settings 탭의 폼이 실제로 값을 변경/저장하도록 만들고, 온보딩에서 수집한 데이터를 Settings에 반영합니다. DB 없이 React Context + localStorage로 임시 영속성을 구현합니다.
+Settings는 모든 탭에서 참조하는 전역 설정입니다. Settings 탭의 폼을 통해 설정 변경이 발생하면 실제 Supabase DB에 값이 저장 및 동기화되며, 전역 Context(`SettingsProvider`)를 활용해 각 탭과 클라이언트 상태를 유지합니다.
 
 ### 구현 체크리스트
 

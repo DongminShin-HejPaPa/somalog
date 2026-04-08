@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Expand, X } from "lucide-react";
+import { Expand, X, GripHorizontal } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -106,6 +106,27 @@ export function WeightChart({
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPortrait, setIsPortrait] = useState(false);
+  const [legendPos, setLegendPos] = useState({ x: 0, y: 0 });
+  const isDragging = useRef(false);
+  const dragStart = useRef({ x: 0, y: 0 });
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    isDragging.current = true;
+    dragStart.current = { x: e.clientX - legendPos.x, y: e.clientY - legendPos.y };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging.current) return;
+    setLegendPos({ x: e.clientX - dragStart.current.x, y: e.clientY - dragStart.current.y });
+  };
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    isDragging.current = false;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+
+  useEffect(() => {
+    if (!isFullscreen) setLegendPos({ x: 0, y: 0 });
+  }, [isFullscreen]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -272,38 +293,51 @@ export function WeightChart({
         </div>
       )}
 
-      {!isFullscreen && (
-        <div className="px-4 mb-3 flex gap-1.5 flex-shrink-0">
-          {(Object.keys(periodLabels) as Period[]).map((p) => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              className={cn(
-                "px-3 py-1.5 rounded-full text-xs font-medium transition-colors min-h-[36px]",
-                period === p
-                  ? "bg-navy text-white"
-                  : "bg-secondary text-muted-foreground"
-              )}
-            >
-              {periodLabels[p]}
-            </button>
-          ))}
-        </div>
-      )}
-
       <div className={cn(
-        isFullscreen 
-          ? "absolute top-6 left-6 right-20 z-20 flex flex-wrap gap-x-4 gap-y-1.5 pointer-events-none bg-background/60 p-2.5 rounded-lg backdrop-blur-sm" 
-          : "px-4 mb-2 space-y-1.5 flex-shrink-0"
+        "flex gap-1.5 flex-shrink-0 z-20 transition-opacity",
+        isFullscreen ? "absolute bottom-6 left-6 bg-background/80 p-2.5 rounded-2xl backdrop-blur-md shadow-sm" : "px-4 mb-3"
       )}>
+        {(Object.keys(periodLabels) as Period[]).map((p) => (
+          <button
+            key={p}
+            onClick={() => setPeriod(p)}
+            className={cn(
+              "px-3 py-1.5 rounded-full text-xs font-medium transition-colors min-h-[36px]",
+              period === p
+                ? "bg-navy text-white"
+                : "bg-secondary text-muted-foreground"
+            )}
+          >
+            {periodLabels[p]}
+          </button>
+        ))}
+      </div>
+
+      <div 
+        className={cn(
+          isFullscreen 
+            ? "absolute top-6 right-20 z-20 flex flex-col gap-1.5 bg-secondary/95 p-3 rounded-xl backdrop-blur-md shadow-lg border border-border cursor-grab active:cursor-grabbing touch-none select-none max-w-[70%]" 
+            : "px-4 mb-2 space-y-1.5 flex-shrink-0"
+        )}
+        style={isFullscreen ? { transform: `translate(${legendPos.x}px, ${legendPos.y}px)` } : undefined}
+        onPointerDown={isFullscreen ? handlePointerDown : undefined}
+        onPointerMove={isFullscreen ? handlePointerMove : undefined}
+        onPointerUp={isFullscreen ? handlePointerUp : undefined}
+        onPointerCancel={isFullscreen ? handlePointerUp : undefined}
+      >
+        {isFullscreen && (
+          <div className="flex justify-center w-full mb-0.5 opacity-40">
+            <GripHorizontal size={16} />
+          </div>
+        )}
         {/* 선 범례 */}
-        <div className={cn("flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-muted-foreground pointer-events-auto", isFullscreen && "contents")}>
+        <div className={cn("flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-muted-foreground", !isFullscreen && "pointer-events-auto")}>
           <span className="flex items-center gap-1">
             <span className="w-4 h-0.5 bg-navy inline-block" /> 일별 체중
           </span>
           <button
             onClick={() => setShow3dAvg((v) => !v)}
-            className={cn("flex items-center gap-1 transition-opacity pointer-events-auto", !show3dAvg && "opacity-40")}
+            className={cn("flex items-center gap-1 transition-opacity", !show3dAvg && "opacity-40", !isFullscreen && "pointer-events-auto")}
           >
             <span className="w-4 h-0.5 bg-gray-400 inline-block" /> 3일 이동평균
           </button>
@@ -315,7 +349,7 @@ export function WeightChart({
           </span>
         </div>
         {/* 점 마커 범례 */}
-        <div className={cn("flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-muted-foreground pointer-events-auto", isFullscreen && "contents")}>
+        <div className={cn("flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-muted-foreground", !isFullscreen && "pointer-events-auto")}>
           <span className="flex items-center gap-1.5">
             {/* 별 = 역대 최저 */}
             <svg width="12" height="12" viewBox="0 0 12 12">
@@ -349,6 +383,7 @@ export function WeightChart({
         </button>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
+            margin={{ top: 10, right: 30, left: 0, bottom: 5 }}
             data={chartData.map((d, i) => ({
               ...d,
               goalWeight: goalLineData[i],

@@ -223,8 +223,8 @@ export function WeightChart({
   const allWeights = chartData
     .map((d) => d.weight)
     .filter((w): w is number => w !== null);
-  const minW = Math.floor(Math.min(...allWeights) - 1);
-  const maxW = Math.ceil(Math.max(...allWeights) + 1);
+  const minW = Number((Math.min(...allWeights) - 0.5).toFixed(1));
+  const maxW = Number((Math.max(...allWeights) + 0.5).toFixed(1));
 
   // 카드 계산은 항상 전체 로그 기준 최신 체중 사용 (표시 기간과 무관)
   const allSortedWeights = sortedLogs

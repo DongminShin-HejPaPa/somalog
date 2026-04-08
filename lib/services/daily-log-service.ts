@@ -220,6 +220,37 @@ export async function upsertDailyLog(
   return rowToDailyLog(upserted as Record<string, unknown>);
 }
 
+/** 특정 필드를 null로 초기화 (항목 개별 삭제) */
+export async function clearDailyLogField(
+  date: string,
+  field: "weight" | "water" | "exercise" | "breakfast" | "lunch" | "dinner" | "lateSnack"
+): Promise<DailyLog | null> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const colMap: Record<string, string> = {
+    weight: "weight",
+    water: "water",
+    exercise: "exercise",
+    breakfast: "breakfast",
+    lunch: "lunch",
+    dinner: "dinner",
+    lateSnack: "late_snack",
+  };
+
+  const { data: upserted, error } = await supabase
+    .from("daily_logs")
+    .update({ [colMap[field]]: null })
+    .eq("user_id", user.id)
+    .eq("date", date)
+    .select()
+    .single();
+
+  if (error || !upserted) return null;
+  return rowToDailyLog(upserted as Record<string, unknown>);
+}
+
 export async function closeDailyLog(date: string, existingLog?: DailyLog): Promise<DailyLog | null> {
   const supabase = await createClient();
   const {

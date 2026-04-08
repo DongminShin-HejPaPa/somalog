@@ -62,6 +62,9 @@ export type DailyLogInput = Pick<
 
 export type DailyLogUpdate = Partial<DailyLogInput>;
 
+/** 개별 삭제 가능한 필드 */
+export type ClearableField = "weight" | "water" | "exercise" | "breakfast" | "lunch" | "dinner" | "lateSnack";
+
 export type SettingsInput = Omit<Settings, "onboardingComplete">;
 
 export type SettingsUpdate = Partial<Settings>;

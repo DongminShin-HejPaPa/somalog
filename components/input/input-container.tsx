@@ -13,6 +13,7 @@ import {
   actionGetRecentDailyLogs,
   actionAutoCloseOldLogs,
   actionGetFirstUnclosedLog,
+  actionClearDailyLogField,
 } from "@/app/actions/log-actions";
 import { actionParseFreText } from "@/app/actions/parse-actions";
 import { DateHeader } from "./date-header";
@@ -20,7 +21,7 @@ import { InputChipList } from "./input-chip-list";
 import { InputModal, type ItemKey } from "./input-modal";
 import { FeedbackArea } from "./feedback-area";
 import { FreeTextInput } from "./free-text-input";
-import type { DailyLog, DailyLogUpdate } from "@/lib/types";
+import type { DailyLog, DailyLogUpdate, ClearableField } from "@/lib/types";
 import { logStore } from "@/lib/stores/log-store";
 
 function addDays(dateStr: string, n: number): string {
@@ -190,6 +191,24 @@ export function InputContainer() {
     if (updated) {
       setCurrentLog(updated);
       updateCache(updated);
+    }
+  };
+
+  const handleDelete = async (field: ClearableField) => {
+    const previousLog = currentLog;
+    // 낙관적 업데이트: 즉시 UI 반영
+    setCurrentLog(currentLog ? { ...currentLog, [field]: null } as DailyLog : null);
+    setModalField(null);
+    try {
+      const updated = await actionClearDailyLogField(currentDate, field);
+      if (updated) {
+        setCurrentLog(updated);
+        updateCache(updated);
+      }
+    } catch {
+      setCurrentLog(previousLog);
+      setSaveError("삭제에 실패했습니다. 다시 시도해주세요.");
+      setTimeout(() => setSaveError(null), 4000);
     }
   };
 
@@ -440,6 +459,7 @@ export function InputContainer() {
         prevWeight={prevWeight ?? (settings.currentWeight > 0 ? settings.currentWeight : null)}
         isSaving={isSaving}
         onSave={handleModalSave}
+        onDelete={handleDelete}
         onClose={() => setModalField(null)}
       />
     </div>

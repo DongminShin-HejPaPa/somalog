@@ -110,7 +110,7 @@ export function WeightChart({
     const handleFullscreenChange = () => {
       if (!document.fullscreenElement && !(document as any).webkitFullscreenElement) {
         setIsFullscreen(false);
-        screen.orientation?.unlock?.();
+        (screen.orientation as any)?.unlock?.();
       }
     };
     document.addEventListener("fullscreenchange", handleFullscreenChange);
@@ -130,8 +130,8 @@ export function WeightChart({
           } else if ((containerRef.current as any).webkitRequestFullscreen) {
             await ((containerRef.current as any).webkitRequestFullscreen)();
           }
-          if (screen.orientation && screen.orientation.lock) {
-            await screen.orientation.lock("landscape").catch(() => {});
+          if (screen.orientation && (screen.orientation as any).lock) {
+            await ((screen.orientation as any).lock("landscape")).catch(() => {});
           }
         } catch (err) {
           console.warn("Fullscreen API failed", err);
@@ -147,8 +147,8 @@ export function WeightChart({
             await ((document as any).webkitExitFullscreen)();
           }
         }
-        if (screen.orientation && screen.orientation.unlock) {
-          screen.orientation.unlock();
+        if (screen.orientation && (screen.orientation as any).unlock) {
+          (screen.orientation as any).unlock();
         }
       } catch (err) {
         console.warn("Exit Fullscreen API failed", err);

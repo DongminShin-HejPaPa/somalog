@@ -13,7 +13,8 @@ import type { DailyLogUpdate } from "@/lib/types";
 export async function actionParseFreText(
   text: string,
   todayWeight: number | null,
-  prevWeight: number | null
+  prevWeight: number | null,
+  options: { todayBreakfast?: string | null; todayLunch?: string | null; todayDinner?: string | null } = {}
 ): Promise<DailyLogUpdate> {
   if (!process.env.OPENROUTER_API_KEY) {
     return {};
@@ -23,11 +24,18 @@ export async function actionParseFreText(
   const prevRef = prevWeight != null ? `${prevWeight}kg` : null;
   const currentRef = todayRef ?? prevRef; // 오늘값 없으면 어제값으로 fallback
 
-  const weightContext = [
+  const mealContext = [
     todayWeight != null ? `오늘 이미 기록된 체중: ${todayWeight}kg` : "오늘 체중 미기록",
     prevWeight != null ? `어제(직전) 체중: ${prevWeight}kg` : null,
     `"어제보다", "전날보다" 등 → 어제 체중(${prevRef ?? "정보 없음"}) 기준으로 계산`,
     `"지금보다", "현재보다", "오늘보다" 등 → ${currentRef ? `${currentRef} 기준으로 계산` : "기준 체중 정보 없음, null 반환"}`,
+  ].filter(Boolean).join("\n");
+
+  const { todayBreakfast, todayLunch, todayDinner } = options;
+  const existingMeals = [
+    todayBreakfast ? `오늘 이미 기록된 아침: "${todayBreakfast}"` : null,
+    todayLunch ? `오늘 이미 기록된 점심: "${todayLunch}"` : null,
+    todayDinner ? `오늘 이미 기록된 저녁: "${todayDinner}"` : null,
   ].filter(Boolean).join("\n");
 
   try {
@@ -83,7 +91,8 @@ export async function actionParseFreText(
 - 오타(예: 체ㅈ → 체중), 구어체(예: 안함 → 운동 안 함), 이모티콘(예: ㅠㅠ, ㅇㅇ)을 모두 올바르게 해석한다.
 - 명확히 언급되지 않은 필드는 반드시 null로 둔다. 추측하지 않는다.
 - 아침/점심/저녁 내용은 원문 그대로(간략 요약 없이) 보존한다.
-- ${weightContext}`,
+- "저녁은 아침과 동일", "점심도 아침이랑 같아" 같이 다른 끼니를 참조하는 표현이 있을 경우, 이미 기록된 끼니 내용을 그대로 복사해 해당 필드에 넣는다.
+- ${mealContext}${existingMeals ? `\n\n[오늘 이미 기록된 끼니 정보 — 참조 표현 해석에 활용할 것]\n${existingMeals}` : ""}`,
       prompt: text,
       maxRetries: 1,
     });

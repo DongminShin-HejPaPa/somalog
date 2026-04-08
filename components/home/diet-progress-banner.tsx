@@ -49,7 +49,7 @@ export function DietProgressBanner({
         {isIntensiveDay && (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-coral text-white text-xs font-semibold">
             <span className="w-2 h-2 rounded-full bg-white inline-block" />
-            Hard Reset
+            Hard Reset Mode
           </span>
         )}
       </div>

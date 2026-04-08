@@ -26,6 +26,8 @@ export function InputStatusChips({ log, onCloseToday, isClosingToday }: InputSta
     (item) => log[item.key] !== null && log[item.key] !== undefined
   ).length;
 
+  const isClosed = log.closed;
+
   return (
     <div className="px-4 mt-4">
       <div className="flex items-center justify-between mb-3">
@@ -39,6 +41,23 @@ export function InputStatusChips({ log, onCloseToday, isClosingToday }: InputSta
         {items.map((item) => {
           const value = log[item.key];
           const completed = value !== null && value !== undefined;
+          // 마감된 날은 클릭 불가
+          if (isClosed) {
+            return (
+              <div
+                key={item.key}
+                className={cn(
+                  "flex items-center justify-center gap-1 px-2 py-2.5 rounded-lg text-xs font-medium min-h-[44px]",
+                  completed
+                    ? "bg-navy/60 text-white"
+                    : "bg-secondary/60 text-muted-foreground/60 border border-border"
+                )}
+              >
+                {completed && <Check className="w-3.5 h-3.5" />}
+                <span>{item.label}</span>
+              </div>
+            );
+          }
           return (
             <Link
               key={item.key}
@@ -69,9 +88,9 @@ export function InputStatusChips({ log, onCloseToday, isClosingToday }: InputSta
           href="/input"
           className="flex-1 text-center py-2.5 rounded-lg bg-navy text-white text-sm font-medium min-h-[44px] flex items-center justify-center"
         >
-          기록하기
+          {isClosed ? "기록 보기" : "기록하기"}
         </Link>
-        {!log.closed && onCloseToday && (
+        {!isClosed && onCloseToday && (
           <button
             onClick={onCloseToday}
             disabled={isClosingToday}

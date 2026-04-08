@@ -412,7 +412,10 @@ const rules: GreetingRule[] = [
       `${ctx.name}님, 기록이 습관이 되면 다이어트는 자연스럽게 따라와요 📝`,
       `${ctx.name}님, 오늘의 기록이 미래의 나를 만들어요 ✨`,
       `${ctx.name}님, 천천히 꾸준하게. 그게 제일 좋은 방법이에요 🐢`,
-      `반가워요, ${ctx.name}님! 오늘도 하나씩 채워봐요 📋`,
+      // 아무것도 입력 안 한 날에만 '채워봐요' 메세지 노출
+      ...(todayInputCount(ctx.todayLog) === 0 && !ctx.todayLog?.closed
+        ? [`반가워요, ${ctx.name}님! 오늘도 하나씩 채워봐요 📋`]
+        : []),
     ],
   },
 ];

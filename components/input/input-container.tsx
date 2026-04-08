@@ -234,10 +234,14 @@ export function InputContainer() {
   };
 
   // URL ?open= 파라미터로 모달 자동 열기
+  const hasAutoOpened = useRef(false);
   useEffect(() => {
     const open = searchParams.get("open") as ItemKey | null;
-    if (open && !isLoading && currentLog && !currentLog.closed) {
+    if (open && !isLoading && currentLog && !currentLog.closed && !hasAutoOpened.current) {
       setModalField(open);
+      hasAutoOpened.current = true;
+      // Optional: Replace URL state to remove query parameter
+      window.history.replaceState(null, '', '/input');
     }
   }, [searchParams, isLoading, currentLog]);
 

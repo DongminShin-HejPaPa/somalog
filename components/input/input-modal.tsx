@@ -85,7 +85,7 @@ export function InputModal({
   useEffect(() => {
     if (!field) return;
     if (field === "weight") {
-      setWeightValue(log.weight != null ? String(log.weight) : "");
+      setWeightValue(log.weight != null ? String(log.weight) : (prevWeight != null ? String(prevWeight) : "70"));
     } else if (field === "water") {
       setWaterValue(log.water ?? waterGoal);
     } else if (field === "breakfast") {

@@ -316,7 +316,7 @@ export function WeightChart({
       <div 
         className={cn(
           isFullscreen 
-            ? "absolute top-6 right-20 z-20 flex flex-col gap-1.5 bg-secondary/95 p-3 rounded-xl backdrop-blur-md shadow-lg border border-border cursor-grab active:cursor-grabbing touch-none select-none max-w-[70%]" 
+            ? "absolute top-6 right-20 z-20 flex flex-col gap-1.5 bg-secondary/40 p-3 rounded-xl backdrop-blur-md shadow-lg border border-border cursor-grab active:cursor-grabbing touch-none select-none max-w-[70%]" 
             : "px-4 mb-2 space-y-1.5 flex-shrink-0"
         )}
         style={isFullscreen ? { transform: `translate(${legendPos.x}px, ${legendPos.y}px)` } : undefined}

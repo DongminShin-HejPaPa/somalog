@@ -244,8 +244,8 @@ export function WeightChart({
         isFullscreen ? "fixed inset-0 z-[100] flex flex-col p-4 sm:p-6 overflow-y-auto w-full h-[100dvh]" : ""
       )}
     >
-      <div className="px-4 mb-3 flex items-center justify-between flex-shrink-0">
-        <div className="flex gap-1.5">
+      {!isFullscreen && (
+        <div className="px-4 mb-3 flex gap-1.5 flex-shrink-0">
           {(Object.keys(periodLabels) as Period[]).map((p) => (
             <button
               key={p}
@@ -261,24 +261,20 @@ export function WeightChart({
             </button>
           ))}
         </div>
-        <button
-          onClick={toggleFullscreen}
-          className="p-2 -mr-2 text-muted-foreground hover:bg-secondary rounded-full transition-colors"
-          aria-label={isFullscreen ? "전체화면 종료" : "전체화면 확대"}
-        >
-          {isFullscreen ? <X size={20} /> : <Expand size={20} />}
-        </button>
-      </div>
+      )}
 
-      <div className="px-4 mb-2 space-y-1.5 flex-shrink-0">
+      <div className={cn(
+        "space-y-1.5",
+        isFullscreen ? "absolute top-4 left-4 right-20 z-20 pointer-events-none bg-background/60 p-2 rounded-lg backdrop-blur-sm" : "px-4 mb-2 flex-shrink-0"
+      )}>
         {/* 선 범례 */}
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-muted-foreground pointer-events-auto">
           <span className="flex items-center gap-1">
             <span className="w-4 h-0.5 bg-navy inline-block" /> 일별 체중
           </span>
           <button
             onClick={() => setShow3dAvg((v) => !v)}
-            className={cn("flex items-center gap-1 transition-opacity", !show3dAvg && "opacity-40")}
+            className={cn("flex items-center gap-1 transition-opacity pointer-events-auto", !show3dAvg && "opacity-40")}
           >
             <span className="w-4 h-0.5 bg-gray-400 inline-block" /> 3일 이동평균
           </button>
@@ -290,7 +286,7 @@ export function WeightChart({
           </span>
         </div>
         {/* 점 마커 범례 */}
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-muted-foreground pointer-events-auto">
           <span className="flex items-center gap-1.5">
             {/* 별 = 역대 최저 */}
             <svg width="12" height="12" viewBox="0 0 12 12">
@@ -311,7 +307,17 @@ export function WeightChart({
         </div>
       </div>
 
-      <div className={cn("px-2", isFullscreen ? "flex-1 min-h-[300px]" : "h-[300px]")}>
+      <div className={cn("relative", isFullscreen ? "flex-1 w-full h-[100dvh]" : "px-2 h-[300px]")}>
+        <button
+          onClick={toggleFullscreen}
+          className={cn(
+            "absolute z-30 flex items-center justify-center bg-background/80 hover:bg-secondary rounded-full transition-colors text-muted-foreground shadow-sm backdrop-blur-sm",
+            isFullscreen ? "top-4 right-4 p-3 border-none" : "top-1 right-2 p-1.5 border border-border"
+          )}
+          aria-label={isFullscreen ? "전체화면 종료" : "전체화면 확대"}
+        >
+          {isFullscreen ? <X size={24} /> : <Expand size={16} />}
+        </button>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={chartData.map((d, i) => ({
@@ -391,32 +397,34 @@ export function WeightChart({
         </ResponsiveContainer>
       </div>
 
-      <div className="px-4 mt-4 grid grid-cols-2 gap-3">
-        <div className="p-3 bg-secondary rounded-xl">
-          <p className="text-xs text-muted-foreground">시작 체중</p>
-          <p className="text-lg font-bold">{startWeight} kg</p>
-          <p className="text-xs text-muted-foreground">{fmtCardDate(new Date(startDate + "T00:00:00"))}</p>
+      {!isFullscreen && (
+        <div className="px-4 mt-4 grid grid-cols-2 gap-3">
+          <div className="p-3 bg-secondary rounded-xl">
+            <p className="text-xs text-muted-foreground">시작 체중</p>
+            <p className="text-lg font-bold">{startWeight} kg</p>
+            <p className="text-xs text-muted-foreground">{fmtCardDate(new Date(startDate + "T00:00:00"))}</p>
+          </div>
+          <div className="p-3 bg-secondary rounded-xl">
+            <p className="text-xs text-muted-foreground">목표 체중</p>
+            <p className="text-lg font-bold">{targetWeight} kg</p>
+            <p className="text-xs text-muted-foreground">{fmtCardDate(targetEndDate)}</p>
+          </div>
+          <div className="p-3 bg-secondary rounded-xl">
+            <p className="text-xs text-muted-foreground">역대 최저</p>
+            <p className="text-lg font-bold">{lowestWeight} kg</p>
+            <p className="text-xs text-muted-foreground">{fmtCardDate(new Date(lowestWeightDate + "T00:00:00"))}</p>
+          </div>
+          <div className="p-3 bg-secondary rounded-xl">
+            <p className="text-xs text-muted-foreground">목표까지</p>
+            <p className="text-lg font-bold">{remaining.toFixed(1)} kg</p>
+            {estimatedDate && (
+              <p className="text-xs text-muted-foreground">
+                예상 {fmtCardDate(estimatedDate)}
+              </p>
+            )}
+          </div>
         </div>
-        <div className="p-3 bg-secondary rounded-xl">
-          <p className="text-xs text-muted-foreground">목표 체중</p>
-          <p className="text-lg font-bold">{targetWeight} kg</p>
-          <p className="text-xs text-muted-foreground">{fmtCardDate(targetEndDate)}</p>
-        </div>
-        <div className="p-3 bg-secondary rounded-xl">
-          <p className="text-xs text-muted-foreground">역대 최저</p>
-          <p className="text-lg font-bold">{lowestWeight} kg</p>
-          <p className="text-xs text-muted-foreground">{fmtCardDate(new Date(lowestWeightDate + "T00:00:00"))}</p>
-        </div>
-        <div className="p-3 bg-secondary rounded-xl">
-          <p className="text-xs text-muted-foreground">목표까지</p>
-          <p className="text-lg font-bold">{remaining.toFixed(1)} kg</p>
-          {estimatedDate && (
-            <p className="text-xs text-muted-foreground">
-              예상 {fmtCardDate(estimatedDate)}
-            </p>
-          )}
-        </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
-import { actionGetDailyLog, actionGetRecentDailyLogs, actionCloseDailyLog, actionGetFirstUnclosedLog, actionGetWeeklyLogs, actionGetDailyLogsTotalCount } from "@/app/actions/log-actions";
+import { actionGetDailyLog, actionGetRecentDailyLogs, actionCloseDailyLog, actionGetFirstUnclosedLog, actionGetWeeklyLogs, actionGetDailyLogsTotalCount, actionGetAllDailyLogs, actionGetLowestWeight } from "@/app/actions/log-actions";
 import { HomeContent } from "./home-content";
 import { formatDate } from "@/lib/utils/date-utils";
 import { getGreetingMessage } from "@/lib/utils/greeting-messages";
@@ -64,17 +64,30 @@ export function HomeContainer() {
     };
 
     init().then(() => {
-      // 백그라운드 프리페치: Records 탭 데이터 (1초 지연으로 렌더링 블록 방지)
+      // 백그라운드 프리페치: Records & Graph 탭 데이터 (1초 지연)
       setTimeout(() => {
-        if (!logStore.getWeeklyLogs() || logStore.getTotalCount() === null) {
-          Promise.all([
-            actionGetWeeklyLogs(4),
-            actionGetDailyLogsTotalCount(),
-          ]).then(([weekly, count]) => {
-            logStore.setWeeklyLogs(weekly);
-            logStore.setTotalCount(count);
-          }).catch(() => {});
+        const promises: Promise<any>[] = [];
+        const fetchRecords = !logStore.getWeeklyLogs() || logStore.getTotalCount() === null;
+        const fetchGraph = !logStore.getAllLogs() || !logStore.getLowestWeight();
+
+        if (fetchRecords) {
+          promises.push(
+            Promise.all([actionGetWeeklyLogs(4), actionGetDailyLogsTotalCount()]).then(([w, c]) => {
+              logStore.setWeeklyLogs(w);
+              logStore.setTotalCount(c);
+            })
+          );
         }
+        if (fetchGraph) {
+          promises.push(
+            Promise.all([actionGetAllDailyLogs(), actionGetLowestWeight()]).then(([all, low]) => {
+              logStore.setAllLogs(all);
+              logStore.setLowestWeight(low);
+            })
+          );
+        }
+
+        Promise.all(promises).catch(() => {});
       }, 1000);
     });
   }, []);

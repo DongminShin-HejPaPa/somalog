@@ -7,6 +7,8 @@ class LogStore {
   private recentLogs: DailyLog[] | null = null;
   private weeklyLogs: any[] | null = null;
   private totalCount: number | null = null;
+  private allLogs: DailyLog[] | null = null;
+  private lowestWeight: { weight: number; date: string } | null = null;
   private lastFetchTime = 0;
 
   getLog(date: string): DailyLog | undefined {
@@ -54,6 +56,22 @@ class LogStore {
 
   getTotalCount() {
     return this.totalCount;
+  }
+
+  setAllLogs(logs: DailyLog[]) {
+    this.allLogs = logs;
+  }
+
+  getAllLogs() {
+    return this.allLogs;
+  }
+
+  setLowestWeight(lowest: { weight: number; date: string } | null) {
+    this.lowestWeight = lowest;
+  }
+
+  getLowestWeight() {
+    return this.lowestWeight;
   }
 
   getFirstUnclosedLog(): DailyLog | null {

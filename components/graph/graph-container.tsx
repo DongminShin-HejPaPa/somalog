@@ -8,6 +8,7 @@ import {
 } from "@/app/actions/log-actions";
 import { WeightChart } from "./weight-chart";
 import type { DailyLog } from "@/lib/types";
+import { logStore } from "@/lib/stores/log-store";
 
 export function GraphContainer() {
   const { settings } = useSettings();
@@ -15,10 +16,18 @@ export function GraphContainer() {
   const [lowest, setLowest] = useState<{ weight: number; date: string } | undefined>(undefined);
 
   useEffect(() => {
+    if (!logStore.isStale() && logStore.getAllLogs() && logStore.getLowestWeight()) {
+      setLogs(logStore.getAllLogs()!);
+      setLowest(logStore.getLowestWeight()!);
+      return;
+    }
+
     Promise.all([
       actionGetAllDailyLogs(),
       actionGetLowestWeight(),
     ]).then(([fetchedLogs, fetchedLowest]) => {
+      logStore.setAllLogs(fetchedLogs);
+      logStore.setLowestWeight(fetchedLowest);
       setLogs(fetchedLogs);
       setLowest(fetchedLowest);
     });

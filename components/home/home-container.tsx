@@ -85,7 +85,12 @@ export function HomeContainer() {
     <div className="pb-6">
       <header className="px-4 pt-4 pb-2">
         <div className="flex items-center justify-between">
-          <h1 className="text-lg font-bold">Soma Log</h1>
+          <div className="flex items-end gap-2">
+            <h1 className="text-lg font-bold">Soma Log</h1>
+            <span className="text-[10px] text-muted-foreground/40 font-mono mb-0.5">
+              b.{process.env.NEXT_PUBLIC_BUILD_TIME}-{process.env.NEXT_PUBLIC_COMMIT_SHA}
+            </span>
+          </div>
           {displayName !== undefined && !displayName && (
             <Link
               href="/login"

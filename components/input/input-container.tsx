@@ -90,11 +90,14 @@ export function InputContainer() {
 
   useEffect(() => {
     const init = async () => {
-      // 1. 30일 이상 된 미마감 날짜 일괄 자동 마감 (비동기로 백그라운드 처리)
-      actionAutoCloseOldLogs().then((autoClosedCount) => {
+      actionAutoCloseOldLogs().then(async (autoClosedCount) => {
         if (autoClosedCount > 0) {
           setAutoCloseToast(autoClosedCount);
           setTimeout(() => setAutoCloseToast(null), 5000);
+          // 조용히 최신 데이터로 다시 덮어씌움 (화면 불일치 방지)
+          const updatedLogs = await actionGetRecentDailyLogs(30);
+          logStore.setRecentLogs(updatedLogs);
+          setAllLogs(updatedLogs);
         }
       }).catch(() => {});
 

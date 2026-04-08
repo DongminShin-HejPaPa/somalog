@@ -13,10 +13,11 @@ import {
   regenerateDailySummary,
   autoCloseOldLogs,
   getFirstUnclosedLog,
+  clearDailyLogField,
 } from "@/lib/services/daily-log-service";
 import { getWeeklyLogs } from "@/lib/services/weekly-log-service";
 import { getLowestWeight } from "@/lib/services/stats-service";
-import type { DailyLog, DailyLogUpdate, WeeklyLog } from "@/lib/types";
+import type { DailyLog, DailyLogUpdate, ClearableField, WeeklyLog } from "@/lib/types";
 
 export async function actionGetDailyLog(
   date: string
@@ -102,5 +103,16 @@ export async function actionRegenerateDailySummary(date: string): Promise<import
   const result = await regenerateDailySummary(date);
   revalidatePath("/log");
   revalidatePath("/home");
+  return result;
+}
+
+export async function actionClearDailyLogField(
+  date: string,
+  field: ClearableField
+): Promise<DailyLog | null> {
+  const result = await clearDailyLogField(date, field);
+  revalidatePath("/home");
+  revalidatePath("/log");
+  revalidatePath("/graph");
   return result;
 }

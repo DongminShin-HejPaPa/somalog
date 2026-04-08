@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X } from "lucide-react";
+import { X, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useKeyboardOffset } from "@/lib/hooks/use-keyboard-offset";
-import type { DailyLog, DailyLogUpdate } from "@/lib/types";
+import type { DailyLog, DailyLogUpdate, ClearableField } from "@/lib/types";
 
 export type ItemKey =
   | "weight"
@@ -22,6 +22,7 @@ interface InputModalProps {
   prevWeight: number | null;
   isSaving?: boolean;
   onSave: (update: DailyLogUpdate) => void;
+  onDelete: (field: ClearableField) => void;
   onClose: () => void;
 }
 
@@ -65,6 +66,20 @@ function SaveButton({
   );
 }
 
+function DeleteButton({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      data-testid="modal-delete"
+      className="w-full py-2.5 rounded-xl border border-border text-muted-foreground text-sm font-medium min-h-[44px] flex items-center justify-center gap-1.5 hover:bg-red-50 hover:border-red-200 hover:text-red-500 transition-colors disabled:opacity-40"
+    >
+      <Trash2 className="w-3.5 h-3.5" />
+      삭제
+    </button>
+  );
+}
+
 export function InputModal({
   field,
   log,
@@ -72,6 +87,7 @@ export function InputModal({
   prevWeight,
   isSaving,
   onSave,
+  onDelete,
   onClose,
 }: InputModalProps) {
   const [weightValue, setWeightValue] = useState("");
@@ -110,9 +126,14 @@ export function InputModal({
   };
 
   const handleWeightSave = () => {
-    const num = parseFloat(weightValue);
-    if (isNaN(num)) return;
-    onSave({ weight: Math.round(num * 10) / 10 });
+    const trimmed = weightValue.trim();
+    // 빈 입력 or NaN → 삭제
+    if (!trimmed || isNaN(parseFloat(trimmed))) {
+      if (log.weight != null) onDelete("weight");
+      else onClose();
+      return;
+    }
+    onSave({ weight: Math.round(parseFloat(trimmed) * 10) / 10 });
   };
 
   const handleWaterSave = () => {
@@ -122,11 +143,30 @@ export function InputModal({
 
   const handleTextSave = () => {
     const trimmed = textValue.trim();
-    if (!trimmed) return;
+    // 빈 텍스트 저장 → 해당 필드 삭제
+    if (!trimmed) {
+      const mealField = field as "breakfast" | "lunch" | "dinner";
+      const hasValue = log[mealField] != null;
+      if (hasValue) onDelete(mealField);
+      else onClose();
+      return;
+    }
     onSave({ [field]: trimmed } as DailyLogUpdate);
   };
 
   const label = fieldLabels[field];
+
+  // 현재 값이 있는지 (삭제 버튼 노출 여부)
+  const hasCurrentValue = ((): boolean => {
+    if (field === "weight") return log.weight != null;
+    if (field === "water") return log.water != null;
+    if (field === "exercise") return log.exercise != null;
+    if (field === "breakfast") return log.breakfast != null;
+    if (field === "lunch") return log.lunch != null;
+    if (field === "dinner") return log.dinner != null;
+    if (field === "lateSnack") return log.lateSnack != null;
+    return false;
+  })();
 
   return (
     <div
@@ -210,6 +250,9 @@ export function InputModal({
               <span className="text-base text-muted-foreground font-medium">kg</span>
             </div>
             <SaveButton onClick={handleWeightSave} isSaving={isSaving} />
+            {hasCurrentValue && (
+              <DeleteButton onClick={() => onDelete("weight")} disabled={isSaving} />
+            )}
           </div>
         )}
 
@@ -269,36 +312,44 @@ export function InputModal({
               disabled={waterValue == null || waterValue === 0}
               isSaving={isSaving}
             />
+            {hasCurrentValue && (
+              <DeleteButton onClick={() => onDelete("water")} disabled={isSaving} />
+            )}
           </div>
         )}
 
         {/* Exercise */}
         {field === "exercise" && (
-          <div className="flex gap-3">
-            <button
-              onClick={() => onSave({ exercise: "Y" })}
-              data-testid="modal-exercise-y"
-              className={cn(
-                "flex-1 py-4 rounded-xl text-sm font-semibold min-h-[60px] transition-colors",
-                log.exercise === "Y"
-                  ? "bg-navy text-white"
-                  : "bg-secondary text-foreground border border-border"
-              )}
-            >
-              했음
-            </button>
-            <button
-              onClick={() => onSave({ exercise: "N" })}
-              data-testid="modal-exercise-n"
-              className={cn(
-                "flex-1 py-4 rounded-xl text-sm font-semibold min-h-[60px] transition-colors",
-                log.exercise === "N"
-                  ? "bg-coral text-white"
-                  : "bg-secondary text-foreground border border-border"
-              )}
-            >
-              안 했음
-            </button>
+          <div className="space-y-3">
+            <div className="flex gap-3">
+              <button
+                onClick={() => onSave({ exercise: "Y" })}
+                data-testid="modal-exercise-y"
+                className={cn(
+                  "flex-1 py-4 rounded-xl text-sm font-semibold min-h-[60px] transition-colors",
+                  log.exercise === "Y"
+                    ? "bg-navy text-white"
+                    : "bg-secondary text-foreground border border-border"
+                )}
+              >
+                했음
+              </button>
+              <button
+                onClick={() => onSave({ exercise: "N" })}
+                data-testid="modal-exercise-n"
+                className={cn(
+                  "flex-1 py-4 rounded-xl text-sm font-semibold min-h-[60px] transition-colors",
+                  log.exercise === "N"
+                    ? "bg-coral text-white"
+                    : "bg-secondary text-foreground border border-border"
+                )}
+              >
+                안 했음
+              </button>
+            </div>
+            {hasCurrentValue && (
+              <DeleteButton onClick={() => onDelete("exercise")} disabled={isSaving} />
+            )}
           </div>
         )}
 
@@ -316,36 +367,47 @@ export function InputModal({
               className="w-full px-4 py-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[52px]"
             />
             <SaveButton onClick={handleTextSave} isSaving={isSaving} />
+            {hasCurrentValue && (
+              <DeleteButton
+                onClick={() => onDelete(field as ClearableField)}
+                disabled={isSaving}
+              />
+            )}
           </div>
         )}
 
         {/* LateSnack */}
         {field === "lateSnack" && (
-          <div className="flex gap-3">
-            <button
-              onClick={() => onSave({ lateSnack: "Y" })}
-              data-testid="modal-late-snack-y"
-              className={cn(
-                "flex-1 py-4 rounded-xl text-sm font-semibold min-h-[60px] transition-colors",
-                log.lateSnack === "Y"
-                  ? "bg-coral text-white"
-                  : "bg-secondary text-foreground border border-border"
-              )}
-            >
-              먹음
-            </button>
-            <button
-              onClick={() => onSave({ lateSnack: "N" })}
-              data-testid="modal-late-snack-n"
-              className={cn(
-                "flex-1 py-4 rounded-xl text-sm font-semibold min-h-[60px] transition-colors",
-                log.lateSnack === "N"
-                  ? "bg-navy text-white"
-                  : "bg-secondary text-foreground border border-border"
-              )}
-            >
-              안 먹음
-            </button>
+          <div className="space-y-3">
+            <div className="flex gap-3">
+              <button
+                onClick={() => onSave({ lateSnack: "Y" })}
+                data-testid="modal-late-snack-y"
+                className={cn(
+                  "flex-1 py-4 rounded-xl text-sm font-semibold min-h-[60px] transition-colors",
+                  log.lateSnack === "Y"
+                    ? "bg-coral text-white"
+                    : "bg-secondary text-foreground border border-border"
+                )}
+              >
+                먹음
+              </button>
+              <button
+                onClick={() => onSave({ lateSnack: "N" })}
+                data-testid="modal-late-snack-n"
+                className={cn(
+                  "flex-1 py-4 rounded-xl text-sm font-semibold min-h-[60px] transition-colors",
+                  log.lateSnack === "N"
+                    ? "bg-navy text-white"
+                    : "bg-secondary text-foreground border border-border"
+                )}
+              >
+                안 먹음
+              </button>
+            </div>
+            {hasCurrentValue && (
+              <DeleteButton onClick={() => onDelete("lateSnack")} disabled={isSaving} />
+            )}
           </div>
         )}
 

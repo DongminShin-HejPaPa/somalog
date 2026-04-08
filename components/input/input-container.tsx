@@ -90,12 +90,13 @@ export function InputContainer() {
 
   useEffect(() => {
     const init = async () => {
-      // 1. 30일 이상 된 미마감 날짜 일괄 자동 마감 (세션 시작 시 1회)
-      const autoClosedCount = await actionAutoCloseOldLogs();
-      if (autoClosedCount > 0) {
-        setAutoCloseToast(autoClosedCount);
-        setTimeout(() => setAutoCloseToast(null), 5000);
-      }
+      // 1. 30일 이상 된 미마감 날짜 일괄 자동 마감 (비동기로 백그라운드 처리)
+      actionAutoCloseOldLogs().then((autoClosedCount) => {
+        if (autoClosedCount > 0) {
+          setAutoCloseToast(autoClosedCount);
+          setTimeout(() => setAutoCloseToast(null), 5000);
+        }
+      }).catch(() => {});
 
       // 2. 글로벌 캐시 유효성 확인
       const today = formatDate(new Date());

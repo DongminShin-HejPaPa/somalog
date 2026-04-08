@@ -8,6 +8,7 @@ import { useSettings } from "@/lib/contexts/settings-context";
 import type { Settings } from "@/lib/types";
 import { serverLoadDemoData } from "@/app/actions/data-actions";
 import { DIET_PRESETS, calcAllPresetMonths, computePresetMonths } from "@/lib/utils/diet-presets";
+import { computeRecommendedWater } from "@/lib/utils/compute-daily";
 
 const coachStyles = [
   { value: "strong", label: "팩트 위주 / 강한 코치", desc: "위로보다 수치와 사실로 강하게", example: "\"어제 야식 먹고 오늘 체중 올랐잖아. 당연한 결과야. 오늘 저녁은 관리식단 필수.\"" },
@@ -101,12 +102,11 @@ export function OnboardingFlow() {
     return map;
   }, [weight, targetWeight]);
 
-  // 신체정보 기반 권장 수분량 (체중 × 35ml/남성, 31ml/여성)
+  // 신체정보 기반 권장 수분량
   const recommendedWater = useMemo(() => {
     const w = Number(weight) || 0;
     if (w === 0) return 2.8;
-    const ml = gender === "남성" ? w * 35 : w * 31;
-    return Math.round(ml / 100) / 10; // ml → L, 소수점 1자리
+    return computeRecommendedWater(w, gender);
   }, [weight, gender]);
 
   // targetWeight / weight / selectedPreset 변경 시 presetMonthsMap 기반으로 개월 수 재계산

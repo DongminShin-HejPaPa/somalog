@@ -12,6 +12,8 @@ import { mockSettings } from "@/lib/mock-data";
 import { DIET_PRESETS, computePresetMonths } from "@/lib/utils/diet-presets";
 import { logout } from "@/app/actions/auth-actions";
 import { AccountInfoDialog } from "./account-info-dialog";
+import { actionGetRecentDailyLogs } from "@/app/actions/log-actions";
+import { computeRecommendedWater } from "@/lib/utils/compute-daily";
 
 type DialogState = "idle" | "confirm-reset" | "confirm-onboarding" | "confirm-demo";
 
@@ -243,7 +245,16 @@ export function SettingsForm() {
   const [customCriteria, setCustomCriteria] = useState("");
   const router = useRouter();
 
+  const [latestWeight, setLatestWeight] = useState<number | null>(null);
+
   useEffect(() => {
+    actionGetRecentDailyLogs(30).then((logs) => {
+      const mostRecent = logs.find((l) => l.weight !== null);
+      if (mostRecent) {
+        setLatestWeight(mostRecent.weight);
+      }
+    });
+
     if (isLoaded) {
       setForm(settings);
       // 저장된 값이 프리셋이 아닌 경우 커스텀 값으로 복원
@@ -291,8 +302,7 @@ export function SettingsForm() {
 
   const handleSave = () => {
     if (formErrors.length > 0) return;
-    // currentWeight는 startWeight와 동기화 (설정에서는 startWeight만 노출)
-    updateSettings({ ...form, currentWeight: form.startWeight });
+    updateSettings({ ...form });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -323,10 +333,11 @@ export function SettingsForm() {
     form.intensiveDayCriteria !== "직접입력";
   const criteriaButtonValue = isCustomCriteriaSelected ? "직접입력" : form.intensiveDayCriteria;
 
-  // 수분 권장량 계산 (시작 체중 × 0.033L)
+  // 수분 권장량 계산
+  const currentBasisWeight = latestWeight ?? form.startWeight;
   const recommendedWater =
-    form.startWeight > 0
-      ? Math.round(form.startWeight * 0.033 * 10) / 10
+    currentBasisWeight > 0
+      ? computeRecommendedWater(currentBasisWeight, form.gender)
       : null;
 
   return (
@@ -487,7 +498,7 @@ export function SettingsForm() {
         <p className="text-xs text-muted-foreground mt-1">
           {recommendedWater !== null ? (
             <>
-              신체 정보 기반 권장: {recommendedWater}L
+              현재 신체 정보 기반 권장: {recommendedWater}L
               <button
                 onClick={() => handleChange("waterGoal", recommendedWater)}
                 className="ml-2 text-navy font-medium underline"
@@ -705,7 +716,7 @@ export function SettingsForm() {
           href="/onboarding"
           className="block w-full py-3 rounded-xl text-center text-sm font-medium text-coral border border-coral/30 hover:bg-coral-light transition-colors min-h-[48px] leading-[48px]"
         >
-          초기 설정 다시 하기
+          시작 도우미 다시 불러오기
         </Link>
       </div>
 

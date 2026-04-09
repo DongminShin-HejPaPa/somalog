@@ -27,6 +27,18 @@ class LogStore {
         this.recentLogs.sort((a, b) => b.date.localeCompare(a.date));
       }
     }
+    // allLogs도 동기화: 그래프가 항상 최신 데이터를 보도록
+    if (this.allLogs) {
+      const idx = this.allLogs.findIndex((l) => l.date === log.date);
+      if (idx !== -1) {
+        this.allLogs[idx] = log;
+      } else {
+        this.allLogs.push(log);
+        this.allLogs.sort((a, b) => b.date.localeCompare(a.date));
+      }
+    }
+    // 체중 변경 시 lowestWeight 캐시 무효화 (그래프 최저 체중 마커 정확성)
+    this.lowestWeight = null;
   }
 
   setLogs(logs: DailyLog[]) {
@@ -37,6 +49,18 @@ class LogStore {
     this.recentLogs = [...logs].sort((a, b) => b.date.localeCompare(a.date));
     this.setLogs(logs);
     this.lastFetchTime = Date.now();
+    // allLogs도 변경된 항목 반영: 마감/저장 후 그래프 캐시 최신 유지
+    if (this.allLogs) {
+      for (const log of logs) {
+        const idx = this.allLogs.findIndex((l) => l.date === log.date);
+        if (idx !== -1) {
+          this.allLogs[idx] = log;
+        } else {
+          this.allLogs.push(log);
+        }
+      }
+      this.allLogs.sort((a, b) => b.date.localeCompare(a.date));
+    }
   }
 
   getRecentLogs(): DailyLog[] | null {

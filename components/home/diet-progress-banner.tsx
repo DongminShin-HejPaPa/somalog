@@ -7,6 +7,7 @@ interface DietProgressBannerProps {
   startWeight: number;
   targetWeight: number;
   weightChange: number | null;
+  fallbackWeightChange?: number | null;
   isIntensiveDay: boolean;
 }
 
@@ -22,14 +23,21 @@ export function DietProgressBanner({
   startWeight,
   targetWeight,
   weightChange,
+  fallbackWeightChange,
   isIntensiveDay,
 }: DietProgressBannerProps) {
   const totalToLose = startWeight - targetWeight;
-  // weightChange = currentWeight - startWeight (음수면 감량, 양수면 증가)
-  // 체중이 늘었을 때는 0으로 처리 (진행 없음)
-  const actualLost = weightChange !== null ? Math.max(-weightChange, 0) : 0;
+  // 오늘 체중 미입력 시 최근 기록의 weightChange로 진행률 계산
+  const effectiveWeightChange = weightChange ?? fallbackWeightChange ?? null;
+  const actualLost = effectiveWeightChange !== null ? Math.max(-effectiveWeightChange, 0) : 0;
   const progress = totalToLose > 0 ? Math.min((actualLost / totalToLose) * 100, 100) : 0;
-  const remaining = currentWeight ? currentWeight - targetWeight : startWeight - targetWeight;
+  // 남은 kg: 오늘 체중 있으면 직접 계산, 없으면 fallback weightChange로 추정
+  const remaining =
+    currentWeight !== null
+      ? currentWeight - targetWeight
+      : effectiveWeightChange !== null
+        ? startWeight + effectiveWeightChange - targetWeight
+        : startWeight - targetWeight;
 
   return (
     <div

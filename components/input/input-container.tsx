@@ -182,6 +182,8 @@ export function InputContainer({ userId }: { userId: string | null }) {
       });
     } catch {
       setCurrentLog(previousLog);
+      // 롤백 시 자동 마감 ref 초기화: 재입력 후 자동 마감 재시도 가능하도록
+      autoCloseFiredRef.current = false;
       setSaveError("저장에 실패했습니다. 다시 시도해주세요.");
       setTimeout(() => setSaveError(null), 4000);
     }

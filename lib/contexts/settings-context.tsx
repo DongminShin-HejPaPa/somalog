@@ -10,6 +10,7 @@ import {
 } from "react";
 import type { Settings, SettingsUpdate, SettingsInput } from "@/lib/types";
 import { mockSettings } from "@/lib/mock-data-new";
+import { logStore } from "@/lib/stores/log-store";
 import {
   actionGetSettings,
   actionUpdateSettings,
@@ -160,11 +161,13 @@ export function SettingsProvider({
   /** 모든 설정을 DEFAULT_SETTINGS로 리셋 (실제 데이터 삭제는 settings-form에서 serverResetAllData 호출) */
   const resetAllSettings = useCallback(() => {
     clearCachedSettings(uid);
+    logStore.clear(); // DB 데이터 전체 삭제 후 메모리 캐시도 함께 초기화
     setSettings(DEFAULT_SETTINGS);
   }, [uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** 데모 데이터로 설정 state 교체 (실제 데이터 로드는 settings-form에서 serverLoadDemoData 호출 후 이 함수로 상태 동기화) */
   const loadDemoSettings = useCallback(() => {
+    logStore.clear(); // DB가 데모 데이터로 교체됐으므로 메모리 캐시 전체 초기화
     setSettings({ ...mockSettings });
   }, []);
 

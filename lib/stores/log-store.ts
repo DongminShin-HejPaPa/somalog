@@ -3,6 +3,7 @@
 import type { DailyLog } from "@/lib/types";
 
 class LogStore {
+  private currentUserId: string | null = null;
   private cache = new Map<string, DailyLog>();
   private recentLogs: DailyLog[] | null = null;
   private weeklyLogs: any[] | null = null;
@@ -85,9 +86,21 @@ class LogStore {
     return Date.now() - this.lastFetchTime > 5 * 60 * 1000; // 5 minutes
   }
 
+  /** userId가 바뀐 경우 캐시 전체 초기화. 각 container 마운트 시 첫 번째로 호출해야 함. */
+  invalidateIfUserChanged(userId: string | null): void {
+    if (this.currentUserId !== userId) {
+      this.clear();
+      this.currentUserId = userId;
+    }
+  }
+
   clear() {
     this.cache.clear();
     this.recentLogs = null;
+    this.weeklyLogs = null;
+    this.totalCount = null;
+    this.allLogs = null;
+    this.lowestWeight = null;
     this.lastFetchTime = 0;
   }
 }

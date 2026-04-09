@@ -30,7 +30,7 @@ function addDays(dateStr: string, n: number): string {
   return formatDate(d);
 }
 
-export function InputContainer() {
+export function InputContainer({ userId }: { userId: string | null }) {
   const { settings } = useSettings();
   const searchParams = useSearchParams();
   const [currentDate, setCurrentDate] = useState<string>(formatDate(new Date()));
@@ -91,6 +91,7 @@ export function InputContainer() {
 
   useEffect(() => {
     const init = async () => {
+      logStore.invalidateIfUserChanged(userId);
       actionAutoCloseOldLogs().then(async (autoClosedCount) => {
         if (autoClosedCount > 0) {
           setAutoCloseToast(autoClosedCount);

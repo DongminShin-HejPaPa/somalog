@@ -11,7 +11,7 @@ import { useSettings } from "@/lib/contexts/settings-context";
 import type { DailyLog } from "@/lib/types";
 import { logStore } from "@/lib/stores/log-store";
 
-export function HomeContainer() {
+export function HomeContainer({ userId }: { userId: string | null }) {
   const [displayName, setDisplayName] = useState<string | null | undefined>(undefined);
   // activeLog: 홈에서 보여줄 로그 (초기=오늘, 마감 후=다음 미마감)
   const [activeLog, setActiveLog] = useState<DailyLog | null | undefined>(undefined);
@@ -35,8 +35,9 @@ export function HomeContainer() {
     });
 
     const init = async () => {
+      logStore.invalidateIfUserChanged(userId);
       const today = formatDate(new Date());
-      
+
       let logs: DailyLog[];
       let firstUnclosed: DailyLog | null = null;
       let todayLog: DailyLog | null = null;

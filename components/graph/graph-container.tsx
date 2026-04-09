@@ -10,12 +10,13 @@ import { WeightChart } from "./weight-chart";
 import type { DailyLog } from "@/lib/types";
 import { logStore } from "@/lib/stores/log-store";
 
-export function GraphContainer() {
+export function GraphContainer({ userId }: { userId: string | null }) {
   const { settings } = useSettings();
   const [logs, setLogs] = useState<DailyLog[] | undefined>(undefined);
   const [lowest, setLowest] = useState<{ weight: number; date: string } | undefined>(undefined);
 
   useEffect(() => {
+    logStore.invalidateIfUserChanged(userId);
     if (!logStore.isStale() && logStore.getAllLogs() && logStore.getLowestWeight()) {
       setLogs(logStore.getAllLogs()!);
       setLowest(logStore.getLowestWeight()!);

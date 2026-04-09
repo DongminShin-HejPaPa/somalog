@@ -13,13 +13,14 @@ import { logStore } from "@/lib/stores/log-store";
 
 const PAGE_SIZE = 30;
 
-export function LogContainer() {
+export function LogContainer({ userId }: { userId: string | null }) {
   const [logs, setLogs] = useState<DailyLog[] | undefined>(undefined);
   const [weeklyLogs, setWeeklyLogs] = useState<WeeklyLog[] | undefined>(undefined);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   const fetchInitial = useCallback(async () => {
+    logStore.invalidateIfUserChanged(userId);
     if (!logStore.isStale() && logStore.getRecentLogs() && logStore.getWeeklyLogs() && logStore.getTotalCount() !== null) {
       setLogs(logStore.getRecentLogs()!);
       setWeeklyLogs(logStore.getWeeklyLogs()!);

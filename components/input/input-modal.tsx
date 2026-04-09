@@ -358,7 +358,7 @@ export function InputModal({
           <div className="space-y-3">
             <input
               type="text"
-              placeholder="예: 관리식단, 소식 한식, 고칼로리 외식"
+              placeholder="예: 버섯크림파스타와 콜라ㅠㅠ, 한식 소식, 고칼로리 식단"
               value={textValue}
               onChange={(e) => setTextValue(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleTextSave()}

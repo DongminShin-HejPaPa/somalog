@@ -8,7 +8,7 @@ import type { Settings } from "@/lib/types";
 import Link from "next/link";
 import { LogOut, UserPen } from "lucide-react";
 import { serverResetAllData, serverLoadDemoData } from "@/app/actions/data-actions";
-import { mockSettings } from "@/lib/mock-data";
+import { mockSettings } from "@/lib/mock-data-new";
 import { DIET_PRESETS, computePresetMonths } from "@/lib/utils/diet-presets";
 import { logout } from "@/app/actions/auth-actions";
 import { AccountInfoDialog } from "./account-info-dialog";

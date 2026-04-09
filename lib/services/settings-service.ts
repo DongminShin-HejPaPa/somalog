@@ -4,7 +4,7 @@ import { getAuthUser } from "@/lib/supabase/server";
 import { createClient } from "@/lib/supabase/server";
 import type { Settings, SettingsInput, SettingsUpdate } from "@/lib/types";
 import { formatDate } from "@/lib/utils/date-utils";
-import { mockSettings } from "@/lib/mock-data";
+import { mockSettings } from "@/lib/mock-data-new";
 
 export function createDefaultSettings(): Settings {
   return {

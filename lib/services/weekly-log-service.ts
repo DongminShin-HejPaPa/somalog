@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import type { WeeklyLog } from "@/lib/types";
-import { mockWeeklyLog } from "@/lib/mock-data";
+import { mockWeeklyLog } from "@/lib/mock-data-new";
 
 function rowToWeeklyLog(row: Record<string, unknown>): WeeklyLog {
   return {

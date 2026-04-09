@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import type { Settings, SettingsUpdate, SettingsInput } from "@/lib/types";
-import { mockSettings } from "@/lib/mock-data";
+import { mockSettings } from "@/lib/mock-data-new";
 import {
   actionGetSettings,
   actionUpdateSettings,

@@ -19,7 +19,7 @@ import {
 } from "@/lib/ai/coach-service";
 import { getSettings } from "./settings-service";
 import { upsertWeeklyLog } from "./weekly-log-service";
-import { mockDailyLogs } from "@/lib/mock-data";
+import { mockDailyLogs } from "@/lib/mock-data-new";
 
 function rowToDailyLog(row: Record<string, unknown>): DailyLog {
   return {

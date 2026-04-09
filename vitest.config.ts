@@ -12,7 +12,7 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "lcov"],
       include: ["lib/utils/**", "lib/services/**"],
-      exclude: ["lib/supabase/**", "lib/mock-data.ts"],
+      exclude: ["lib/supabase/**", "lib/mock-data-new.ts"],
     },
   },
   resolve: {

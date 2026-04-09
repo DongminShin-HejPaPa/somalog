@@ -44,6 +44,12 @@ export function HomeContent({ todayLog, recentLogs, onCloseToday, isClosingToday
     : yesterday?.oneLiner;
   const isYesterday = !todayLog.closed && !!yesterday?.oneLiner;
 
+  // 오늘 체중 미입력 시 최근 기록 기준으로 진행률/남은 kg 표시
+  const lastKnownWithWeight = recentLogs.find(
+    (l) => l.date !== todayLog.date && l.weight !== null && l.weightChange !== null
+  );
+  const fallbackWeightChange = todayLog.weight === null ? (lastKnownWithWeight?.weightChange ?? null) : null;
+
   return (
     <>
       <DietProgressBanner
@@ -53,6 +59,7 @@ export function HomeContent({ todayLog, recentLogs, onCloseToday, isClosingToday
         startWeight={settings.startWeight}
         targetWeight={settings.targetWeight}
         weightChange={todayLog.weightChange}
+        fallbackWeightChange={fallbackWeightChange}
         isIntensiveDay={settings.intensiveDayOn && todayLog.intensiveDay === true}
       />
 

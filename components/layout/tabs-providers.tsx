@@ -6,11 +6,12 @@ import type { Settings } from "@/lib/types";
 interface TabsProvidersProps {
   children: React.ReactNode;
   initialSettings: Settings | null;
+  userId: string | null;
 }
 
-export function TabsProviders({ children, initialSettings }: TabsProvidersProps) {
+export function TabsProviders({ children, initialSettings, userId }: TabsProvidersProps) {
   return (
-    <SettingsProvider initialSettings={initialSettings}>
+    <SettingsProvider initialSettings={initialSettings} userId={userId}>
       {children}
     </SettingsProvider>
   );

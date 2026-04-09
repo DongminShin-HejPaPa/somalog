@@ -381,7 +381,7 @@ export async function reopenDailyLog(date: string): Promise<DailyLog | null> {
 
   const { data, error } = await supabase
     .from("daily_logs")
-    .update({ closed: false })
+    .update({ closed: false, daily_summary: null, one_liner: null })
     .eq("user_id", user.id)
     .eq("date", date)
     .select()

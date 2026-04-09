@@ -224,7 +224,7 @@ export function LogList({
                           </div>
                         </div>
 
-                        {log.dailySummary && (
+                        {log.closed && log.dailySummary && (
                           <div className="mt-2">
                             <p className="text-xs font-medium text-navy mb-1">코치의 총평</p>
                             <p className="text-sm leading-relaxed text-muted-foreground">

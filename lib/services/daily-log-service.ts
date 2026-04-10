@@ -352,22 +352,21 @@ export async function regenerateDailySummary(date: string): Promise<DailyLog | n
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const [existing, settings] = await Promise.all([
+  const [existing, settings, { data: prevRow }] = await Promise.all([
     getDailyLog(date),
     getSettings(),
+    supabase
+      .from("daily_logs")
+      .select("weight")
+      .eq("user_id", user.id)
+      .lt("date", date)
+      .not("weight", "is", null)
+      .order("date", { ascending: false })
+      .limit(1)
+      .single(),
   ]);
   if (!existing || !existing.closed) return null;
 
-  // 직전 체중 기록 조회 (총평에 prevWeight 맥락 제공)
-  const { data: prevRow } = await supabase
-    .from("daily_logs")
-    .select("weight")
-    .eq("user_id", user.id)
-    .lt("date", date)
-    .not("weight", "is", null)
-    .order("date", { ascending: false })
-    .limit(1)
-    .single();
   const prevWeight = (prevRow?.weight as number | null) ?? null;
 
   // AI로 총평과 한줄 요약을 모두 재생성 (코치 스타일 반영)

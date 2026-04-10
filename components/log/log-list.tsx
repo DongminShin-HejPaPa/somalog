@@ -226,7 +226,7 @@ export function LogList({
 
                         {log.closed && log.dailySummary && (
                           <div className="mt-2">
-                            <p className="text-xs font-medium text-navy mb-1">코치의 총평</p>
+                            <p className="text-xs font-medium text-navy mb-1">{settings.coachName}의 하루평가</p>
                             <p className="text-sm leading-relaxed text-muted-foreground">
                               {log.dailySummary}
                             </p>

@@ -39,6 +39,10 @@ class LogStore {
     }
     // 체중 변경 시 lowestWeight 캐시 무효화 (그래프 최저 체중 마커 정확성)
     this.lowestWeight = null;
+    // 마감 시 weeklyLogs 캐시 무효화: 일요일 마감이면 weekly log가 새로 생성됐을 수 있음
+    if (log.closed) {
+      this.weeklyLogs = null;
+    }
   }
 
   setLogs(logs: DailyLog[]) {

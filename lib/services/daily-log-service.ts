@@ -164,26 +164,32 @@ export async function upsertDailyLog(
   // 3. day는 항상 계산
   merged.day = computeDay(date, settings.dietStartDate);
 
-  // 4. weight가 있을 때 파생 필드 자동 계산
+
+  // 4. DB에서 전체 로그 가져와 파생 필드 계산 (항상 실행)
+  const { data: allRows } = await supabase
+    .from("daily_logs")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("date", { ascending: false });
+
+  const allLogs: DailyLog[] = allRows
+    ? allRows.map((r) => rowToDailyLog(r as Record<string, unknown>))
+    : [];
+
+  // 현재 upsert 대상 포함하여 계산 (기존 로그를 merged로 교체)
+  const logsWithMerged = allLogs.some((l) => l.date === date)
+    ? allLogs.map((l) => (l.date === date ? merged : l))
+    : [merged, ...allLogs];
+
+  // 오늘을 제외한 가장 최근 체중 기록 (피드백에 prevWeight로 전달)
+  const prevLog = logsWithMerged.find(
+    (l) => l.date < date && l.weight !== null
+  );
+  const prevWeight = prevLog?.weight ?? null;
+
+  // 5. weight가 있을 때 파생 필드 자동 계산
   if (merged.weight !== null) {
-    // DB에서 모든 로그 가져와 최저 체중 계산
-    const { data: allRows } = await supabase
-      .from("daily_logs")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("date", { ascending: false });
-
-    const allLogs: DailyLog[] = allRows
-      ? allRows.map((r) => rowToDailyLog(r as Record<string, unknown>))
-      : [];
-
-    // 현재 upsert 대상 포함하여 계산 (기존 로그를 merged로 교체)
-    const logsWithMerged = allLogs.some((l) => l.date === date)
-      ? allLogs.map((l) => (l.date === date ? merged : l))
-      : [merged, ...allLogs];
-
     const lowestW = getLowestWeightFromLogs(logsWithMerged);
-
     merged.weightChange = computeWeightChange(merged.weight, settings.startWeight);
     merged.avgWeight3d = computeAvgWeight3d(date, logsWithMerged);
 
@@ -194,17 +200,11 @@ export async function upsertDailyLog(
         lowestW
       );
     }
-
-    // 5. 피드백 생성 (체중 입력 시)
-    const prevLog = logsWithMerged.find(
-      (l) => l.date < date && l.weight !== null
-    );
-    merged.feedback = await generateAiFeedback(
-      merged,
-      prevLog?.weight ?? null,
-      settings
-    );
   }
+
+  // 6. 피드백 생성 (모든 입력 시, prevWeight 항상 전달)
+  merged.feedback = await generateAiFeedback(merged, prevWeight, settings);
+
 
   // 6. DB upsert
   const row = dailyLogToRow(merged, user.id);

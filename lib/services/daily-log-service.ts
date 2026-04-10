@@ -202,8 +202,21 @@ export async function upsertDailyLog(
     }
   }
 
-  // 6. 피드백 생성 (모든 입력 시, prevWeight 항상 전달)
-  merged.feedback = await generateAiFeedback(merged, prevWeight, settings);
+  // 6. 피드백 생성 — 방금 입력한 항목을 중심으로 코칭
+  const changedKeys = (Object.keys(data) as (keyof typeof data)[]).filter(
+    (k) => data[k] !== null && data[k] !== undefined
+  );
+  const fieldPriority: (keyof typeof data)[] = [
+    "weight", "dinner", "lateSnack", "lunch", "breakfast", "exercise", "water", "note",
+  ];
+  const primaryKey = fieldPriority.find((k) => changedKeys.includes(k)) ?? changedKeys[0] ?? null;
+  const fieldLabels: Partial<Record<keyof typeof data, string>> = {
+    weight: "체중", water: "수분", exercise: "운동",
+    breakfast: "아침 식단", lunch: "점심 식단", dinner: "저녁 식단",
+    lateSnack: "야식", note: "메모",
+  };
+  const changedField = primaryKey ? (fieldLabels[primaryKey] ?? null) : null;
+  merged.feedback = await generateAiFeedback(merged, prevWeight, settings, changedField);
 
 
   // 6. DB upsert
@@ -345,12 +358,24 @@ export async function regenerateDailySummary(date: string): Promise<DailyLog | n
   ]);
   if (!existing || !existing.closed) return null;
 
+  // 직전 체중 기록 조회 (총평에 prevWeight 맥락 제공)
+  const { data: prevRow } = await supabase
+    .from("daily_logs")
+    .select("weight")
+    .eq("user_id", user.id)
+    .lt("date", date)
+    .not("weight", "is", null)
+    .order("date", { ascending: false })
+    .limit(1)
+    .single();
+  const prevWeight = (prevRow?.weight as number | null) ?? null;
+
   // AI로 총평과 한줄 요약을 모두 재생성 (코치 스타일 반영)
   let dailySummary: string;
   let oneLiner: string;
   try {
     [dailySummary, oneLiner] = await Promise.all([
-      generateAiDailySummary(existing, settings),
+      generateAiDailySummary(existing, settings, prevWeight),
       generateAiOneLiner(existing, settings),
     ]);
   } catch {

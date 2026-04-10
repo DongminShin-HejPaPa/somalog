@@ -14,18 +14,24 @@ import { generateDailySummary } from "@/lib/utils/templates";
 export async function generateAiFeedback(
   log: DailyLog,
   prevWeight: number | null,
-  settings: Settings
+  settings: Settings,
+  changedField: string | null
 ): Promise<string> {
   if (!process.env.OPENROUTER_API_KEY) {
     return fallbackFeedback(log, prevWeight, settings.waterGoal);
   }
+
+  const fieldLine = changedField ? `\n방금 입력한 항목: ${changedField}` : "";
+  const focusInstruction = changedField
+    ? `"${changedField}"을/를 중심으로 나머지 오늘 맥락과 연결해 코칭 한 마디(2~3문장).`
+    : `오늘 입력 내용을 중심으로 코칭 한 마디(2~3문장).`;
 
   try {
     const abort = AbortSignal.timeout(5_000);
     const { text } = await generateText({
       model: openrouter(MODEL),
       system: buildSystemPrompt(settings),
-      prompt: `오늘 입력 데이터:\n${buildContext(log, prevWeight, settings)}\n\n오늘 행동(운동, 식단, 수분 등)을 중심으로 코칭 한 마디(2~3문장). 단순 수치 나열 금지. Hard Reset Mode는 맥락 정보 중 하나일 뿐, 논지의 재료가 되어야 해.`,
+      prompt: `오늘 입력 데이터:\n${buildContext(log, prevWeight, settings)}${fieldLine}\n\n${focusInstruction} 단순 수치 나열 금지. Hard Reset Mode는 맥락 정보 중 하나일 뿐, 논지의 재료가 되어야 해.`,
       maxOutputTokens: 150,
       temperature: 0.7,
       abortSignal: abort,
@@ -43,7 +49,8 @@ export async function generateAiFeedback(
  */
 export async function generateAiDailySummary(
   log: DailyLog,
-  settings: Settings
+  settings: Settings,
+  prevWeight: number | null
 ): Promise<string> {
   if (!process.env.OPENROUTER_API_KEY) {
     return generateDailySummary(log, settings.waterGoal);
@@ -54,7 +61,7 @@ export async function generateAiDailySummary(
     const { text } = await generateText({
       model: openrouter(MODEL),
       system: buildSystemPrompt(settings),
-      prompt: `오늘 하루 기록:\n${buildContext(log, null, settings)}\n\n오늘의 행동과 패턴을 분석하고, 전문가 노력으로 3~4문장 총평해.\n- 단순 데이터 나열 절대 금지\n- 잘한 점과 아쉬운 점을 행동 맥락에서 평가\n- 최근 선택들이 체중과 건강에 어떤 영향을 줄 것인지 짜임새 있게\n- 내일을 위한 한 마디 코치로 마무리\n- Hard Reset Mode가 있다면 하나의 맥락으로만 사용.`,
+      prompt: `오늘 하루 기록:\n${buildContext(log, prevWeight, settings)}\n\n오늘의 행동과 패턴을 분석하고, 전문가 노력으로 3~4문장 총평해.\n- 단순 데이터 나열 절대 금지\n- 잘한 점과 아쉬운 점을 행동 맥락에서 평가\n- 최근 선택들이 체중과 건강에 어떤 영향을 줄 것인지 짜임새 있게\n- 내일을 위한 한 마디 코치로 마무리\n- Hard Reset Mode가 있다면 하나의 맥락으로만 사용.`,
       maxOutputTokens: 250,
       temperature: 0.7,
       abortSignal: abort,

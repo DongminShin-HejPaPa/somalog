@@ -8,6 +8,7 @@ import { generateDailySummary } from "@/lib/utils/templates";
 // ──────────────────────────────────────────────
 
 /**
+ * Soma의 피드백 (입력 탭)
  * 체중 입력 시 즉시 피드백 생성
  */
 export async function generateAiFeedback(
@@ -37,6 +38,7 @@ export async function generateAiFeedback(
 }
 
 /**
+ * 코치의 총평 (기록 탭)
  * 마감 / 총평 재생성 시 일일 총평 생성 (AI, 코치 스타일 반영)
  */
 export async function generateAiDailySummary(
@@ -65,7 +67,8 @@ export async function generateAiDailySummary(
 }
 
 /**
- * 마감 시 홈 탭 "코치 한마디" 한줄 요약 생성
+ * Soma의 한마디 (홈 탭)
+ * 마감 시 홈 탭 "Soma의 한마디" 한줄 요약 생성
  */
 export async function generateAiOneLiner(
   log: DailyLog,
@@ -183,7 +186,7 @@ function fallbackFeedback(
 
 function fallbackOneLiner(log: DailyLog): string {
   if (log.intensiveDay && log.exercise === "Y" && log.lateSnack === "N") {
-    return "Hard Reset Mode에 운동까지 — 오늘 잘 버텼어.";
+    return "Hard Reset Mode 상황에 맞게 운동까지! — 오늘 잘 버텼어.";
   }
   if (log.exercise === "Y" && log.lateSnack === "N") {
     return "운동하고 야식 안 먹은 하루 — 착실한 관리야.";

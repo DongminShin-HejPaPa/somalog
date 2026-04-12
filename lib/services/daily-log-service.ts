@@ -466,8 +466,8 @@ export async function loadMockDailyLogs(): Promise<void> {
  * 동작:
  * 1. 최근 1년 이내 기존 로그 전체 조회
  * 2. 첫 로그 ~ 어제 사이 빠진 날짜를 closed=true 빈 로그로 채움
- * 3. 7일 이상 지난 미마감 날짜가 하나라도 있으면 오늘 제외 전체 마감
- *    (hadOldUnclosed=true 반환 → 클라이언트에서 전용 토스트 표시)
+ * 3. 마지막 로그 날짜로부터 7일 이상 경과 + 미마감 날짜 존재 시
+ *    (가장 오래된 미마감일 ~ 어제) 범위를 반환 → 클라이언트가 확인 후 처리
  * 4. 그 외에는 기존 30일 초과 마감 규칙 유지
  */
 export async function fillMissingAndAutoClose(): Promise<{
@@ -511,6 +511,13 @@ export async function fillMissingAndAutoClose(): Promise<{
     existingMap.set(row.date as string, row.closed as boolean);
   }
 
+  // 마지막 로그 날짜 (채우기 전 기준 — 실제 마지막 접속일)
+  const maxExistingDate = existingRows[existingRows.length - 1].date as string;
+  const msPerDay = 86400000;
+  const daysSinceLastLog = Math.floor(
+    (new Date(today + "T00:00:00").getTime() - new Date(maxExistingDate + "T00:00:00").getTime()) / msPerDay
+  );
+
   // 첫 로그 날짜 ~ 어제 사이 누락된 날짜 탐색
   const rangeStart = existingRows[0].date as string;
   const missingDates: string[] = [];
@@ -541,21 +548,17 @@ export async function fillMissingAndAutoClose(): Promise<{
     }
   }
 
-  // 7일 이상 된 미마감 날짜 존재 여부 확인 (자동 마감 안 함 — 클라이언트에서 확인 후 처리)
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-  const cutoff7d = formatDate(sevenDaysAgo);
-
+  // 트리거: 마지막 로그 날짜로부터 7일 이상 경과 + 미마감 날짜 존재
+  // 범위: 가장 오래된 미마감일 ~ 어제 (자동 마감 안 함 — 클라이언트 확인 후 처리)
   const unclosedDates = [...existingMap.entries()]
     .filter(([date, closed]) => !closed && date !== today)
     .map(([date]) => date)
     .sort();
 
-  const hadOldUnclosed = unclosedDates.some((date) => date < cutoff7d);
-  const oldUnclosedRange =
-    hadOldUnclosed && unclosedDates.length > 0
-      ? { from: unclosedDates[0], to: unclosedDates[unclosedDates.length - 1] }
-      : null;
+  const hadOldUnclosed = daysSinceLastLog >= 7 && unclosedDates.length > 0;
+  const oldUnclosedRange = hadOldUnclosed
+    ? { from: unclosedDates[0], to: yesterday }
+    : null;
 
   // 기본: 30일 초과 미마감만 조용히 마감 (7일 초과분은 클라이언트 확인 후 별도 처리)
   let closedCount = 0;

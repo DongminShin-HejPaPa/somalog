@@ -461,32 +461,121 @@ export async function loadMockDailyLogs(): Promise<void> {
 }
 
 /**
- * 마감되지 않은 채 30일이 지난 로그를 일괄 마감 처리.
- * 세션 시작 시 호출해 오래된 미마감 날짜를 정리한다.
- * AI 피드백 생성 없이 closed=true 만 설정 (배치 처리).
+ * 누락된 날짜 생성 + 오래된 미마감 로그 일괄 마감.
+ *
+ * 동작:
+ * 1. 최근 1년 이내 기존 로그 전체 조회
+ * 2. 첫 로그 ~ 어제 사이 빠진 날짜를 closed=true 빈 로그로 채움
+ * 3. 7일 이상 지난 미마감 날짜가 하나라도 있으면 오늘 제외 전체 마감
+ *    (hadOldUnclosed=true 반환 → 클라이언트에서 전용 토스트 표시)
+ * 4. 그 외에는 기존 30일 초과 마감 규칙 유지
  */
-export async function autoCloseOldLogs(): Promise<number> {
+export async function fillMissingAndAutoClose(): Promise<{
+  filledCount: number;
+  closedCount: number;
+  hadOldUnclosed: boolean;
+}> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) return 0;
+  if (!user) return { filledCount: 0, closedCount: 0, hadOldUnclosed: false };
 
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - 30);
-  const cutoffDate = formatDate(cutoff);
+  const today = formatDate(new Date());
+  const yesterdayDate = new Date();
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterday = formatDate(yesterdayDate);
 
-  const { data, error } = await supabase
+  const oneYearAgo = new Date();
+  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+  const oneYearAgoStr = formatDate(oneYearAgo);
+
+  // 최근 1년 이내 로그 날짜 + 마감 여부 조회
+  const { data: existingRows } = await supabase
     .from("daily_logs")
-    .update({ closed: true })
+    .select("date, closed")
     .eq("user_id", user.id)
-    .eq("closed", false)
-    .lt("date", cutoffDate)
-    .select("date");
+    .gte("date", oneYearAgoStr)
+    .lte("date", yesterday)
+    .order("date", { ascending: true });
 
-  if (error || !data) return 0;
-  return data.length;
+  if (!existingRows || existingRows.length === 0) {
+    return { filledCount: 0, closedCount: 0, hadOldUnclosed: false };
+  }
+
+  // 기존 날짜 맵 (date → closed)
+  const existingMap = new Map<string, boolean>();
+  for (const row of existingRows) {
+    existingMap.set(row.date as string, row.closed as boolean);
+  }
+
+  // 첫 로그 날짜 ~ 어제 사이 누락된 날짜 탐색
+  const rangeStart = existingRows[0].date as string;
+  const missingDates: string[] = [];
+  const cur = new Date(rangeStart + "T00:00:00");
+  const endDate = new Date(yesterday + "T00:00:00");
+  while (cur <= endDate) {
+    const d = formatDate(cur);
+    if (!existingMap.has(d)) missingDates.push(d);
+    cur.setDate(cur.getDate() + 1);
+  }
+
+  // 누락 날짜 → closed=true 빈 로그로 일괄 생성
+  let filledCount = 0;
+  if (missingDates.length > 0) {
+    const settings = await getSettings();
+    const rows = missingDates.map((date) => ({
+      user_id: user.id,
+      date,
+      day: computeDay(date, settings.dietStartDate),
+      closed: true,
+    }));
+    const { error } = await supabase
+      .from("daily_logs")
+      .upsert(rows, { onConflict: "user_id,date" });
+    if (!error) {
+      filledCount = missingDates.length;
+      for (const date of missingDates) existingMap.set(date, true);
+    }
+  }
+
+  // 7일 이상 된 미마감 날짜 존재 여부 확인
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const cutoff7d = formatDate(sevenDaysAgo);
+
+  const hadOldUnclosed = [...existingMap.entries()].some(
+    ([date, closed]) => !closed && date < cutoff7d
+  );
+
+  let closedCount = 0;
+  if (hadOldUnclosed) {
+    // 오늘 제외 미마감 전체 마감
+    const { data, error } = await supabase
+      .from("daily_logs")
+      .update({ closed: true })
+      .eq("user_id", user.id)
+      .eq("closed", false)
+      .neq("date", today)
+      .select("date");
+    if (!error && data) closedCount = data.length;
+  } else {
+    // 기본: 30일 초과 미마감만 마감
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const cutoff30d = formatDate(thirtyDaysAgo);
+    const { data, error } = await supabase
+      .from("daily_logs")
+      .update({ closed: true })
+      .eq("user_id", user.id)
+      .eq("closed", false)
+      .lt("date", cutoff30d)
+      .select("date");
+    if (!error && data) closedCount = data.length;
+  }
+
+  return { filledCount, closedCount, hadOldUnclosed };
 }
 
 /**

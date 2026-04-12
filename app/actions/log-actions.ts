@@ -11,7 +11,7 @@ import {
   getDailyLogsTotalCount,
   getAllDailyLogs,
   regenerateDailySummary,
-  autoCloseOldLogs,
+  fillMissingAndAutoClose,
   getFirstUnclosedLog,
   clearDailyLogField,
 } from "@/lib/services/daily-log-service";
@@ -87,8 +87,12 @@ export async function actionGetLowestWeight(): Promise<{
   return getLowestWeight();
 }
 
-export async function actionAutoCloseOldLogs(): Promise<number> {
-  return autoCloseOldLogs();
+export async function actionAutoCloseOldLogs(): Promise<{
+  filledCount: number;
+  closedCount: number;
+  hadOldUnclosed: boolean;
+}> {
+  return fillMissingAndAutoClose();
 }
 
 export async function actionGetFirstUnclosedLog(): Promise<DailyLog | null> {

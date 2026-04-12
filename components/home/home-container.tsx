@@ -96,8 +96,8 @@ export function HomeContainer({ userId }: { userId: string | null }) {
 
       // 백그라운드 구형 로그 마감 처리 (이곳에서도 처리하여 홈뷰 마감 일치성 달성)
       actionAutoCloseOldLogs()
-        .then(async (count) => {
-          if (count > 0) {
+        .then(async (result) => {
+          if (result.filledCount + result.closedCount > 0) {
             const updatedLogs = await actionGetRecentDailyLogs(30);
             logStore.setRecentLogs(updatedLogs);
             setRecentLogs(updatedLogs);

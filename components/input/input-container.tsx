@@ -40,7 +40,7 @@ export function InputContainer({ userId }: { userId: string | null }) {
   const [pendingDays, setPendingDays] = useState(0);
   const [allLogs, setAllLogs] = useState<DailyLog[]>([]);
   const [minDate, setMinDate] = useState<string | null>(null);
-  const [autoCloseToast, setAutoCloseToast] = useState<number | null>(null);
+  const [autoCloseToast, setAutoCloseToast] = useState<string | null>(null);
 
   // currentDate 기준 이전 최신 체중 (날짜 이동 시마다 자동 재계산)
   const prevWeight = useMemo(() => {
@@ -92,9 +92,13 @@ export function InputContainer({ userId }: { userId: string | null }) {
   useEffect(() => {
     const init = async () => {
       logStore.invalidateIfUserChanged(userId);
-      actionAutoCloseOldLogs().then(async (autoClosedCount) => {
-        if (autoClosedCount > 0) {
-          setAutoCloseToast(autoClosedCount);
+      actionAutoCloseOldLogs().then(async (result) => {
+        const total = result.filledCount + result.closedCount;
+        if (total > 0 || result.hadOldUnclosed) {
+          const msg = result.hadOldUnclosed
+            ? `일주일 넘게 마감하지 않은 날짜 ${total}일을 빈 채로 자동 마감했어요`
+            : `한 달 넘게 지난 미마감 날짜 ${result.closedCount}일을 자동 마감했어요`;
+          setAutoCloseToast(msg);
           setTimeout(() => setAutoCloseToast(null), 5000);
           // 조용히 최신 데이터로 다시 덮어씌움 (화면 불일치 방지)
           const updatedLogs = await actionGetRecentDailyLogs(30);
@@ -364,7 +368,7 @@ export function InputContainer({ userId }: { userId: string | null }) {
               <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.5"/>
               <path d="M8 5v3.5M8 11v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
-            <span>한 달 넘게 지난 미마감 날짜 {autoCloseToast}일을 자동 마감했어요</span>
+            <span>{autoCloseToast}</span>
           </div>
         </div>
       )}

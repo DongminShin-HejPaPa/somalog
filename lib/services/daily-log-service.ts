@@ -474,13 +474,14 @@ export async function fillMissingAndAutoClose(): Promise<{
   filledCount: number;
   closedCount: number;
   hadOldUnclosed: boolean;
+  oldUnclosedRange: { from: string; to: string } | null;
 }> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) return { filledCount: 0, closedCount: 0, hadOldUnclosed: false };
+  if (!user) return { filledCount: 0, closedCount: 0, hadOldUnclosed: false, oldUnclosedRange: null };
 
   const today = formatDate(new Date());
   const yesterdayDate = new Date();
@@ -501,7 +502,7 @@ export async function fillMissingAndAutoClose(): Promise<{
     .order("date", { ascending: true });
 
   if (!existingRows || existingRows.length === 0) {
-    return { filledCount: 0, closedCount: 0, hadOldUnclosed: false };
+    return { filledCount: 0, closedCount: 0, hadOldUnclosed: false, oldUnclosedRange: null };
   }
 
   // 기존 날짜 맵 (date → closed)
@@ -540,42 +541,60 @@ export async function fillMissingAndAutoClose(): Promise<{
     }
   }
 
-  // 7일 이상 된 미마감 날짜 존재 여부 확인
+  // 7일 이상 된 미마감 날짜 존재 여부 확인 (자동 마감 안 함 — 클라이언트에서 확인 후 처리)
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
   const cutoff7d = formatDate(sevenDaysAgo);
 
-  const hadOldUnclosed = [...existingMap.entries()].some(
-    ([date, closed]) => !closed && date < cutoff7d
-  );
+  const unclosedDates = [...existingMap.entries()]
+    .filter(([date, closed]) => !closed && date !== today)
+    .map(([date]) => date)
+    .sort();
 
+  const hadOldUnclosed = unclosedDates.some((date) => date < cutoff7d);
+  const oldUnclosedRange =
+    hadOldUnclosed && unclosedDates.length > 0
+      ? { from: unclosedDates[0], to: unclosedDates[unclosedDates.length - 1] }
+      : null;
+
+  // 기본: 30일 초과 미마감만 조용히 마감 (7일 초과분은 클라이언트 확인 후 별도 처리)
   let closedCount = 0;
-  if (hadOldUnclosed) {
-    // 오늘 제외 미마감 전체 마감
-    const { data, error } = await supabase
-      .from("daily_logs")
-      .update({ closed: true })
-      .eq("user_id", user.id)
-      .eq("closed", false)
-      .neq("date", today)
-      .select("date");
-    if (!error && data) closedCount = data.length;
-  } else {
-    // 기본: 30일 초과 미마감만 마감
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const cutoff30d = formatDate(thirtyDaysAgo);
-    const { data, error } = await supabase
-      .from("daily_logs")
-      .update({ closed: true })
-      .eq("user_id", user.id)
-      .eq("closed", false)
-      .lt("date", cutoff30d)
-      .select("date");
-    if (!error && data) closedCount = data.length;
-  }
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const cutoff30d = formatDate(thirtyDaysAgo);
+  const { data: closedData, error: closeErr } = await supabase
+    .from("daily_logs")
+    .update({ closed: true })
+    .eq("user_id", user.id)
+    .eq("closed", false)
+    .lt("date", cutoff30d)
+    .select("date");
+  if (!closeErr && closedData) closedCount = closedData.length;
 
-  return { filledCount, closedCount, hadOldUnclosed };
+  return { filledCount, closedCount, hadOldUnclosed, oldUnclosedRange };
+}
+
+/**
+ * 사용자가 확인한 후 오늘 제외 미마감 로그를 전체 마감.
+ */
+export async function closeAllUnclosedExceptToday(): Promise<number> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return 0;
+
+  const today = formatDate(new Date());
+  const { data, error } = await supabase
+    .from("daily_logs")
+    .update({ closed: true })
+    .eq("user_id", user.id)
+    .eq("closed", false)
+    .neq("date", today)
+    .select("date");
+
+  if (error || !data) return 0;
+  return data.length;
 }
 
 /**

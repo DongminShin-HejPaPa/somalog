@@ -12,6 +12,7 @@ import {
   actionReopenDailyLog,
   actionGetRecentDailyLogs,
   actionAutoCloseOldLogs,
+  actionCloseAllUnclosedExceptToday,
   actionGetFirstUnclosedLog,
   actionClearDailyLogField,
 } from "@/app/actions/log-actions";
@@ -23,6 +24,12 @@ import { FeedbackArea } from "./feedback-area";
 import { FreeTextInput } from "./free-text-input";
 import type { DailyLog, DailyLogUpdate, ClearableField } from "@/lib/types";
 import { logStore } from "@/lib/stores/log-store";
+
+function fmtShort(dateStr: string): string {
+  // "2026-04-01" → "4/1"
+  const [, m, d] = dateStr.split("-");
+  return `${parseInt(m)}/${parseInt(d)}`;
+}
 
 function addDays(dateStr: string, n: number): string {
   const d = new Date(dateStr + "T00:00:00");
@@ -41,6 +48,7 @@ export function InputContainer({ userId }: { userId: string | null }) {
   const [allLogs, setAllLogs] = useState<DailyLog[]>([]);
   const [minDate, setMinDate] = useState<string | null>(null);
   const [autoCloseToast, setAutoCloseToast] = useState<string | null>(null);
+  const [pendingOldClose, setPendingOldClose] = useState<{ from: string; to: string } | null>(null);
 
   // currentDate 기준 이전 최신 체중 (날짜 이동 시마다 자동 재계산)
   const prevWeight = useMemo(() => {
@@ -93,20 +101,20 @@ export function InputContainer({ userId }: { userId: string | null }) {
     const init = async () => {
       logStore.invalidateIfUserChanged(userId);
       actionAutoCloseOldLogs().then(async (result) => {
+        // 7일 이상 미마감 → 사용자에게 확인 요청 (자동 마감 안 함)
+        if (result.hadOldUnclosed && result.oldUnclosedRange) {
+          setPendingOldClose(result.oldUnclosedRange);
+        }
+        // 30일 초과 자동 마감 또는 누락 날짜 채움이 발생한 경우
         const total = result.filledCount + result.closedCount;
-        if (total > 0 || result.hadOldUnclosed) {
-          const msg = result.hadOldUnclosed
-            ? `일주일 넘게 마감하지 않은 날짜 ${total}일을 빈 채로 자동 마감했어요`
-            : `한 달 넘게 지난 미마감 날짜 ${result.closedCount}일을 자동 마감했어요`;
-          setAutoCloseToast(msg);
-          setTimeout(() => setAutoCloseToast(null), 5000);
-          // 조용히 최신 데이터로 다시 덮어씌움 (화면 불일치 방지)
+        if (total > 0) {
+          if (!result.hadOldUnclosed) {
+            setAutoCloseToast(`한 달 넘게 지난 미마감 날짜 ${result.closedCount}일을 자동 마감했어요`);
+            setTimeout(() => setAutoCloseToast(null), 5000);
+          }
           const updatedLogs = await actionGetRecentDailyLogs(30);
           logStore.setRecentLogs(updatedLogs);
           setAllLogs(updatedLogs);
-          
-          // 방금 강제 마감된 날짜를 유저가 띄워놓고 보고 있을 수 있으므로, 
-          // 새롭게 갱신된 내역 기준으로 "다음번 미마감 날짜"로 자동 이동시킴
           const newFirstUnclosed = logStore.getFirstUnclosedLog();
           const newTargetDate = newFirstUnclosed?.date ?? formatDate(new Date());
           await loadLog(newTargetDate);
@@ -151,6 +159,21 @@ export function InputContainer({ userId }: { userId: string | null }) {
   const today = formatDate(new Date());
   const canGoPrev = !!minDate && currentDate > minDate;
   const canGoNext = currentDate < today;
+
+  const handleConfirmOldClose = async () => {
+    setPendingOldClose(null);
+    const count = await actionCloseAllUnclosedExceptToday();
+    if (count > 0) {
+      setAutoCloseToast(`미마감 날짜 ${count}일을 빈 채로 마감했어요`);
+      setTimeout(() => setAutoCloseToast(null), 5000);
+      const updatedLogs = await actionGetRecentDailyLogs(30);
+      logStore.setRecentLogs(updatedLogs);
+      setAllLogs(updatedLogs);
+      const newFirstUnclosed = logStore.getFirstUnclosedLog();
+      const newTargetDate = newFirstUnclosed?.date ?? formatDate(new Date());
+      await loadLog(newTargetDate);
+    }
+  };
 
   const handlePrev = async () => {
     if (!canGoPrev) return;
@@ -369,6 +392,36 @@ export function InputContainer({ userId }: { userId: string | null }) {
               <path d="M8 5v3.5M8 11v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
             <span>{autoCloseToast}</span>
+          </div>
+        </div>
+      )}
+
+      {pendingOldClose && (
+        <div className="fixed top-16 inset-x-0 z-50 flex justify-center px-4">
+          <div className="bg-foreground text-background text-sm font-medium px-4 py-3 rounded-2xl shadow-xl flex flex-col gap-2 max-w-sm w-full">
+            <div className="flex items-start gap-2">
+              <svg className="w-4 h-4 shrink-0 mt-0.5" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.5"/>
+                <path d="M8 5v3.5M8 11v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+              <span>
+                {fmtShort(pendingOldClose.from)} ~ {fmtShort(pendingOldClose.to)} 사이 마감하지 않은 날짜가 있어요. 빈 채로 마감할까요?
+              </span>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setPendingOldClose(null)}
+                className="px-3 py-1 rounded-full text-xs bg-background/20 hover:bg-background/30 transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleConfirmOldClose}
+                className="px-3 py-1 rounded-full text-xs bg-background text-foreground hover:bg-background/90 transition-colors font-semibold"
+              >
+                마감하기
+              </button>
+            </div>
           </div>
         </div>
       )}

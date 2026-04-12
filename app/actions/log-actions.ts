@@ -12,6 +12,7 @@ import {
   getAllDailyLogs,
   regenerateDailySummary,
   fillMissingAndAutoClose,
+  closeAllUnclosedExceptToday,
   getFirstUnclosedLog,
   clearDailyLogField,
 } from "@/lib/services/daily-log-service";
@@ -91,8 +92,17 @@ export async function actionAutoCloseOldLogs(): Promise<{
   filledCount: number;
   closedCount: number;
   hadOldUnclosed: boolean;
+  oldUnclosedRange: { from: string; to: string } | null;
 }> {
   return fillMissingAndAutoClose();
+}
+
+export async function actionCloseAllUnclosedExceptToday(): Promise<number> {
+  const result = await closeAllUnclosedExceptToday();
+  revalidatePath("/home");
+  revalidatePath("/log");
+  revalidatePath("/graph");
+  return result;
 }
 
 export async function actionGetFirstUnclosedLog(): Promise<DailyLog | null> {

@@ -537,14 +537,14 @@ export async function fillMissingAndAutoClose(): Promise<{
       user_id: user.id,
       date,
       day: computeDay(date, settings.dietStartDate),
-      closed: true,
+      closed: false,
     }));
     const { error } = await supabase
       .from("daily_logs")
       .upsert(rows, { onConflict: "user_id,date" });
     if (!error) {
       filledCount = missingDates.length;
-      for (const date of missingDates) existingMap.set(date, true);
+      for (const date of missingDates) existingMap.set(date, false);
     }
   }
 

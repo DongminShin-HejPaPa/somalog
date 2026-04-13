@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { Send, Loader2 } from "lucide-react";
+import { useKeyboardOffset } from "@/lib/hooks/use-keyboard-offset";
 
 interface FreeTextInputProps {
   onSubmit: (text: string) => void;
@@ -11,24 +12,12 @@ interface FreeTextInputProps {
 
 export function FreeTextInput({ onSubmit, isSaving, isClosed }: FreeTextInputProps) {
   const [text, setText] = useState("");
-  const [bottomOffset, setBottomOffset] = useState(56); // bottom-14 = 56px (nav bar height)
   const inputRef = useRef<HTMLInputElement>(null);
+  const keyboardOffset = useKeyboardOffset();
 
-  // iOS 키보드가 열리면 visualViewport 크기가 줄어든다.
-  // window.innerHeight - visualViewport.height ≈ 키보드 높이
-  // 이 값을 bottom offset으로 사용해 입력창을 키보드 바로 위로 올린다.
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-
-    const updatePosition = () => {
-      const keyboardHeight = window.innerHeight - vv.height;
-      setBottomOffset(keyboardHeight > 100 ? keyboardHeight + 8 : 56);
-    };
-
-    vv.addEventListener("resize", updatePosition);
-    return () => vv.removeEventListener("resize", updatePosition);
-  }, []);
+  // 키보드가 닫혀 있으면 bottom-14(56px, 내비게이션 바 위)
+  // 키보드가 열리면 키보드 높이 + 8px 여백으로 올림
+  const bottomOffset = keyboardOffset > 0 ? keyboardOffset + 8 : 56;
 
   const handleSubmit = () => {
     const trimmed = text.trim();

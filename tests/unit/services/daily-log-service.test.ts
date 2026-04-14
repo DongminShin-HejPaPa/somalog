@@ -130,13 +130,25 @@ describe("getRecentDailyLogs", () => {
         getUser: vi.fn().mockResolvedValue({ data: { user: mockUser } }),
       },
       from: vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnThis(),
-          order: vi.fn().mockReturnValue({
-            limit: vi
-              .fn()
-              .mockResolvedValue({ data: [mockDailyLogRow], error: null }),
-          }),
+        select: vi.fn().mockImplementation((cols: string) => {
+          if (cols === "*") {
+            return {
+              eq: vi.fn().mockReturnThis(),
+              order: vi.fn().mockReturnValue({
+                limit: vi.fn().mockResolvedValue({ data: [mockDailyLogRow], error: null }),
+              }),
+            };
+          }
+          // "weight" — 최저 체중 쿼리
+          return {
+            eq: vi.fn().mockReturnThis(),
+            not: vi.fn().mockReturnThis(),
+            order: vi.fn().mockReturnValue({
+              limit: vi.fn().mockReturnValue({
+                maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+              }),
+            }),
+          };
         }),
       }),
     };

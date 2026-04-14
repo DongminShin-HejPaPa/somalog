@@ -209,21 +209,24 @@ export async function upsertDailyLog(
     );
   }
 
-  // 6. 피드백 생성 — 방금 입력한 항목을 중심으로 코칭
+  // 6. 피드백 생성 — 실제로 입력된 항목이 있을 때만 생성
   const changedKeys = (Object.keys(data) as (keyof typeof data)[]).filter(
     (k) => data[k] !== null && data[k] !== undefined
   );
-  const fieldPriority: (keyof typeof data)[] = [
-    "weight", "dinner", "lateSnack", "lunch", "breakfast", "exercise", "water", "note",
-  ];
-  const primaryKey = fieldPriority.find((k) => changedKeys.includes(k)) ?? changedKeys[0] ?? null;
-  const fieldLabels: Partial<Record<keyof typeof data, string>> = {
-    weight: "체중", water: "수분", exercise: "운동",
-    breakfast: "아침 식단", lunch: "점심 식단", dinner: "저녁 식단",
-    lateSnack: "야식", note: "메모",
-  };
-  const changedField = primaryKey ? (fieldLabels[primaryKey] ?? null) : null;
-  merged.feedback = await generateAiFeedback(merged, prevWeight, settings, changedField);
+  if (changedKeys.length > 0) {
+    const fieldPriority: (keyof typeof data)[] = [
+      "weight", "dinner", "lateSnack", "lunch", "breakfast", "exercise", "water", "note",
+    ];
+    const primaryKey = fieldPriority.find((k) => changedKeys.includes(k)) ?? changedKeys[0] ?? null;
+    const fieldLabels: Partial<Record<keyof typeof data, string>> = {
+      weight: "체중", water: "수분", exercise: "운동",
+      breakfast: "아침 식단", lunch: "점심 식단", dinner: "저녁 식단",
+      lateSnack: "야식", note: "메모",
+    };
+    const changedField = primaryKey ? (fieldLabels[primaryKey] ?? null) : null;
+    merged.feedback = await generateAiFeedback(merged, prevWeight, settings, changedField);
+  }
+  // changedKeys가 비어 있으면(빈 로그 생성 등) 기존 feedback 그대로 유지 (신규 로그는 null)
 
 
   // 6. DB upsert

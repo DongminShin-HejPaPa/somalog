@@ -47,6 +47,25 @@ export interface Settings {
   coachStyleExtra: string[];
   defaultTab: "input" | "home";
   onboardingComplete: boolean;
+  lastNoticeSeenAt: string | null; // ISO string — 마지막 공지 팝업 확인 시각
+}
+
+export interface Notice {
+  id: string;
+  title: string;
+  content: string;
+  author: string;
+  publishedAt: string; // ISO string
+  isImportant: boolean;
+}
+
+export interface NoticeComment {
+  id: string;
+  noticeId: string;
+  userId: string;
+  content: string;
+  createdAt: string; // ISO string
+  updatedAt: string;
 }
 
 export type DailyLogInput = Pick<
@@ -63,6 +82,6 @@ export type DailyLogInput = Pick<
 
 export type DailyLogUpdate = Partial<DailyLogInput>;
 
-export type SettingsInput = Omit<Settings, "onboardingComplete">;
+export type SettingsInput = Omit<Settings, "onboardingComplete" | "lastNoticeSeenAt">;
 
 export type SettingsUpdate = Partial<Settings>;

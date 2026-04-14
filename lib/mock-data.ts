@@ -28,6 +28,7 @@ export const mockSettings: Settings = {
   coachStyleExtra: [],
   defaultTab: "input",
   onboardingComplete: true,
+  lastNoticeSeenAt: null,
 };
 
 export const mockDailyLogs: DailyLog[] = [

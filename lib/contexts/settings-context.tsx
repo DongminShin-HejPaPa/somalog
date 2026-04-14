@@ -66,6 +66,7 @@ export const DEFAULT_SETTINGS: Settings = {
   coachStyleExtra: [],
   defaultTab: "input",
   onboardingComplete: false,
+  lastNoticeSeenAt: null,
 };
 
 interface SettingsContextValue {
@@ -146,7 +147,7 @@ export function SettingsProvider({
       setSettings(initialized);
       writeCachedSettings(initialized);
     } catch {
-      const fallback: Settings = { ...data, onboardingComplete: true };
+      const fallback: Settings = { ...data, onboardingComplete: true, lastNoticeSeenAt: null };
       setSettings(fallback);
       writeCachedSettings(fallback);
     }

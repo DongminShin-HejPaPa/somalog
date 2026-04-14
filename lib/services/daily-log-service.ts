@@ -187,12 +187,12 @@ export async function upsertDailyLog(
   );
   const prevWeight = prevLog?.weight ?? null;
 
-  // 5. weight가 있을 때 파생 필드 자동 계산
+  // 5. 파생 필드 계산
+  const lowestW = getLowestWeightFromLogs(logsWithMerged);
+
   if (merged.weight !== null) {
-    const lowestW = getLowestWeightFromLogs(logsWithMerged);
     merged.weightChange = computeWeightChange(merged.weight, settings.startWeight);
     merged.avgWeight3d = computeAvgWeight3d(date, logsWithMerged);
-
     if (settings.intensiveDayOn) {
       merged.intensiveDay = computeIntensiveDay(
         merged.weight,
@@ -200,6 +200,13 @@ export async function upsertDailyLog(
         lowestW
       );
     }
+  } else if (settings.intensiveDayOn && prevWeight !== null) {
+    // 오늘 체중 미입력 → 직전 체중 기준으로 intensiveDay 판정
+    merged.intensiveDay = computeIntensiveDay(
+      prevWeight,
+      settings.intensiveDayCriteria,
+      lowestW
+    );
   }
 
   // 6. 피드백 생성 — 방금 입력한 항목을 중심으로 코칭

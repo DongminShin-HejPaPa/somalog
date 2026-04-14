@@ -687,7 +687,42 @@ export async function getFirstUnclosedLog(): Promise<DailyLog | null> {
     .maybeSingle();
 
   if (error || !data) return null;
-  return rowToDailyLog(data as Record<string, unknown>);
+
+  const log = rowToDailyLog(data as Record<string, unknown>);
+
+  // 체중이 없는 날은 직전 체중 기준으로 intensiveDay 재계산 (getDailyLog와 동일 로직)
+  if (log.weight === null) {
+    const [settings, prevRow, lowestRow] = await Promise.all([
+      getSettings(),
+      supabase
+        .from("daily_logs")
+        .select("weight")
+        .eq("user_id", user.id)
+        .lt("date", log.date)
+        .not("weight", "is", null)
+        .order("date", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("daily_logs")
+        .select("weight")
+        .eq("user_id", user.id)
+        .not("weight", "is", null)
+        .order("weight", { ascending: true })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+
+    if (settings.intensiveDayOn) {
+      const prevWeight = (prevRow.data?.weight as number | null) ?? null;
+      const lowestWeight = (lowestRow.data?.weight as number | null) ?? Infinity;
+      log.intensiveDay = prevWeight !== null
+        ? computeIntensiveDay(prevWeight, settings.intensiveDayCriteria, lowestWeight)
+        : false;
+    }
+  }
+
+  return log;
 }
 
 export async function getDailyLogsWithOffset(count: number, offset: number): Promise<DailyLog[]> {

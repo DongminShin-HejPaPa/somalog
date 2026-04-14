@@ -24,6 +24,7 @@ export const mockSettings: Settings = {
   coachStyleExtra: [],
   defaultTab: "input",
   onboardingComplete: true,
+  lastNoticeSeenAt: null,
 };
 
 /** 테스트용 Settings DB row (snake_case) */

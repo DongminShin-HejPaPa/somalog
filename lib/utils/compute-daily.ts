@@ -71,3 +71,40 @@ export function getLowestWeightFromLogs(logs: DailyLog[]): number {
     .filter((w): w is number => w !== null);
   return weights.length > 0 ? Math.min(...weights) : Infinity;
 }
+
+/**
+ * 로그 배열 전체의 intensiveDay를 재계산·보정한다.
+ *
+ * - weight가 있는 날: 그 체중으로 판정
+ * - weight가 없는 날: 직전 체중(lastKnownWeight)으로 판정
+ * - 아직 체중 기록이 한 번도 없는 날: intensiveDay = false (판단 불가)
+ *
+ * DB에 이미 저장된 값이 stale 하거나 null 이더라도 읽기 시점에 항상 올바른 값을 반환.
+ */
+export function enrichIntensiveDay(
+  logs: DailyLog[],
+  criteria: string,
+  lowestWeight: number
+): DailyLog[] {
+  if (lowestWeight === Infinity) return logs; // 체중 기록 없음 → 변경 불필요
+
+  // 날짜 오름차순으로 순회해야 직전 체중을 올바르게 추적할 수 있음
+  const sorted = [...logs].sort((a, b) => a.date.localeCompare(b.date));
+  let lastKnownWeight: number | null = null;
+
+  const enriched = sorted.map((log) => {
+    if (log.weight !== null) lastKnownWeight = log.weight;
+    const effective = log.weight ?? lastKnownWeight;
+    if (effective === null) {
+      // 아직 체중이 한 번도 입력되지 않은 초기 날짜
+      return { ...log, intensiveDay: false };
+    }
+    return {
+      ...log,
+      intensiveDay: computeIntensiveDay(effective, criteria, lowestWeight),
+    };
+  });
+
+  // 원래 순서(내림차순)로 복원
+  return enriched.sort((a, b) => b.date.localeCompare(a.date));
+}

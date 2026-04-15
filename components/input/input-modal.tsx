@@ -210,19 +210,41 @@ export function InputModal({
                 </span>
                 <span className="text-xs text-muted-foreground">{sliderMax}kg</span>
               </div>
-              <input
-                type="range"
-                min={sliderMin}
-                max={sliderMax}
-                step={0.1}
-                value={sliderValue}
-                onChange={(e) =>
-                  setWeightValue(
-                    String(Math.round(Number(e.target.value) * 10) / 10)
-                  )
-                }
-                className="w-full h-2 rounded-full appearance-none cursor-pointer accent-navy bg-secondary"
-              />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = Math.round((sliderValue - 0.1) * 10) / 10;
+                    if (next >= sliderMin) setWeightValue(String(next));
+                  }}
+                  className="w-9 h-9 flex items-center justify-center rounded-lg bg-secondary border border-border text-foreground text-lg font-semibold shrink-0 hover:bg-border transition-colors"
+                >
+                  −
+                </button>
+                <input
+                  type="range"
+                  min={sliderMin}
+                  max={sliderMax}
+                  step={0.1}
+                  value={sliderValue}
+                  onChange={(e) =>
+                    setWeightValue(
+                      String(Math.round(Number(e.target.value) * 10) / 10)
+                    )
+                  }
+                  className="flex-1 h-2 rounded-full appearance-none cursor-pointer accent-navy bg-secondary"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = Math.round((sliderValue + 0.1) * 10) / 10;
+                    if (next <= sliderMax) setWeightValue(String(next));
+                  }}
+                  className="w-9 h-9 flex items-center justify-center rounded-lg bg-secondary border border-border text-foreground text-lg font-semibold shrink-0 hover:bg-border transition-colors"
+                >
+                  +
+                </button>
+              </div>
               {/* 이전 체중 대비 +- 표시 */}
               {prevWeight != null && (() => {
                 const current = parseFloat(weightValue);

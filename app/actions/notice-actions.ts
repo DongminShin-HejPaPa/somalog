@@ -34,9 +34,10 @@ export async function actionGetNoticeComments(
 
 export async function actionAddNoticeComment(
   noticeId: string,
+  name: string,
   content: string
 ): Promise<NoticeComment> {
-  return addNoticeComment(noticeId, content);
+  return addNoticeComment(noticeId, name, content);
 }
 
 export async function actionUpdateNoticeComment(

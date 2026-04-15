@@ -18,6 +18,7 @@ function rowToComment(row: Record<string, unknown>): NoticeComment {
     id: row.id as string,
     noticeId: row.notice_id as string,
     userId: row.user_id as string,
+    name: (row.name as string) ?? "",
     content: row.content as string,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
@@ -50,7 +51,7 @@ export async function getNotice(id: string): Promise<Notice | null> {
 }
 
 /**
- * 사용자가 아직 확인하지 않은 중요 공지사항 목록
+ * 사용자가 아직 확인하지 않은 중요 공지사항 목록 (최신순)
  * lastSeenAt 이후에 게시된 is_important=true 공지
  */
 export async function getUnseenImportantNotices(lastSeenAt: string | null): Promise<Notice[]> {
@@ -60,7 +61,7 @@ export async function getUnseenImportantNotices(lastSeenAt: string | null): Prom
     .from("notices")
     .select("*")
     .eq("is_important", true)
-    .order("published_at", { ascending: true });
+    .order("published_at", { ascending: false }); // 최신 공지 먼저
 
   if (lastSeenAt) {
     query = query.gt("published_at", lastSeenAt);
@@ -85,14 +86,14 @@ export async function getNoticeComments(noticeId: string): Promise<NoticeComment
 }
 
 /** 댓글 작성 */
-export async function addNoticeComment(noticeId: string, content: string): Promise<NoticeComment> {
+export async function addNoticeComment(noticeId: string, name: string, content: string): Promise<NoticeComment> {
   const user = await getAuthUser();
   if (!user) throw new Error("Unauthorized");
 
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("notice_comments")
-    .insert({ notice_id: noticeId, user_id: user.id, content })
+    .insert({ notice_id: noticeId, user_id: user.id, name, content })
     .select()
     .single();
 

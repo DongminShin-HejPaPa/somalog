@@ -47,12 +47,13 @@ const intensiveCriteria = [
 
 function Section({ title, children, highlight }: { title: string; children: React.ReactNode; highlight?: boolean }) {
   return (
-    <div className={cn(
-      "px-4 py-4 border-b border-border transition-colors duration-500",
-      highlight && "bg-navy/5 ring-2 ring-inset ring-navy/30"
-    )}>
-      <h3 className={cn("text-sm font-semibold mb-3", highlight && "text-navy")}>{title}</h3>
-      {children}
+    <div className="relative px-4 py-4 border-b border-border">
+      {/* 하이라이트 오버레이 — 콘텐츠는 선명하게 유지하면서 링/배경만 펄스 */}
+      {highlight && (
+        <div className="absolute inset-0 ring-2 ring-inset ring-navy bg-navy/10 animate-pulse pointer-events-none" />
+      )}
+      <h3 className={cn("relative text-sm font-semibold mb-3", highlight && "text-navy")}>{title}</h3>
+      <div className="relative">{children}</div>
     </div>
   );
 }

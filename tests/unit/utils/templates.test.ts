@@ -32,35 +32,35 @@ const baseDailyLog: DailyLog = {
 describe("generateFeedback", () => {
   const waterGoal = 2.5;
 
-  it("1. prevWeight 있고 체중 감소: '어제 대비 -1kg' 포함", () => {
+  it("1. prevWeight 있고 체중 감소: '전날 대비 -1kg' 포함", () => {
     const log: DailyLog = { ...baseDailyLog, weight: 80 };
     const result = generateFeedback(log, 81, 79, waterGoal);
-    expect(result).toContain("어제 대비 -1kg");
+    expect(result).toContain("전날 대비 -1kg");
   });
 
-  it("2. prevWeight 있고 체중 증가: '어제 대비 +0.5kg' 포함 (+ 부호 확인)", () => {
+  it("2. prevWeight 있고 체중 증가: '전날 대비 +0.5kg' 포함 (+ 부호 확인)", () => {
     const log: DailyLog = { ...baseDailyLog, weight: 80.5 };
     const result = generateFeedback(log, 80, 79, waterGoal);
-    expect(result).toContain("어제 대비 +0.5kg");
+    expect(result).toContain("전날 대비 +0.5kg");
   });
 
-  it("3. prevWeight=null → '체중 80kg.' 포함, '어제 대비' 미포함", () => {
+  it("3. prevWeight=null → '체중 80kg 기록 완료.' 포함, '전날 대비' 미포함", () => {
     const log: DailyLog = { ...baseDailyLog, weight: 80 };
     const result = generateFeedback(log, null, 79, waterGoal);
-    expect(result).toContain("체중 80kg.");
-    expect(result).not.toContain("어제 대비");
+    expect(result).toContain("체중 80kg 기록 완료.");
+    expect(result).not.toContain("전날 대비");
   });
 
-  it("4. weight > lowestWeight → '역대 최저(79kg)보다 1kg 높은 상태야.' 포함", () => {
+  it("4. weight > lowestWeight → 역대 최저 경고 문구 없음 (제거됨)", () => {
     const log: DailyLog = { ...baseDailyLog, weight: 80 };
     const result = generateFeedback(log, null, 79, waterGoal);
-    expect(result).toContain("역대 최저(79kg)보다 1kg 높은 상태야.");
+    expect(result).not.toContain("역대 최저(79kg)보다");
   });
 
-  it("5. weight <= lowestWeight → '역대 최저 기록이야!' 포함", () => {
+  it("5. weight <= lowestWeight → '역대 최저 기록 갱신!' 포함", () => {
     const log: DailyLog = { ...baseDailyLog, weight: 79 };
     const result = generateFeedback(log, null, 79, waterGoal);
-    expect(result).toContain("역대 최저 기록이야!");
+    expect(result).toContain("역대 최저 기록 갱신!");
   });
 
   it("6. lowestWeight=Infinity → 역대최저 관련 문구 없음", () => {
@@ -69,10 +69,10 @@ describe("generateFeedback", () => {
     expect(result).not.toContain("역대 최저");
   });
 
-  it("7. water=2.0, waterGoal=2.5 (목표 미달) → '수분은 목표의' 포함, 'L 남았어' 포함", () => {
+  it("7. water=2.0, waterGoal=2.5 (목표 미달) → '수분 80%' 포함, 'L 남았어' 포함", () => {
     const log: DailyLog = { ...baseDailyLog, water: 2.0 };
     const result = generateFeedback(log, null, Infinity, waterGoal);
-    expect(result).toContain("수분은 목표의");
+    expect(result).toContain("수분 80%");
     expect(result).toContain("L 남았어");
   });
 
@@ -88,16 +88,17 @@ describe("generateFeedback", () => {
     expect(result).not.toContain("수분");
   });
 
-  it("10. intensiveDay=true → '오늘 식단 관리가 핵심이야.' 포함", () => {
+  it("10. intensiveDay=true → 'Hard Reset Mode' 포함", () => {
     const log: DailyLog = { ...baseDailyLog, intensiveDay: true };
     const result = generateFeedback(log, null, Infinity, waterGoal);
-    expect(result).toContain("오늘 식단 관리가 핵심이야.");
+    expect(result).toContain("Hard Reset Mode");
   });
 
-  it("11. intensiveDay=false → '이 흐름 유지해.' 포함", () => {
-    const log: DailyLog = { ...baseDailyLog, intensiveDay: false };
+  it("11. intensiveDay=false, 입력 없음 → '이 흐름 이어가자' 포함", () => {
+    // 체중·수분·운동 모두 null이어야 parts가 비어서 else 분기 실행됨
+    const log: DailyLog = { ...baseDailyLog, weight: null, water: null, exercise: null, lateSnack: null, intensiveDay: false };
     const result = generateFeedback(log, null, Infinity, waterGoal);
-    expect(result).toContain("이 흐름 유지해.");
+    expect(result).toContain("이 흐름 이어가자");
   });
 });
 
@@ -107,16 +108,17 @@ describe("generateFeedback", () => {
 describe("generateDailySummary", () => {
   const waterGoal = 2.5;
 
-  it("12. weight=80, weightChange=-5 → '체중 80kg (시작 대비 -5kg)' 포함", () => {
+  it("12. weight=80, weightChange=-5 → '오늘 체중 80kg' 및 '빠졌어' 포함", () => {
     const log: DailyLog = { ...baseDailyLog, weight: 80, weightChange: -5 };
     const result = generateDailySummary(log, waterGoal);
-    expect(result).toContain("체중 80kg (시작 대비 -5kg)");
+    expect(result).toContain("오늘 체중 80kg");
+    expect(result).toContain("빠졌어");
   });
 
-  it("13. weight=80, weightChange=+2 → '시작 대비 +2kg' 포함 (+ 부호 확인)", () => {
+  it("13. weight=80, weightChange=+2 → '시작 대비 2kg 올랐어' 포함 (+ 부호 없음)", () => {
     const log: DailyLog = { ...baseDailyLog, weight: 80, weightChange: 2 };
     const result = generateDailySummary(log, waterGoal);
-    expect(result).toContain("시작 대비 +2kg");
+    expect(result).toContain("시작 대비 2kg 올랐어");
   });
 
   it("14. weight=80, weightChange=null → '시작 대비' 미포함", () => {
@@ -131,7 +133,7 @@ describe("generateDailySummary", () => {
     expect(result).not.toContain("체중");
   });
 
-  it("16. breakfast/lunch/dinner 모두 있음 → '아침: 오트밀, 점심: 샐러드, 저녁: 닭가슴살' 포함", () => {
+  it("16. breakfast/lunch/dinner 모두 있음 → '세 끼 다 챙겼네' 포함", () => {
     const log: DailyLog = {
       ...baseDailyLog,
       breakfast: "오트밀",
@@ -139,10 +141,10 @@ describe("generateDailySummary", () => {
       dinner: "닭가슴살",
     };
     const result = generateDailySummary(log, waterGoal);
-    expect(result).toContain("아침: 오트밀, 점심: 샐러드, 저녁: 닭가슴살");
+    expect(result).toContain("세 끼 다 챙겼네");
   });
 
-  it("17. breakfast만 있음 → '아침: 오트밀' 포함, '점심'/'저녁' 미포함", () => {
+  it("17. breakfast만 있음 → '세 끼' 미포함 (1끼는 특수 문구 없음)", () => {
     const log: DailyLog = {
       ...baseDailyLog,
       breakfast: "오트밀",
@@ -150,39 +152,38 @@ describe("generateDailySummary", () => {
       dinner: null,
     };
     const result = generateDailySummary(log, waterGoal);
-    expect(result).toContain("아침: 오트밀");
-    expect(result).not.toContain("점심");
-    expect(result).not.toContain("저녁");
+    expect(result).not.toContain("세 끼");
+    expect(result).not.toContain("기록이 없어");
   });
 
-  it("18. exercise='Y' → '운동 완료.' 포함", () => {
-    const log: DailyLog = { ...baseDailyLog, exercise: "Y" };
+  it("18. exercise='Y', lateSnack='N' → '운동하고 야식도 참았어' 포함", () => {
+    const log: DailyLog = { ...baseDailyLog, exercise: "Y", lateSnack: "N" };
     const result = generateDailySummary(log, waterGoal);
-    expect(result).toContain("운동 완료.");
+    expect(result).toContain("운동하고 야식도 참았어");
   });
 
-  it("19. exercise='N' → '운동 미수행.' 포함", () => {
-    const log: DailyLog = { ...baseDailyLog, exercise: "N" };
+  it("19. exercise='N', lateSnack='N' → '야식은 참았어' 포함", () => {
+    const log: DailyLog = { ...baseDailyLog, exercise: "N", lateSnack: "N" };
     const result = generateDailySummary(log, waterGoal);
-    expect(result).toContain("운동 미수행.");
+    expect(result).toContain("야식은 참았어");
   });
 
-  it("20. lateSnack='Y' → '야식 있음.' 포함", () => {
-    const log: DailyLog = { ...baseDailyLog, lateSnack: "Y" };
+  it("20. exercise='Y', lateSnack='Y' → '야식이 그 효과를 일부 상쇄했어' 포함", () => {
+    const log: DailyLog = { ...baseDailyLog, exercise: "Y", lateSnack: "Y" };
     const result = generateDailySummary(log, waterGoal);
-    expect(result).toContain("야식 있음.");
+    expect(result).toContain("야식이 그 효과를 일부 상쇄했어");
   });
 
-  it("21. intensiveDay=true → '체중 집중 관리가 필요한 날이었어' 포함", () => {
+  it("21. intensiveDay=true → 'Hard Reset Mode였어' 포함", () => {
     const log: DailyLog = { ...baseDailyLog, intensiveDay: true };
     const result = generateDailySummary(log, waterGoal);
-    expect(result).toContain("체중 집중 관리가 필요한 날이었어");
+    expect(result).toContain("Hard Reset Mode였어");
   });
 
-  it("22. intensiveDay=false → '내일도 꾸준히.' 포함", () => {
+  it("22. intensiveDay=false → '내일도 오늘처럼 꾸준하게.' 포함", () => {
     const log: DailyLog = { ...baseDailyLog, intensiveDay: false };
     const result = generateDailySummary(log, waterGoal);
-    expect(result).toContain("내일도 꾸준히.");
+    expect(result).toContain("내일도 오늘처럼 꾸준하게.");
   });
 });
 
@@ -190,7 +191,7 @@ describe("generateDailySummary", () => {
 // generateOneLiner
 // ─────────────────────────────────────────────
 describe("generateOneLiner", () => {
-  it("23. intensiveDay=true, exercise=Y, lateSnack=N → '집중 관리일에 운동까지' 포함 (1순위)", () => {
+  it("23. intensiveDay=true, exercise=Y, lateSnack=N → 'Hard Reset Mode에 운동까지' 포함 (1순위)", () => {
     const log: DailyLog = {
       ...baseDailyLog,
       intensiveDay: true,
@@ -198,17 +199,18 @@ describe("generateOneLiner", () => {
       lateSnack: "N",
     };
     const result = generateOneLiner(log);
-    expect(result).toContain("집중 관리일에 운동까지");
+    expect(result).toContain("Hard Reset Mode에 운동까지");
   });
 
-  it("24. intensiveDay=true, lateSnack=Y → '집중 관리일에 야식은 아쉬워' 포함 (2순위)", () => {
+  it("24. intensiveDay=true, lateSnack=Y → 'Hard Reset Mode인데 야식까지' 포함 (2순위)", () => {
     const log: DailyLog = {
       ...baseDailyLog,
       intensiveDay: true,
+      exercise: "N",
       lateSnack: "Y",
     };
     const result = generateOneLiner(log);
-    expect(result).toContain("집중 관리일에 야식은 아쉬워");
+    expect(result).toContain("Hard Reset Mode인데 야식까지");
   });
 
   it("25. exercise=Y, lateSnack=N → '운동하고 야식 안 먹은 하루' 포함 (3순위)", () => {

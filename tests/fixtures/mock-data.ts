@@ -23,6 +23,7 @@ export const mockSettings: Settings = {
   coachStylePreset: "strong",
   coachStyleExtra: [],
   onboardingComplete: true,
+  lastNoticeSeenAt: null,
 };
 
 /** 테스트용 Settings DB row (snake_case) */

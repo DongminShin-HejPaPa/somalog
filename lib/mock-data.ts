@@ -27,6 +27,7 @@ export const mockSettings: Settings = {
   coachStylePreset: "balanced",
   coachStyleExtra: [],
   onboardingComplete: true,
+  lastNoticeSeenAt: null,
 };
 
 export const mockDailyLogs: DailyLog[] = [

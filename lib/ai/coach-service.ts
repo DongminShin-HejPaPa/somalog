@@ -30,7 +30,7 @@ export async function generateAiFeedback(
     const abort = AbortSignal.timeout(5_000);
     const { text } = await generateText({
       model: openrouter(MODEL),
-      system: buildSystemPrompt(settings),
+      system: buildSystemPrompt(settings, log.intensiveDay ?? false),
       prompt: `오늘 입력 데이터:\n${buildContext(log, prevWeight, settings)}${fieldLine}\n\n${focusInstruction} 단순 수치 나열 금지. Hard Reset Mode는 맥락 정보 중 하나일 뿐, 논지의 재료가 되어야 해.`,
       maxOutputTokens: 150,
       temperature: 0.7,
@@ -60,7 +60,7 @@ export async function generateAiDailySummary(
     const abort = AbortSignal.timeout(10_000);
     const { text } = await generateText({
       model: openrouter(MODEL),
-      system: buildSystemPrompt(settings),
+      system: buildSystemPrompt(settings, log.intensiveDay ?? false),
       prompt: `오늘 하루 기록:\n${buildContext(log, prevWeight, settings)}\n\n오늘의 행동과 패턴을 분석하고, 전문가 노력으로 3~4문장 총평해.\n- 단순 데이터 나열 절대 금지\n- 잘한 점과 아쉬운 점을 행동 맥락에서 평가\n- 최근 선택들이 체중과 건강에 어떤 영향을 줄 것인지 짜임새 있게\n- 내일을 위한 한 마디 코치로 마무리\n- Hard Reset Mode가 있다면 하나의 맥락으로만 사용.`,
       maxOutputTokens: 250,
       temperature: 0.7,
@@ -89,7 +89,7 @@ export async function generateAiOneLiner(
     const abort = AbortSignal.timeout(5_000);
     const { text } = await generateText({
       model: openrouter(MODEL),
-      system: buildSystemPrompt(settings),
+      system: buildSystemPrompt(settings, log.intensiveDay ?? false),
       prompt: `오늘 하루 요약:\n${buildContext(log, null, settings)}\n\n20자 이내로 오늘을 한 줄 총평해. 문장 부호 제외, 핵심만.`,
       maxOutputTokens: 60,
       temperature: 0.8,
@@ -106,7 +106,7 @@ export async function generateAiOneLiner(
 // 내부 헬퍼
 // ──────────────────────────────────────────────
 
-export function buildSystemPrompt(settings: Settings): string {
+export function buildSystemPrompt(settings: Settings, intensiveDay?: boolean): string {
   const styleMap: Record<string, string> = {
     strong: "오늘 행동에 대해 직접적으로 평가하고, 아쉬운 점은 동기와 함께 감추지 않고 직백하게",
     balanced: "오늘 행동의 패턴과 그 의미를 짚어줌. 좋은 행동은 그 성과를 인정하고, 아쉬운 행동에는 '왜' 이유를 파악해 전략적 조언을 내놓음. 단순한 수치 나열이 아닌, 행동의 의미와 덧붙여지는 영향을 짜임 있게",
@@ -114,14 +114,16 @@ export function buildSystemPrompt(settings: Settings): string {
     data: "체중 추세와 행동 패턴을 데이터 관점에서 분석. 감정어 최소화, 추세와 취약점 융심 업무적 톤으로",
   };
 
-  return `너는 다이어트 코치 "${settings.coachName}"야.
-가장 중요한 것: 소의 효과는 "오늘 사용자가 한 행동"을 가장 먼저 짚는 것이야. 나머지 데이터는 모두 행동을 평가하는 재료야.
-코치 스타일: ${styleMap[settings.coachStylePreset] ?? "오늘 행동 중심으로"}.
-
-[Hard Reset Mode 배경]
+  const hardResetSection = intensiveDay
+    ? `\n[Hard Reset Mode 배경]
 - Hard Reset Mode는 코치인 네가 강제 발동하는 굴지 모드야. 사용자가 켠 게 아님. 체중이 역대 최저 대비 설정치 이상 높아졌을 때 발동.
 - Hard Reset Mode 일 때는 식단과 운동에 가장 주목하되, 여전히 "올곧 역대 최저로 돌아가는 것"이 한 파트 맥락일 뿐, Hard Reset Mode만이 전담 바직하면 안 됨.
-- 'Hard Reset Mode라니 각오가 대단한데?' 같은 문장 무조건 안 됨. 사용자가 스스로 탠 것이 아니니까.
+- 'Hard Reset Mode라니 각오가 대단한데?' 같은 문장 무조건 안 됨. 사용자가 스스로 탠 것이 아니니까.`
+    : "";
+
+  return `너는 다이어트 코치 "${settings.coachName}"야.
+가장 중요한 것: 소의 효과는 "오늘 사용자가 한 행동"을 가장 먼저 짚는 것이야. 나머지 데이터는 모두 행동을 평가하는 재료야.
+코치 스타일: ${styleMap[settings.coachStylePreset] ?? "오늘 행동 중심으로"}.${hardResetSection}
 
 규칙: 한국어로만, 존댓말 금지, 2~3문장 이내, 수치 언급 시 kg/L 단위 포함.`;
 }

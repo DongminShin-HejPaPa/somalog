@@ -28,8 +28,15 @@ export function NoticePopup({ lastNoticeSeenAt }: NoticePopupProps) {
 
   const handleClose = async () => {
     setDismissed(true);
-    // 확인 시각 업데이트 (fire-and-forget)
-    actionMarkNoticesSeen().catch(() => {});
+    // 팝업에 표시된 공지 중 가장 최신 published_at을 저장 (NOW() 대신)
+    // → 팝업 확인 후 새로 올라온 공지는 다음 새로고침 때 다시 표시됨
+    if (notices.length > 0) {
+      const maxPublishedAt = notices.reduce(
+        (max, n) => (n.publishedAt > max ? n.publishedAt : max),
+        notices[0].publishedAt
+      );
+      actionMarkNoticesSeen(maxPublishedAt).catch(() => {});
+    }
   };
 
   if (dismissed || notices.length === 0) return null;

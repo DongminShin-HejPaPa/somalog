@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useTransition, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/lib/contexts/settings-context";
@@ -254,6 +254,7 @@ export function SettingsForm() {
   });
   const router = useRouter();
   const searchParams = useSearchParams();
+  const customFieldNameRef = useRef<HTMLInputElement>(null);
 
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
 
@@ -269,7 +270,10 @@ export function SettingsForm() {
     if (searchParams.get("addCustomField") === "true") {
       setIsAddingCustomField(true);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
+  useEffect(() => {
     if (isLoaded) {
       setForm(settings);
       // 저장된 값이 프리셋이 아닌 경우 커스텀 값으로 복원
@@ -280,6 +284,16 @@ export function SettingsForm() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoaded]);
+
+  // 맞춤 입력 추가 폼이 열리면 이름 필드로 포커스 + 스크롤
+  useEffect(() => {
+    if (!isAddingCustomField) return;
+    const id = setTimeout(() => {
+      customFieldNameRef.current?.focus();
+      customFieldNameRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 50);
+    return () => clearTimeout(id);
+  }, [isAddingCustomField]);
 
   const handleChange = <K extends keyof Settings>(key: K, value: Settings[K]) => {
     setForm((prev) => {
@@ -783,6 +797,7 @@ export function SettingsForm() {
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">이름</label>
               <input
+                ref={customFieldNameRef}
                 type="text"
                 placeholder="예: 간식, 스트레스 지수, 수면"
                 value={customFieldDraft.name}

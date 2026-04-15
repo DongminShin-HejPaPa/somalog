@@ -17,6 +17,7 @@ function formatDateTime(iso: string): string {
 
 export function NoticeDetailClient({ noticeId }: { noticeId: string }) {
   const [comments, setComments] = useState<NoticeComment[]>([]);
+  const [name, setName] = useState("");
   const [newComment, setNewComment] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -34,13 +35,15 @@ export function NoticeDetailClient({ noticeId }: { noticeId: string }) {
   }, [noticeId]);
 
   const handleSubmit = () => {
-    const trimmed = newComment.trim();
-    if (!trimmed || isPending) return;
+    const trimmedName = name.trim();
+    const trimmedContent = newComment.trim();
+    if (!trimmedName || !trimmedContent || isPending) return;
 
     startTransition(async () => {
-      const comment = await actionAddNoticeComment(noticeId, trimmed);
+      const comment = await actionAddNoticeComment(noticeId, trimmedName, trimmedContent);
       setComments((prev) => [...prev, comment]);
       setNewComment("");
+      // 이름은 유지 (다음 댓글에도 동일한 이름 사용)
     });
   };
 
@@ -53,7 +56,9 @@ export function NoticeDetailClient({ noticeId }: { noticeId: string }) {
 
   return (
     <section className="px-4 py-4">
-      <h3 className="text-sm font-semibold mb-3">댓글 {comments.length > 0 ? `(${comments.length})` : ""}</h3>
+      <h3 className="text-sm font-semibold mb-3">
+        댓글 {comments.length > 0 ? `(${comments.length})` : ""}
+      </h3>
 
       {/* 댓글 목록 */}
       {comments.length === 0 ? (
@@ -63,7 +68,10 @@ export function NoticeDetailClient({ noticeId }: { noticeId: string }) {
           {comments.map((c) => (
             <li key={c.id} className="bg-secondary/60 rounded-xl px-3 py-2.5">
               <div className="flex items-start justify-between gap-2">
-                <p className="text-sm leading-relaxed flex-1">{c.content}</p>
+                <div className="flex-1">
+                  <span className="text-xs font-semibold text-navy">{c.name || "익명"}</span>
+                  <p className="text-sm leading-relaxed mt-0.5">{c.content}</p>
+                </div>
                 {userId === c.userId && (
                   <button
                     onClick={() => handleDelete(c.id)}
@@ -85,27 +93,36 @@ export function NoticeDetailClient({ noticeId }: { noticeId: string }) {
 
       {/* 댓글 입력 */}
       {userId ? (
-        <div className="flex gap-2 items-end">
-          <textarea
-            value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleSubmit();
-              }
-            }}
-            placeholder="댓글을 입력하세요..."
-            rows={2}
-            className="flex-1 text-sm px-3 py-2 border border-border rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-navy/20"
+        <div className="space-y-2">
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="이름"
+            className="w-full text-sm px-3 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20"
           />
-          <button
-            onClick={handleSubmit}
-            disabled={!newComment.trim() || isPending}
-            className="px-4 py-2 rounded-xl bg-navy text-white text-sm font-medium disabled:opacity-40 transition-opacity shrink-0"
-          >
-            등록
-          </button>
+          <div className="flex gap-2 items-end">
+            <textarea
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSubmit();
+                }
+              }}
+              placeholder="댓글을 입력하세요..."
+              rows={2}
+              className="flex-1 text-sm px-3 py-2 border border-border rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-navy/20"
+            />
+            <button
+              onClick={handleSubmit}
+              disabled={!name.trim() || !newComment.trim() || isPending}
+              className="px-4 py-2 rounded-xl bg-navy text-white text-sm font-medium disabled:opacity-40 transition-opacity shrink-0"
+            >
+              등록
+            </button>
+          </div>
         </div>
       ) : (
         <p className="text-xs text-muted-foreground">댓글을 작성하려면 로그인이 필요합니다.</p>

@@ -62,6 +62,7 @@ export interface NoticeComment {
   id: string;
   noticeId: string;
   userId: string;
+  name: string;
   content: string;
   createdAt: string; // ISO string
   updatedAt: string;

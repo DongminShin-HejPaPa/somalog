@@ -134,14 +134,14 @@ export async function deleteNoticeComment(commentId: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
-/** 공지 팝업 확인 시각 업데이트 */
-export async function markNoticesSeen(): Promise<void> {
+/** 공지 팝업 확인 시각 업데이트 — seenAt: 팝업에 표시된 공지 중 최신 published_at */
+export async function markNoticesSeen(seenAt: string): Promise<void> {
   const user = await getAuthUser();
   if (!user) return;
 
   const supabase = await createClient();
   await supabase
     .from("settings")
-    .update({ last_notice_seen_at: new Date().toISOString() })
+    .update({ last_notice_seen_at: seenAt })
     .eq("user_id", user.id);
 }

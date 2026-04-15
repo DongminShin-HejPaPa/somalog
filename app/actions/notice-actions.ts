@@ -53,6 +53,6 @@ export async function actionDeleteNoticeComment(
   return deleteNoticeComment(commentId);
 }
 
-export async function actionMarkNoticesSeen(): Promise<void> {
-  return markNoticesSeen();
+export async function actionMarkNoticesSeen(seenAt: string): Promise<void> {
+  return markNoticesSeen(seenAt);
 }

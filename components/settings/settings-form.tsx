@@ -307,7 +307,7 @@ export function SettingsForm() {
     if (!isFromDirectLink) return;
 
     let count = 0;
-    const totalBlinks = 7; // 약 2.5초 (350ms × 7 = 2450ms)
+    const totalBlinks = 4; // 약 2.8초 (700ms × 4 = 2800ms)
     setBlinkOn(true);
 
     const interval = setInterval(() => {
@@ -318,7 +318,7 @@ export function SettingsForm() {
         setBlinkOn(false);
         setIsFromDirectLink(false);
       }
-    }, 350);
+    }, 700);
 
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps

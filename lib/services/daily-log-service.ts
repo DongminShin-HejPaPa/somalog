@@ -35,6 +35,7 @@ function rowToDailyLog(row: Record<string, unknown>): DailyLog {
     lunch: (row.lunch as string | null) ?? null,
     dinner: (row.dinner as string | null) ?? null,
     lateSnack: (row.late_snack as "Y" | "N" | null) ?? null,
+    customFieldValue: (row.custom_field_value as string | null) ?? null,
     note: (row.note as string | null) ?? null,
     closed: (row.closed as boolean) ?? false,
     intensiveDay: (row.intensive_day as boolean | null) ?? null,
@@ -61,6 +62,7 @@ function dailyLogToRow(
   if (log.lunch !== undefined) row.lunch = log.lunch;
   if (log.dinner !== undefined) row.dinner = log.dinner;
   if (log.lateSnack !== undefined) row.late_snack = log.lateSnack;
+  if (log.customFieldValue !== undefined) row.custom_field_value = log.customFieldValue;
   if (log.note !== undefined) row.note = log.note;
   if (log.closed !== undefined) row.closed = log.closed;
   if (log.intensiveDay !== undefined) row.intensive_day = log.intensiveDay;
@@ -298,7 +300,7 @@ export async function upsertDailyLog(
 /** 특정 필드를 null로 초기화 (항목 개별 삭제) */
 export async function clearDailyLogField(
   date: string,
-  field: "weight" | "water" | "exercise" | "breakfast" | "lunch" | "dinner" | "lateSnack"
+  field: "weight" | "water" | "exercise" | "breakfast" | "lunch" | "dinner" | "lateSnack" | "customFieldValue"
 ): Promise<DailyLog | null> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -312,6 +314,7 @@ export async function clearDailyLogField(
     lunch: "lunch",
     dinner: "dinner",
     lateSnack: "late_snack",
+    customFieldValue: "custom_field_value",
   };
 
   const { data: upserted, error } = await supabase
@@ -805,4 +808,22 @@ export async function getAllDailyLogs(): Promise<DailyLog[]> {
   // getAllDailyLogs는 전체 로그를 갖고 있으므로 자체적으로 lowestWeight 계산 가능
   const lowestWeight = getLowestWeightFromLogs(logs);
   return enrichIntensiveDay(logs, settings.intensiveDayCriteria, lowestWeight);
+}
+
+/**
+ * 모든 daily_logs의 custom_field_value를 null로 초기화.
+ * 맞춤 입력 필드 삭제 시 호출.
+ */
+export async function clearAllCustomFieldValues(): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return;
+
+  await supabase
+    .from("daily_logs")
+    .update({ custom_field_value: null })
+    .eq("user_id", user.id);
 }

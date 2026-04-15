@@ -67,6 +67,7 @@ export const DEFAULT_SETTINGS: Settings = {
   intensiveDayCriteria: "역대최저",
   coachStylePreset: "strong",
   coachStyleExtra: [],
+  customField: null,
   onboardingComplete: false,
   lastNoticeSeenAt: null,
 };
@@ -153,7 +154,7 @@ export function SettingsProvider({
       setSettings(initialized);
       writeCachedSettings(initialized, uid);
     } catch {
-      const fallback: Settings = { ...data, onboardingComplete: true, lastNoticeSeenAt: null };
+      const fallback: Settings = { ...data, customField: null, onboardingComplete: true, lastNoticeSeenAt: null };
       setSettings(fallback);
       writeCachedSettings(fallback, uid);
     }

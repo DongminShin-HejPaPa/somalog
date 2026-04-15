@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { X, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useKeyboardOffset } from "@/lib/hooks/use-keyboard-offset";
-import type { DailyLog, DailyLogUpdate, ClearableField } from "@/lib/types";
+import type { DailyLog, DailyLogUpdate, ClearableField, CustomFieldDef } from "@/lib/types";
 
 export type ItemKey =
   | "weight"
@@ -13,20 +13,22 @@ export type ItemKey =
   | "breakfast"
   | "lunch"
   | "dinner"
-  | "lateSnack";
+  | "lateSnack"
+  | "customFieldValue";
 
 interface InputModalProps {
   field: ItemKey | null;
   log: DailyLog;
   waterGoal: number;
   prevWeight: number | null;
+  customFieldDef?: CustomFieldDef | null;
   isSaving?: boolean;
   onSave: (update: DailyLogUpdate) => void;
   onDelete: (field: ClearableField) => void;
   onClose: () => void;
 }
 
-const fieldLabels: Record<ItemKey, string> = {
+const fieldLabels: Record<Exclude<ItemKey, "customFieldValue">, string> = {
   weight: "체중",
   water: "수분",
   exercise: "운동",
@@ -85,6 +87,7 @@ export function InputModal({
   log,
   waterGoal,
   prevWeight,
+  customFieldDef,
   isSaving,
   onSave,
   onDelete,
@@ -110,6 +113,8 @@ export function InputModal({
       setTextValue(log.lunch ?? "");
     } else if (field === "dinner") {
       setTextValue(log.dinner ?? "");
+    } else if (field === "customFieldValue") {
+      setTextValue(log.customFieldValue ?? "");
     }
   }, [field, log]);
 
@@ -154,7 +159,9 @@ export function InputModal({
     onSave({ [field]: trimmed } as DailyLogUpdate);
   };
 
-  const label = fieldLabels[field];
+  const label = field === "customFieldValue"
+    ? (customFieldDef?.name ?? "맞춤 입력")
+    : fieldLabels[field as Exclude<ItemKey, "customFieldValue">];
 
   // 현재 값이 있는지 (삭제 버튼 노출 여부)
   const hasCurrentValue = ((): boolean => {
@@ -165,6 +172,7 @@ export function InputModal({
     if (field === "lunch") return log.lunch != null;
     if (field === "dinner") return log.dinner != null;
     if (field === "lateSnack") return log.lateSnack != null;
+    if (field === "customFieldValue") return log.customFieldValue != null;
     return false;
   })();
 
@@ -407,6 +415,65 @@ export function InputModal({
             </div>
             {hasCurrentValue && (
               <DeleteButton onClick={() => onDelete("lateSnack")} disabled={isSaving} />
+            )}
+          </div>
+        )}
+
+        {/* 맞춤 입력 — 선택형 */}
+        {field === "customFieldValue" && customFieldDef?.type === "select" && (
+          <div className="space-y-3">
+            <div className="flex flex-col gap-2">
+              {(customFieldDef.options ?? []).map((opt) => (
+                <button
+                  key={opt}
+                  onClick={() => onSave({ customFieldValue: opt })}
+                  className={cn(
+                    "w-full py-4 rounded-xl text-sm font-semibold min-h-[60px] transition-colors",
+                    log.customFieldValue === opt
+                      ? "bg-navy text-white"
+                      : "bg-secondary text-foreground border border-border"
+                  )}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+            {hasCurrentValue && (
+              <DeleteButton onClick={() => onDelete("customFieldValue")} disabled={isSaving} />
+            )}
+          </div>
+        )}
+
+        {/* 맞춤 입력 — 직접 입력형 */}
+        {field === "customFieldValue" && customFieldDef?.type === "text" && (
+          <div className="space-y-3">
+            <input
+              type="text"
+              placeholder={`${customFieldDef.name} 입력`}
+              value={textValue}
+              onChange={(e) => setTextValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const trimmed = textValue.trim();
+                  if (trimmed) onSave({ customFieldValue: trimmed });
+                  else if (hasCurrentValue) onDelete("customFieldValue");
+                  else onClose();
+                }
+              }}
+              autoFocus
+              className="w-full px-4 py-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[52px]"
+            />
+            <SaveButton
+              onClick={() => {
+                const trimmed = textValue.trim();
+                if (trimmed) onSave({ customFieldValue: trimmed });
+                else if (hasCurrentValue) onDelete("customFieldValue");
+                else onClose();
+              }}
+              isSaving={isSaving}
+            />
+            {hasCurrentValue && (
+              <DeleteButton onClick={() => onDelete("customFieldValue")} disabled={isSaving} />
             )}
           </div>
         )}

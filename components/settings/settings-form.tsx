@@ -45,10 +45,13 @@ const intensiveCriteria = [
   { value: "직접입력", label: "직접 기준 입력", desc: "" },
 ];
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children, highlight }: { title: string; children: React.ReactNode; highlight?: boolean }) {
   return (
-    <div className="px-4 py-4 border-b border-border">
-      <h3 className="text-sm font-semibold mb-3">{title}</h3>
+    <div className={cn(
+      "px-4 py-4 border-b border-border transition-colors duration-500",
+      highlight && "bg-navy/5 ring-2 ring-inset ring-navy/30"
+    )}>
+      <h3 className={cn("text-sm font-semibold mb-3", highlight && "text-navy")}>{title}</h3>
       {children}
     </div>
   );
@@ -247,6 +250,7 @@ export function SettingsForm() {
 
   // 맞춤 입력 설정 UI 상태
   const [isAddingCustomField, setIsAddingCustomField] = useState(false);
+  const [isHighlighting, setIsHighlighting] = useState(false);
   const [customFieldDraft, setCustomFieldDraft] = useState<CustomFieldDef>({
     name: "",
     type: "text",
@@ -269,6 +273,7 @@ export function SettingsForm() {
     // 홈 탭 "추가 가능" 칩에서 직접 진입 시 맞춤 입력 추가 UI 바로 열기
     if (searchParams.get("addCustomField") === "true") {
       setIsAddingCustomField(true);
+      setIsHighlighting(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
@@ -293,6 +298,13 @@ export function SettingsForm() {
     }, 50);
     return () => clearTimeout(id);
   }, [isAddingCustomField]);
+
+  // 하이라이트 2.5초 후 자동 해제
+  useEffect(() => {
+    if (!isHighlighting) return;
+    const id = setTimeout(() => setIsHighlighting(false), 2500);
+    return () => clearTimeout(id);
+  }, [isHighlighting]);
 
   const handleChange = <K extends keyof Settings>(key: K, value: Settings[K]) => {
     setForm((prev) => {
@@ -730,7 +742,7 @@ export function SettingsForm() {
       </Section>
 
       {/* 맞춤 입력 */}
-      <Section title="맞춤 입력">
+      <Section title="맞춤 입력" highlight={isHighlighting}>
         {form.customField ? (
           /* 이미 설정된 경우: 현재 설정 표시 + 삭제 버튼 */
           <div>

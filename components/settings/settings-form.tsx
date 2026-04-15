@@ -48,11 +48,10 @@ const intensiveCriteria = [
 function Section({ title, children, highlight }: { title: string; children: React.ReactNode; highlight?: boolean }) {
   return (
     <div className="relative px-4 py-4 border-b border-border">
-      {/* 하이라이트 오버레이 — 콘텐츠는 선명하게 유지하면서 링/배경만 펄스 */}
       {highlight && (
-        <div className="absolute inset-0 ring-2 ring-inset ring-navy bg-navy/10 animate-pulse pointer-events-none" />
+        <div className="absolute inset-0 ring-[3px] ring-inset ring-amber-400 bg-amber-50 pointer-events-none" />
       )}
-      <h3 className={cn("relative text-sm font-semibold mb-3", highlight && "text-navy")}>{title}</h3>
+      <h3 className={cn("relative text-sm font-semibold mb-3", highlight && "text-amber-700")}>{title}</h3>
       <div className="relative">{children}</div>
     </div>
   );
@@ -251,7 +250,8 @@ export function SettingsForm() {
 
   // 맞춤 입력 설정 UI 상태
   const [isAddingCustomField, setIsAddingCustomField] = useState(false);
-  const [isHighlighting, setIsHighlighting] = useState(false);
+  const [isFromDirectLink, setIsFromDirectLink] = useState(false);
+  const [blinkOn, setBlinkOn] = useState(false);
   const [customFieldDraft, setCustomFieldDraft] = useState<CustomFieldDef>({
     name: "",
     type: "text",
@@ -274,7 +274,8 @@ export function SettingsForm() {
     // 홈 탭 "추가 가능" 칩에서 직접 진입 시 맞춤 입력 추가 UI 바로 열기
     if (searchParams.get("addCustomField") === "true") {
       setIsAddingCustomField(true);
-      setIsHighlighting(true);
+      setIsFromDirectLink(true);
+      setBlinkOn(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
@@ -300,12 +301,28 @@ export function SettingsForm() {
     return () => clearTimeout(id);
   }, [isAddingCustomField]);
 
-  // 하이라이트 2.5초 후 자동 해제
+  // 350ms 간격으로 깜빡이다 2.5초 후 자동 종료
   useEffect(() => {
-    if (!isHighlighting) return;
-    const id = setTimeout(() => setIsHighlighting(false), 2500);
-    return () => clearTimeout(id);
-  }, [isHighlighting]);
+    if (!blinkOn && !isFromDirectLink) return;
+    if (!isFromDirectLink) return;
+
+    let count = 0;
+    const totalBlinks = 7; // 약 2.5초 (350ms × 7 = 2450ms)
+    setBlinkOn(true);
+
+    const interval = setInterval(() => {
+      count++;
+      setBlinkOn((v) => !v);
+      if (count >= totalBlinks * 2) {
+        clearInterval(interval);
+        setBlinkOn(false);
+        setIsFromDirectLink(false);
+      }
+    }, 350);
+
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFromDirectLink]);
 
   const handleChange = <K extends keyof Settings>(key: K, value: Settings[K]) => {
     setForm((prev) => {
@@ -743,7 +760,7 @@ export function SettingsForm() {
       </Section>
 
       {/* 맞춤 입력 */}
-      <Section title="맞춤 입력" highlight={isHighlighting}>
+      <Section title="맞춤 입력" highlight={blinkOn}>
         {form.customField ? (
           /* 이미 설정된 경우: 현재 설정 표시 + 삭제 버튼 */
           <div>
@@ -808,6 +825,16 @@ export function SettingsForm() {
           <div className="space-y-3">
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">이름</label>
+              {/* iOS: 직접 탭 이벤트에서만 키보드가 열림 — 항목 이름이 비어있을 때만 표시 */}
+              {isFromDirectLink && customFieldDraft.name === "" && (
+                <button
+                  type="button"
+                  onClick={() => customFieldNameRef.current?.focus()}
+                  className="w-full mb-1.5 py-2 rounded-xl bg-amber-400 text-amber-900 text-xs font-semibold text-center"
+                >
+                  여기를 탭하여 입력 시작 →
+                </button>
+              )}
               <input
                 ref={customFieldNameRef}
                 autoFocus

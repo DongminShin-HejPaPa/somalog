@@ -119,7 +119,7 @@ export function InputContainer({ userId }: { userId: string | null }) {
           const newTargetDate = newFirstUnclosed?.date ?? formatDate(new Date());
           await loadLog(newTargetDate);
         }
-      }).catch(() => {});
+      }).catch(() => { });
 
       // 2. 글로벌 캐시 유효성 확인
       const today = formatDate(new Date());
@@ -324,7 +324,7 @@ export function InputContainer({ userId }: { userId: string | null }) {
 
   const completedCount = currentLog
     ? (["weight", "water", "exercise", "breakfast", "lunch", "dinner", "lateSnack"] as ItemKey[])
-        .filter((k) => currentLog[k] != null).length
+      .filter((k) => currentLog[k] != null).length
     : 0;
 
   // 로그가 로드(또는 재오픈)될 때의 completedCount를 기준으로 저장
@@ -388,8 +388,8 @@ export function InputContainer({ userId }: { userId: string | null }) {
         <div className="fixed top-16 inset-x-0 flex justify-center z-50 pointer-events-none px-4">
           <div className="bg-foreground text-background text-sm font-medium px-4 py-2.5 rounded-full shadow-xl flex items-center gap-2 max-w-xs text-center">
             <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none">
-              <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.5"/>
-              <path d="M8 5v3.5M8 11v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M8 5v3.5M8 11v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
             <span>{autoCloseToast}</span>
           </div>
@@ -401,11 +401,11 @@ export function InputContainer({ userId }: { userId: string | null }) {
           <div className="bg-foreground text-background text-sm font-medium px-4 py-3 rounded-2xl shadow-xl flex flex-col gap-2 max-w-sm w-full">
             <div className="flex items-start gap-2">
               <svg className="w-4 h-4 shrink-0 mt-0.5" viewBox="0 0 16 16" fill="none">
-                <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.5"/>
-                <path d="M8 5v3.5M8 11v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M8 5v3.5M8 11v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
               <span>
-                {fmtShort(pendingOldClose.from)} ~ {fmtShort(pendingOldClose.to)} 사이 마감하지 않은 날짜가 있어요. 빈 채로 마감할까요?
+                오랜만에 접속 하셨네요! {fmtShort(pendingOldClose.from)} ~ {fmtShort(pendingOldClose.to)} 사이 마감하지 않은 날짜가 있어요. 빈 채로 마감할까요?
               </span>
             </div>
             <div className="flex gap-2 justify-end">
@@ -462,7 +462,7 @@ export function InputContainer({ userId }: { userId: string | null }) {
         <div className="fixed bottom-20 inset-x-0 flex justify-center z-50 pointer-events-none px-4">
           <div className="bg-navy text-white text-sm font-semibold px-5 py-2.5 rounded-full shadow-xl flex items-center gap-2">
             <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none">
-              <path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             <span>마감 완료 · {closeNavMessage}</span>
           </div>

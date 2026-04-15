@@ -58,7 +58,7 @@ function getStreakDays(recentLogs: DailyLog[]): number {
 /** 마지막으로 입력한 날로부터 며칠 지났는지 (오늘 입력 시 0, 어제 입력 시 1, 그저께 입력 시 2(어제 하루 쉼)) */
 function getDaysSinceLastInput(ctx: GreetingContext): number {
   if (ctx.recentLogs.length === 0) return 0;
-  
+
   // 한국 시간(KST) 기준 날짜 문자열 만들기
   const utcMs = ctx.now.getTime() + ctx.now.getTimezoneOffset() * 60_000;
   const kst = new Date(utcMs + 9 * 3_600_000);
@@ -114,7 +114,7 @@ const rules: GreetingRule[] = [
   {
     condition: (ctx) => getHour(ctx.now) >= 9 && getHour(ctx.now) < 12,
     messages: (ctx) => [
-      `${ctx.name}님, 오전이 가기 전에 체중 측정은 하셨나요? ☀️`,
+      `${ctx.name}님, 오전이 가고 있어요! 오늘의 의지 충전 하셨나요? ☀️`,
       `좋은 오전이에요, ${ctx.name}님! 오늘 하루도 잘 부탁드려요`,
       `${ctx.name}님, 오늘도 잘 해내실 거예요! 아자아자 💪`,
     ],

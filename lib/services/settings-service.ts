@@ -25,6 +25,7 @@ export function createDefaultSettings(): Settings {
     coachStylePreset: "strong",
     coachStyleExtra: [],
     onboardingComplete: false,
+    lastNoticeSeenAt: null,
   };
 }
 
@@ -57,6 +58,7 @@ function rowToSettings(row: Record<string, unknown>): Settings {
       "strong",
     coachStyleExtra: (row.coach_style_extra as string[]) ?? [],
     onboardingComplete: ((row.onboarding_complete as boolean) ?? false) || !!(row.diet_start_date as string),
+    lastNoticeSeenAt: (row.last_notice_seen_at as string | null) ?? null,
   };
 }
 
@@ -84,6 +86,8 @@ function settingsToRow(
     coach_style_extra: s.coachStyleExtra,
     onboarding_complete:
       "onboardingComplete" in s ? s.onboardingComplete : false,
+    last_notice_seen_at:
+      "lastNoticeSeenAt" in s ? s.lastNoticeSeenAt : undefined,
   };
 }
 
@@ -136,7 +140,7 @@ export async function initializeSettings(
   const user = await getAuthUser();
   if (!user) throw new Error("Unauthorized");
 
-  const full: Settings = { ...data, onboardingComplete: true };
+  const full: Settings = { ...data, onboardingComplete: true, lastNoticeSeenAt: null };
   const supabase = await createClient();
   const row = settingsToRow(full, user.id);
 

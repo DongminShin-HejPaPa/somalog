@@ -34,10 +34,10 @@ describe("buildSystemPrompt()", () => {
   });
 
   it.each([
-    ["strong", "팩트 위주"],
-    ["balanced", "균형"],
+    ["strong", "직접적으로"],
+    ["balanced", "행동의 패턴"],
     ["empathy", "공감"],
-    ["data", "수치"],
+    ["data", "데이터"],
   ] as const)("coachStylePreset '%s' → 스타일 설명 포함", (preset, keyword) => {
     const result = buildSystemPrompt({ ...mockSettings, coachStylePreset: preset });
     expect(result).toContain(keyword);

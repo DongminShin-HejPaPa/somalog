@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { useSettings } from "@/lib/contexts/settings-context";
 import type { Settings } from "@/lib/types";
 import Link from "next/link";
-import { LogOut, UserPen } from "lucide-react";
+import { LogOut, UserPen, ChevronRight } from "lucide-react";
 import { serverResetAllData, serverLoadDemoData } from "@/app/actions/data-actions";
 import { mockSettings } from "@/lib/mock-data-new";
 import { DIET_PRESETS, computePresetMonths } from "@/lib/utils/diet-presets";
@@ -342,6 +342,15 @@ export function SettingsForm() {
 
   return (
     <div>
+      {/* 공지사항 메뉴 */}
+      <Link
+        href="/settings/notices"
+        className="flex items-center justify-between px-4 py-4 border-b border-border hover:bg-secondary/50 active:bg-secondary transition-colors"
+      >
+        <span className="text-sm font-semibold">공지사항</span>
+        <ChevronRight className="w-4 h-4 text-muted-foreground" />
+      </Link>
+
       <Section title="코치 이름">
         <InputField
           label="이름"

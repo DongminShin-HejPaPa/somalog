@@ -92,6 +92,96 @@ function CustomDot({ cx, cy, payload }: CustomDotProps) {
   );
 }
 
+// ── LOESS (Locally Estimated Scatterplot Smoothing) ──────────────────────────
+// Span: 0.8, Degree: 2 (Quadratic)
+
+function tricube(u: number): number {
+  const a = Math.abs(u);
+  if (a >= 1) return 0;
+  const v = 1 - a * a * a;
+  return v * v * v;
+}
+
+function solveLinear3(A: number[][], b: number[]): number[] | null {
+  const M = A.map((row, i) => [...row, b[i]]);
+  for (let col = 0; col < 3; col++) {
+    let maxRow = col;
+    for (let row = col + 1; row < 3; row++) {
+      if (Math.abs(M[row][col]) > Math.abs(M[maxRow][col])) maxRow = row;
+    }
+    [M[col], M[maxRow]] = [M[maxRow], M[col]];
+    if (Math.abs(M[col][col]) < 1e-12) return null;
+    for (let row = col + 1; row < 3; row++) {
+      const f = M[row][col] / M[col][col];
+      for (let j = col; j <= 3; j++) M[row][j] -= f * M[col][j];
+    }
+  }
+  const x = [0, 0, 0];
+  for (let row = 2; row >= 0; row--) {
+    x[row] = M[row][3];
+    for (let c = row + 1; c < 3; c++) x[row] -= M[row][c] * x[c];
+    x[row] /= M[row][row];
+  }
+  return x;
+}
+
+/**
+ * LOESS 추세 곡선 계산
+ * xs, ys: 실제 데이터 (null 제외), evalXs: 추정할 x 좌표 목록
+ */
+function computeLoess(
+  xs: number[],
+  ys: number[],
+  evalXs: number[],
+  span = 0.8
+): (number | null)[] {
+  const n = xs.length;
+  if (n < 3) return evalXs.map(() => null);
+
+  const windowSize = Math.max(3, Math.round(span * n));
+
+  return evalXs.map((xi) => {
+    // 거리 기준 가장 가까운 windowSize개 선택
+    const dists = xs.map((x, i) => ({ i, d: Math.abs(x - xi) }));
+    dists.sort((a, b) => a.d - b.d);
+    const win = dists.slice(0, windowSize);
+    const h = win[win.length - 1].d || 1;
+
+    // tricube 가중치 + 중심/스케일 정규화
+    const pts = win.map(({ i, d }) => ({
+      x: xs[i],
+      y: ys[i],
+      w: tricube(d / h),
+    }));
+
+    const sumW = pts.reduce((s, p) => s + p.w, 0);
+    if (sumW === 0) return null;
+
+    const xBar = pts.reduce((s, p) => s + p.w * p.x, 0) / sumW;
+    const xScale = Math.max(...pts.map(p => Math.abs(p.x - xBar))) || 1;
+
+    // 가중 이차 회귀 행렬 구성
+    const A = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+    const bv = [0, 0, 0];
+    for (const { x, y, w } of pts) {
+      const t = (x - xBar) / xScale;
+      const basis = [1, t, t * t];
+      for (let r = 0; r < 3; r++) {
+        bv[r] += w * basis[r] * y;
+        for (let c = 0; c < 3; c++) A[r][c] += w * basis[r] * basis[c];
+      }
+    }
+
+    const beta = solveLinear3(A, bv);
+    if (!beta) return sumW > 0 ? pts.reduce((s, p) => s + p.w * p.y, 0) / sumW : null;
+
+    const t = (xi - xBar) / xScale;
+    return beta[0] + beta[1] * t + beta[2] * t * t;
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function WeightChart({
   logs,
   startWeight,
@@ -102,7 +192,6 @@ export function WeightChart({
   lowestWeightDate,
 }: WeightChartProps) {
   const [period, setPeriod] = useState<Period>("all");
-  const [show3dAvg, setShow3dAvg] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPortrait, setIsPortrait] = useState(false);
@@ -220,12 +309,25 @@ export function WeightChart({
       date: log.date.slice(5),
       fullDate: log.date,
       weight: log.weight,
-      avg3d: log.avgWeight3d,
       isLowest: log.date === lowestWeightDate,
       isSurge: surge,
       isMonday: new Date(log.date).getDay() === 1,
     };
   });
+
+  // LOESS 추세 곡선 계산
+  const validPts = chartData
+    .map((d, i) => ({ i, y: d.weight as number }))
+    .filter((p) => chartData[p.i].weight !== null);
+
+  const loessValues = validPts.length >= 3
+    ? computeLoess(
+        validPts.map((p) => p.i),
+        validPts.map((p) => p.y),
+        chartData.map((_, i) => i),
+        0.8
+      )
+    : chartData.map(() => null);
 
   const targetEndDate = new Date(startDate);
   targetEndDate.setMonth(targetEndDate.getMonth() + targetMonths);
@@ -247,7 +349,6 @@ export function WeightChart({
   const minW = Number((Math.min(...allWeights) - 0.5).toFixed(1));
   const maxW = Number((Math.max(...allWeights) + 0.5).toFixed(1));
 
-  // 카드 계산은 항상 전체 로그 기준 최신 체중 사용 (표시 기간과 무관)
   const allSortedWeights = sortedLogs
     .map((l) => l.weight)
     .filter((w): w is number => w !== null);
@@ -265,6 +366,15 @@ export function WeightChart({
   const estimatedDate = daysToGoal
     ? new Date(Date.now() + daysToGoal * 86400000)
     : null;
+
+  const finalChartData = chartData.map((d, i) => ({
+    ...d,
+    loessTrend:
+      loessValues[i] !== null
+        ? Math.round(loessValues[i]! * 10) / 10
+        : null,
+    goalWeight: goalLineData[i],
+  }));
 
   return (
     <div
@@ -284,7 +394,7 @@ export function WeightChart({
           <p className="text-sm text-muted-foreground mb-8 leading-relaxed">
             일부 모바일 환경에서는 자동 회전이 지원되지 않습니다.<br/>기기를 직접 돌리시면 꽉 찬 차트가 나타납니다.
           </p>
-          <button 
+          <button
             onClick={toggleFullscreen}
             className="px-6 py-2.5 bg-secondary text-foreground font-medium rounded-full"
           >
@@ -313,10 +423,11 @@ export function WeightChart({
         ))}
       </div>
 
-      <div 
+      {/* 범례 */}
+      <div
         className={cn(
-          isFullscreen 
-            ? "absolute top-6 right-20 z-20 flex flex-col gap-1.5 bg-secondary/40 p-3 rounded-xl backdrop-blur-md shadow-lg border border-border cursor-grab active:cursor-grabbing touch-none select-none max-w-[70%]" 
+          isFullscreen
+            ? "absolute top-6 right-20 z-20 flex flex-col gap-1.5 bg-secondary/40 p-3 rounded-xl backdrop-blur-md shadow-lg border border-border cursor-grab active:cursor-grabbing touch-none select-none max-w-[70%]"
             : "px-4 mb-2 space-y-1.5 flex-shrink-0"
         )}
         style={isFullscreen ? { transform: `translate(${legendPos.x}px, ${legendPos.y}px)` } : undefined}
@@ -335,14 +446,19 @@ export function WeightChart({
           <span className="flex items-center gap-1">
             <span className="w-4 h-0.5 bg-navy inline-block" /> 일별 체중
           </span>
-          <button
-            onClick={() => setShow3dAvg((v) => !v)}
-            className={cn("flex items-center gap-1 transition-opacity", !show3dAvg && "opacity-40", !isFullscreen && "pointer-events-auto")}
-          >
-            <span className="w-4 h-0.5 bg-gray-400 inline-block" /> 3일 이동평균
-          </button>
           <span className="flex items-center gap-1">
-            <span className="w-4 h-0.5 bg-green-300 inline-block" /> 목표 감량선
+            {/* 주황 점선 */}
+            <svg width="16" height="4" className="inline-block">
+              <line x1="0" y1="2" x2="16" y2="2" stroke="#f97316" strokeWidth="2" strokeDasharray="5 3" />
+            </svg>
+            <span>추세</span>
+          </span>
+          <span className="flex items-center gap-1">
+            {/* 연초록 점선 */}
+            <svg width="16" height="4" className="inline-block">
+              <line x1="0" y1="2" x2="16" y2="2" stroke="#86efac" strokeWidth="2" strokeDasharray="5 3" />
+            </svg>
+            목표 감량선
           </span>
           <span className="flex items-center gap-1">
             <span className="w-4 h-0.5 bg-green-600 inline-block" /> 목표 체중
@@ -351,7 +467,6 @@ export function WeightChart({
         {/* 점 마커 범례 */}
         <div className={cn("flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-muted-foreground", !isFullscreen && "pointer-events-auto")}>
           <span className="flex items-center gap-1.5">
-            {/* 별 = 역대 최저 */}
             <svg width="12" height="12" viewBox="0 0 12 12">
               <polygon
                 points="6,1 7.18,4.38 10.76,4.45 7.9,6.62 8.94,10.05 6,8 3.06,10.05 4.1,6.62 1.24,4.45 4.82,4.38"
@@ -361,7 +476,6 @@ export function WeightChart({
             역대 최저
           </span>
           <span className="flex items-center gap-1.5">
-            {/* 사각형 = 전일 대비 1kg↑ */}
             <svg width="12" height="12" viewBox="0 0 12 12">
               <rect x="2" y="2" width="8" height="8" fill="#1e3a5f" />
             </svg>
@@ -384,10 +498,7 @@ export function WeightChart({
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             margin={{ top: 10, right: 30, left: 0, bottom: 5 }}
-            data={chartData.map((d, i) => ({
-              ...d,
-              goalWeight: goalLineData[i],
-            }))}
+            data={finalChartData}
           >
             <CartesianGrid
               strokeDasharray="3 3"
@@ -417,7 +528,7 @@ export function WeightChart({
               formatter={(value: number, name: string) => {
                 const labels: Record<string, string> = {
                   weight: "체중",
-                  avg3d: "3일 평균",
+                  loessTrend: "추세",
                   goalWeight: "목표선",
                 };
                 return [`${value} kg`, labels[name] ?? name];
@@ -428,6 +539,7 @@ export function WeightChart({
               stroke="#16a34a"
               strokeWidth={1.5}
             />
+            {/* 목표 감량선 */}
             <Line
               type="linear"
               dataKey="goalWeight"
@@ -437,17 +549,17 @@ export function WeightChart({
               dot={false}
               connectNulls
             />
-            {show3dAvg && (
-              <Line
-                type="monotone"
-                dataKey="avg3d"
-                stroke="#9ca3af"
-                strokeWidth={1.5}
-                strokeDasharray="4 4"
-                dot={false}
-                connectNulls
-              />
-            )}
+            {/* 추세 곡선 */}
+            <Line
+              type="monotone"
+              dataKey="loessTrend"
+              stroke="#f97316"
+              strokeWidth={2}
+              strokeDasharray="6 3"
+              dot={false}
+              connectNulls
+            />
+            {/* 일별 체중 */}
             <Line
               type="monotone"
               dataKey="weight"

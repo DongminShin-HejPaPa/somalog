@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { SettingsForm } from "@/components/settings/settings-form";
 
 export default function SettingsPage() {
@@ -6,7 +7,9 @@ export default function SettingsPage() {
       <header className="px-4 pt-4 pb-2">
         <h1 className="text-lg font-bold">설정</h1>
       </header>
-      <SettingsForm />
+      <Suspense>
+        <SettingsForm />
+      </Suspense>
     </div>
   );
 }

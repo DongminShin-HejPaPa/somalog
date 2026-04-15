@@ -285,11 +285,10 @@ export function SettingsForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoaded]);
 
-  // 맞춤 입력 추가 폼이 열리면 이름 필드로 포커스 + 스크롤
+  // 맞춤 입력 추가 폼이 열리면 해당 영역으로 스크롤
   useEffect(() => {
     if (!isAddingCustomField) return;
     const id = setTimeout(() => {
-      customFieldNameRef.current?.focus();
       customFieldNameRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 50);
     return () => clearTimeout(id);
@@ -798,6 +797,7 @@ export function SettingsForm() {
               <label className="text-xs text-muted-foreground mb-1 block">이름</label>
               <input
                 ref={customFieldNameRef}
+                autoFocus
                 type="text"
                 placeholder="예: 간식, 스트레스 지수, 수면"
                 value={customFieldDraft.name}

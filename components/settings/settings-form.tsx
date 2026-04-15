@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/lib/contexts/settings-context";
 import type { Settings, CustomFieldDef } from "@/lib/types";
@@ -253,6 +253,7 @@ export function SettingsForm() {
     options: ["", "", ""],
   });
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
 
@@ -263,6 +264,11 @@ export function SettingsForm() {
         setLatestWeight(mostRecent.weight);
       }
     });
+
+    // 홈 탭 "추가 가능" 칩에서 직접 진입 시 맞춤 입력 추가 UI 바로 열기
+    if (searchParams.get("addCustomField") === "true") {
+      setIsAddingCustomField(true);
+    }
 
     if (isLoaded) {
       setForm(settings);

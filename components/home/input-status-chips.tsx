@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Check } from "lucide-react";
+import { Check, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { DailyLog, CustomFieldDef } from "@/lib/types";
 
@@ -83,6 +83,17 @@ export function InputStatusChips({ log, customFieldDef, onCloseToday, isClosingT
             </Link>
           );
         })}
+
+        {/* 맞춤 입력 미설정 시 고스트 슬롯 */}
+        {!customFieldDef && !isClosed && (
+          <Link
+            href="/settings?addCustomField=true"
+            className="flex flex-col items-center justify-center gap-0.5 px-2 py-2.5 rounded-lg min-h-[44px] border border-dashed border-border text-muted-foreground/50 hover:border-navy/40 hover:text-navy/50 transition-colors"
+          >
+            <Plus className="w-3 h-3" />
+            <span className="text-[10px] leading-tight">추가 가능</span>
+          </Link>
+        )}
       </div>
 
       <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">

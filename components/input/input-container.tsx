@@ -322,13 +322,18 @@ export function InputContainer({ userId }: { userId: string | null }) {
     }
   }, [searchParams, isLoading, currentLog]);
 
+  const BASE_FIELDS: ItemKey[] = ["weight", "water", "exercise", "breakfast", "lunch", "dinner", "lateSnack"];
+  const allFields: ItemKey[] = settings.customField
+    ? [...BASE_FIELDS, "customFieldValue"]
+    : BASE_FIELDS;
+  const totalCount = allFields.length;
+
   const completedCount = currentLog
-    ? (["weight", "water", "exercise", "breakfast", "lunch", "dinner", "lateSnack"] as ItemKey[])
-      .filter((k) => currentLog[k] != null).length
+    ? allFields.filter((k) => currentLog[k] != null).length
     : 0;
 
   // 로그가 로드(또는 재오픈)될 때의 completedCount를 기준으로 저장
-  // → 이미 7개가 채워진 상태로 열렸다면 자동 마감 비활성화
+  // → 이미 전체가 채워진 상태로 열렸다면 자동 마감 비활성화
   const loadTimeCountRef = useRef<number>(0);
   const autoCloseFiredRef = useRef(false);
   useEffect(() => {
@@ -337,10 +342,10 @@ export function InputContainer({ userId }: { userId: string | null }) {
     autoCloseFiredRef.current = false;
   }, [currentLog?.date, currentLog?.closed, isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 7개 항목 모두 입력 시 자동 마감 (로드 시점 기준값이 7 미만이었을 때만)
+  // 모든 항목 입력 시 자동 마감 (로드 시점 기준값이 전체 미만이었을 때만)
   useEffect(() => {
     if (!currentLog || currentLog.closed || isLoading) return;
-    if (completedCount === 7 && !autoCloseFiredRef.current && loadTimeCountRef.current < 7) {
+    if (completedCount === totalCount && !autoCloseFiredRef.current && loadTimeCountRef.current < totalCount) {
       autoCloseFiredRef.current = true;
       const timer = setTimeout(() => {
         handleClose();
@@ -379,7 +384,7 @@ export function InputContainer({ userId }: { userId: string | null }) {
     );
   }
 
-  const allCompleted = completedCount === 7;
+  const allCompleted = completedCount === totalCount;
   const day = getDayNumber(currentDate, settings.dietStartDate);
 
   return (
@@ -449,6 +454,7 @@ export function InputContainer({ userId }: { userId: string | null }) {
       <InputChipList
         log={currentLog}
         waterGoal={settings.waterGoal}
+        customFieldDef={settings.customField}
         onChipClick={handleChipClick}
         isClosed={currentLog.closed}
       />
@@ -517,6 +523,7 @@ export function InputContainer({ userId }: { userId: string | null }) {
         log={currentLog}
         waterGoal={settings.waterGoal}
         prevWeight={prevWeight ?? (settings.currentWeight > 0 ? settings.currentWeight : null)}
+        customFieldDef={settings.customField}
         isSaving={isSaving}
         onSave={handleModalSave}
         onDelete={handleDelete}

@@ -4,10 +4,11 @@ import { useState, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/lib/contexts/settings-context";
-import type { Settings } from "@/lib/types";
+import type { Settings, CustomFieldDef } from "@/lib/types";
 import Link from "next/link";
-import { LogOut, UserPen, ChevronRight } from "lucide-react";
+import { LogOut, UserPen, ChevronRight, Trash2 } from "lucide-react";
 import { serverResetAllData, serverLoadDemoData } from "@/app/actions/data-actions";
+import { actionDeleteCustomField } from "@/app/actions/settings-actions";
 import { mockSettings } from "@/lib/mock-data-new";
 import { DIET_PRESETS, computePresetMonths } from "@/lib/utils/diet-presets";
 import { logout } from "@/app/actions/auth-actions";
@@ -15,7 +16,7 @@ import { AccountInfoDialog } from "./account-info-dialog";
 import { actionGetRecentDailyLogs } from "@/app/actions/log-actions";
 import { computeRecommendedWater } from "@/lib/utils/compute-daily";
 
-type DialogState = "idle" | "confirm-reset" | "confirm-onboarding" | "confirm-demo";
+type DialogState = "idle" | "confirm-reset" | "confirm-onboarding" | "confirm-demo" | "confirm-delete-custom-field";
 
 const coachStyles = [
   { value: "strong", label: "팩트 위주 / 강한 코치", desc: "위로보다 수치와 사실로 강하게" },
@@ -243,6 +244,14 @@ export function SettingsForm() {
   const [isPending, startTransition] = useTransition();
   // 직접입력 기준 임시 입력값
   const [customCriteria, setCustomCriteria] = useState("");
+
+  // 맞춤 입력 설정 UI 상태
+  const [isAddingCustomField, setIsAddingCustomField] = useState(false);
+  const [customFieldDraft, setCustomFieldDraft] = useState<CustomFieldDef>({
+    name: "",
+    type: "text",
+    options: ["", "", ""],
+  });
   const router = useRouter();
 
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
@@ -305,6 +314,28 @@ export function SettingsForm() {
     updateSettings({ ...form });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleDeleteCustomFieldConfirm = () => {
+    startTransition(async () => {
+      const updated = await actionDeleteCustomField();
+      setForm((prev) => ({ ...prev, customField: updated.customField }));
+      setDialog("idle");
+    });
+  };
+
+  const handleSaveCustomField = () => {
+    const name = customFieldDraft.name.trim();
+    if (!name) return;
+    const def: CustomFieldDef = { name, type: customFieldDraft.type };
+    if (customFieldDraft.type === "select") {
+      const opts = (customFieldDraft.options ?? []).map((o) => o.trim()).filter(Boolean);
+      if (opts.length === 0) return;
+      def.options = opts.slice(0, 3);
+    }
+    setForm((prev) => ({ ...prev, customField: def }));
+    setIsAddingCustomField(false);
+    setSaved(false);
   };
 
   /** 데이터 초기화 확인 → 서버 + 클라이언트 모두 리셋 → 온보딩 재시작 여부 묻기 */
@@ -679,6 +710,163 @@ export function SettingsForm() {
         </p>
       </Section>
 
+      {/* 맞춤 입력 */}
+      <Section title="맞춤 입력">
+        {form.customField ? (
+          /* 이미 설정된 경우: 현재 설정 표시 + 삭제 버튼 */
+          <div>
+            <div className="p-3 bg-secondary rounded-xl mb-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm font-medium">{form.customField.name}</span>
+                <span className="text-xs text-muted-foreground px-2 py-0.5 bg-background rounded-full border border-border">
+                  {form.customField.type === "select" ? "선택형" : "직접 입력"}
+                </span>
+              </div>
+              {form.customField.type === "select" && form.customField.options && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {form.customField.options.map((opt, i) => (
+                    <span key={i} className="text-xs px-2 py-1 bg-background border border-border rounded-lg">
+                      {opt}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {dialog === "confirm-delete-custom-field" ? (
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                <p className="text-sm font-semibold text-amber-800 mb-1">
+                  맞춤 입력 항목을 삭제할까요?
+                </p>
+                <p className="text-xs text-amber-700 mb-1">
+                  기존에 입력했던 맞춤 입력 내용은 모두 삭제됩니다.
+                </p>
+                <p className="text-xs text-amber-700 mb-4">
+                  나머지 모든 입력은 문제 없이 보존됩니다!
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleDeleteCustomFieldConfirm}
+                    disabled={isPending}
+                    className="flex-1 py-2.5 rounded-lg bg-amber-600 text-white text-sm font-semibold min-h-[44px] disabled:opacity-50 transition-colors"
+                  >
+                    {isPending ? "삭제 중..." : "삭제할게요"}
+                  </button>
+                  <button
+                    onClick={() => setDialog("idle")}
+                    disabled={isPending}
+                    className="flex-1 py-2.5 rounded-lg border border-border text-sm font-medium min-h-[44px]"
+                  >
+                    취소
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setDialog("confirm-delete-custom-field")}
+                className="flex items-center gap-1.5 text-sm text-coral font-medium"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                맞춤 입력 삭제
+              </button>
+            )}
+          </div>
+        ) : isAddingCustomField ? (
+          /* 추가 폼 */
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">이름</label>
+              <input
+                type="text"
+                placeholder="예: 간식, 스트레스 지수, 수면"
+                value={customFieldDraft.name}
+                onChange={(e) => setCustomFieldDraft((d) => ({ ...d, name: e.target.value }))}
+                className="w-full px-3 py-2 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[44px]"
+                maxLength={20}
+              />
+            </div>
+
+            <div>
+              <label className="text-xs text-muted-foreground mb-1.5 block">입력 종류</label>
+              <div className="flex gap-2">
+                {(["text", "select"] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setCustomFieldDraft((d) => ({ ...d, type: t }))}
+                    className={cn(
+                      "flex-1 py-2.5 rounded-xl text-sm font-medium min-h-[44px] transition-colors border",
+                      customFieldDraft.type === t
+                        ? "bg-navy text-white border-navy"
+                        : "bg-secondary text-foreground border-border"
+                    )}
+                  >
+                    {t === "text" ? "직접 입력" : "선택형"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {customFieldDraft.type === "select" && (
+              <div>
+                <label className="text-xs text-muted-foreground mb-1.5 block">
+                  선택지 (최대 3개)
+                </label>
+                <div className="space-y-2">
+                  {[0, 1, 2].map((i) => (
+                    <input
+                      key={i}
+                      type="text"
+                      placeholder={`선택지 ${i + 1}${i === 0 ? " (필수)" : " (선택)"}`}
+                      value={customFieldDraft.options?.[i] ?? ""}
+                      onChange={(e) => {
+                        const opts = [...(customFieldDraft.options ?? ["", "", ""])];
+                        opts[i] = e.target.value;
+                        setCustomFieldDraft((d) => ({ ...d, options: opts }));
+                      }}
+                      className="w-full px-3 py-2 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[44px]"
+                      maxLength={20}
+                    />
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  예: 안 먹음, 조금 먹음, 많이 먹음
+                </p>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                onClick={handleSaveCustomField}
+                className="flex-1 py-2.5 rounded-xl bg-navy text-white text-sm font-semibold min-h-[44px]"
+              >
+                추가
+              </button>
+              <button
+                onClick={() => setIsAddingCustomField(false)}
+                className="flex-1 py-2.5 rounded-xl border border-border text-sm font-medium min-h-[44px]"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* 미설정 상태 */
+          <div>
+            <p className="text-xs text-muted-foreground mb-3">
+              체중·수분·운동·식단·야식 외에 매일 추적하고 싶은 항목을 1개 추가할 수 있어요.
+            </p>
+            <button
+              onClick={() => {
+                setCustomFieldDraft({ name: "", type: "text", options: ["", "", ""] });
+                setIsAddingCustomField(true);
+              }}
+              className="text-sm text-navy font-medium"
+            >
+              + 맞춤 입력 추가
+            </button>
+          </div>
+        )}
+      </Section>
 
       {/* 저장 버튼 */}
       <div className="px-4 py-4 border-b border-border">

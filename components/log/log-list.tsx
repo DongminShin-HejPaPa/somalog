@@ -222,6 +222,14 @@ export function LogList({
                             <span className="text-muted-foreground w-8 flex-shrink-0">저녁</span>
                             <span>{log.dinner ?? ""}</span>
                           </div>
+                          {settings.customField && log.customFieldValue != null && (
+                            <div className="flex gap-2">
+                              <span className="text-muted-foreground flex-shrink-0" style={{ width: "2rem" }}>
+                                {settings.customField.name.slice(0, 2)}
+                              </span>
+                              <span>{log.customFieldValue}</span>
+                            </div>
+                          )}
                         </div>
 
                         {log.closed && log.dailySummary && (

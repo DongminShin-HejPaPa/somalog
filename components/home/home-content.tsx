@@ -64,7 +64,7 @@ export function HomeContent({ todayLog, recentLogs, onCloseToday, isClosingToday
         isIntensiveDay={settings.intensiveDayOn && todayLog.intensiveDay === true}
       />
 
-      <InputStatusChips log={todayLog} onCloseToday={onCloseToday} isClosingToday={isClosingToday} />
+      <InputStatusChips log={todayLog} customFieldDef={settings.customField} onCloseToday={onCloseToday} isClosingToday={isClosingToday} />
 
       {(dailySummary || oneLiner) && (
         <CoachOneLiner

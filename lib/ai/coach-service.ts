@@ -152,6 +152,9 @@ export function buildContext(
   if (log.lateSnack) {
     lines.push(`야식: ${log.lateSnack === "Y" ? "먹음" : "안 먹음"}`);
   }
+  if (log.customFieldValue != null && settings.customField) {
+    lines.push(`${settings.customField.name}: ${log.customFieldValue}`);
+  }
   if (log.intensiveDay) lines.push(`오늘은 Hard Reset Mode`);
 
   return lines.join("\n");

@@ -3,15 +3,16 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { DailyLog } from "@/lib/types";
+import type { DailyLog, CustomFieldDef } from "@/lib/types";
 
 interface InputStatusChipsProps {
   log: DailyLog;
+  customFieldDef?: CustomFieldDef | null;
   onCloseToday?: () => void;
   isClosingToday?: boolean;
 }
 
-const items = [
+const BASE_ITEMS = [
   { key: "weight", label: "체중" },
   { key: "water", label: "수분" },
   { key: "exercise", label: "운동" },
@@ -21,9 +22,17 @@ const items = [
   { key: "lateSnack", label: "야식" },
 ] as const;
 
-export function InputStatusChips({ log, onCloseToday, isClosingToday }: InputStatusChipsProps) {
+type BaseKey = typeof BASE_ITEMS[number]["key"];
+
+export function InputStatusChips({ log, customFieldDef, onCloseToday, isClosingToday }: InputStatusChipsProps) {
+  const items: { key: string; label: string }[] = customFieldDef
+    ? [...BASE_ITEMS, { key: "customFieldValue", label: customFieldDef.name }]
+    : [...BASE_ITEMS];
+
+  const totalCount = items.length;
   const completedCount = items.filter(
-    (item) => log[item.key] !== null && log[item.key] !== undefined
+    (item) => log[item.key as BaseKey | "customFieldValue"] !== null &&
+              log[item.key as BaseKey | "customFieldValue"] !== undefined
   ).length;
 
   const isClosed = log.closed;
@@ -33,13 +42,13 @@ export function InputStatusChips({ log, onCloseToday, isClosingToday }: InputSta
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold text-sm">오늘 입력 현황</h3>
         <span className="text-xs text-muted-foreground">
-          {completedCount}/7 완료
+          {completedCount}/{totalCount} 완료
         </span>
       </div>
 
       <div className="grid grid-cols-4 gap-2 mb-3">
         {items.map((item) => {
-          const value = log[item.key];
+          const value = log[item.key as BaseKey | "customFieldValue"];
           const completed = value !== null && value !== undefined;
           // 마감된 날은 클릭 불가
           if (isClosed) {
@@ -79,7 +88,7 @@ export function InputStatusChips({ log, onCloseToday, isClosingToday }: InputSta
       <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
         <div
           className="h-full bg-navy rounded-full transition-all"
-          style={{ width: `${(completedCount / 7) * 100}%` }}
+          style={{ width: `${(completedCount / totalCount) * 100}%` }}
         />
       </div>
 

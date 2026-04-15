@@ -2,17 +2,18 @@
 
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { DailyLog } from "@/lib/types";
+import type { DailyLog, CustomFieldDef } from "@/lib/types";
 import type { ItemKey } from "./input-modal";
 
 interface InputChipListProps {
   log: DailyLog;
   waterGoal: number;
+  customFieldDef?: CustomFieldDef | null;
   onChipClick: (key: ItemKey) => void;
   isClosed: boolean;
 }
 
-const items: { key: ItemKey; label: string }[] = [
+const BASE_ITEMS: { key: ItemKey; label: string }[] = [
   { key: "weight", label: "체중" },
   { key: "water", label: "수분" },
   { key: "exercise", label: "운동" },
@@ -41,9 +42,15 @@ function formatValue(key: ItemKey, value: unknown, waterGoal: number): string {
 export function InputChipList({
   log,
   waterGoal,
+  customFieldDef,
   onChipClick,
   isClosed,
 }: InputChipListProps) {
+  const items: { key: ItemKey; label: string }[] = customFieldDef
+    ? [...BASE_ITEMS, { key: "customFieldValue", label: customFieldDef.name }]
+    : BASE_ITEMS;
+
+  const totalCount = items.length;
   const completedCount = items.filter(
     (item) => log[item.key] !== null && log[item.key] !== undefined
   ).length;
@@ -99,12 +106,12 @@ export function InputChipList({
       <div className="mt-4">
         <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
           <span>진행률</span>
-          <span>{completedCount}/7</span>
+          <span>{completedCount}/{totalCount}</span>
         </div>
         <div data-testid="progress-bar" className="w-full h-2 bg-secondary rounded-full overflow-hidden">
           <div
             className="h-full bg-navy rounded-full transition-all"
-            style={{ width: `${(completedCount / 7) * 100}%` }}
+            style={{ width: `${(completedCount / totalCount) * 100}%` }}
           />
         </div>
       </div>

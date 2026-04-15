@@ -25,6 +25,7 @@ export const mockSettings: Settings = {
   intensiveDayCriteria: "역대최저",
   coachStylePreset: "balanced",
   coachStyleExtra: [],
+  customField: null,
   onboardingComplete: true,
   lastNoticeSeenAt: null,
 };

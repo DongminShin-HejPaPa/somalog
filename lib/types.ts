@@ -1,3 +1,9 @@
+export interface CustomFieldDef {
+  name: string;                // 맞춤 입력 이름 (예: "간식")
+  type: "text" | "select";    // 입력 종류
+  options?: string[];          // 선택형일 경우 선택지 (최대 3개)
+}
+
 export interface DailyLog {
   date: string;
   day: number;
@@ -10,6 +16,7 @@ export interface DailyLog {
   lunch: string | null;
   dinner: string | null;
   lateSnack: "Y" | "N" | null;
+  customFieldValue?: string | null;
   note: string | null;
   closed: boolean;
   intensiveDay: boolean | null;
@@ -45,6 +52,7 @@ export interface Settings {
   intensiveDayCriteria: string;
   coachStylePreset: "strong" | "balanced" | "empathy" | "data";
   coachStyleExtra: string[];
+  customField: CustomFieldDef | null; // 맞춤 입력 필드 정의
   onboardingComplete: boolean;
   lastNoticeSeenAt: string | null; // ISO string — 마지막 공지 팝업 확인 시각
 }
@@ -78,13 +86,13 @@ export type DailyLogInput = Pick<
   | "dinner"
   | "lateSnack"
   | "note"
->;
+> & { customFieldValue?: string | null };
 
 export type DailyLogUpdate = Partial<DailyLogInput>;
 
 /** 개별 삭제 가능한 필드 */
-export type ClearableField = "weight" | "water" | "exercise" | "breakfast" | "lunch" | "dinner" | "lateSnack";
+export type ClearableField = "weight" | "water" | "exercise" | "breakfast" | "lunch" | "dinner" | "lateSnack" | "customFieldValue";
 
-export type SettingsInput = Omit<Settings, "onboardingComplete" | "lastNoticeSeenAt">;
+export type SettingsInput = Omit<Settings, "onboardingComplete" | "lastNoticeSeenAt" | "customField">;
 
 export type SettingsUpdate = Partial<Settings>;

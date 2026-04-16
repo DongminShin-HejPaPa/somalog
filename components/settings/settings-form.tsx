@@ -1031,18 +1031,19 @@ export function SettingsForm() {
         )}
 
         {dialog === "confirm-demo" && (
-          <div className="p-4 bg-secondary border border-border rounded-xl">
-            <p className="text-sm font-semibold mb-1 text-coral">⚠️ 기존 데이터가 모두 삭제됩니다</p>
-            <p className="text-xs text-muted-foreground mb-4">
-              현재 설정과 모든 기록이 삭제되고, 데모 데이터(3개월 97일 샘플)로 교체됩니다. 이 작업은 되돌릴 수 없어요.
+          <div className="p-4 bg-amber-50 border border-amber-300 rounded-xl">
+            <p className="text-sm font-semibold text-amber-800 mb-1">⚠️ 기존 데이터가 모두 삭제됩니다</p>
+            <p className="text-xs text-amber-700 mb-1">
+              현재 설정과 모든 기록이 삭제되고, 데모 데이터(3개월 97일 샘플)로 교체됩니다.
             </p>
+            <p className="text-xs font-semibold text-amber-800 mb-4">이 작업은 되돌릴 수 없어요.</p>
             <div className="flex gap-2">
               <button
                 onClick={handleDemoConfirm}
                 disabled={isPending}
-                className="flex-1 py-2.5 rounded-lg bg-navy text-white text-sm font-semibold min-h-[44px] disabled:opacity-50 transition-colors"
+                className="flex-1 py-2.5 rounded-lg bg-amber-600 text-white text-sm font-semibold min-h-[44px] disabled:opacity-50 transition-colors"
               >
-                {isPending ? "불러오는 중..." : "확인"}
+                {isPending ? "불러오는 중..." : "확인, 교체할게요"}
               </button>
               <button
                 onClick={() => setDialog("idle")}

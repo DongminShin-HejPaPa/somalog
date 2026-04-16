@@ -11,12 +11,12 @@ import { serverResetAllData, serverLoadDemoData } from "@/app/actions/data-actio
 import { actionDeleteCustomField } from "@/app/actions/settings-actions";
 import { mockSettings } from "@/lib/mock-data-new";
 import { DIET_PRESETS, computePresetMonths } from "@/lib/utils/diet-presets";
-import { logout } from "@/app/actions/auth-actions";
+import { logout, deleteAccount } from "@/app/actions/auth-actions";
 import { AccountInfoDialog } from "./account-info-dialog";
 import { actionGetRecentDailyLogs } from "@/app/actions/log-actions";
 import { computeRecommendedWater } from "@/lib/utils/compute-daily";
 
-type DialogState = "idle" | "confirm-reset" | "confirm-onboarding" | "confirm-demo" | "confirm-delete-custom-field";
+type DialogState = "idle" | "confirm-reset" | "confirm-onboarding" | "confirm-demo" | "confirm-delete-custom-field" | "confirm-delete-account" | "confirm-delete-account-final";
 
 const coachStyles = [
   { value: "strong", label: "팩트 위주 / 강한 코치", desc: "위로보다 수치와 사실로 강하게" },
@@ -1105,6 +1105,75 @@ export function SettingsForm() {
             </div>
           </div>
         )}
+
+        {/* 계정 삭제 */}
+        {dialog !== "confirm-delete-account" && dialog !== "confirm-delete-account-final" ? (
+          <button
+            type="button"
+            onClick={() => setDialog("confirm-delete-account")}
+            className="w-full py-3 rounded-xl text-sm font-medium min-h-[48px] text-red-500 border border-red-200 hover:bg-red-50 transition-colors"
+          >
+            계정 삭제
+          </button>
+        ) : dialog === "confirm-delete-account" ? (
+          <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+            <p className="text-sm font-semibold text-red-700 mb-1">정말로 계정을 삭제할까요?</p>
+            <p className="text-xs text-red-600 mb-4">
+              계정과 모든 기록(체중, 식단, 운동 등)이 <strong>영구 삭제</strong>되며 복구할 수 없습니다.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setDialog("confirm-delete-account-final")}
+                className="flex-1 py-2.5 rounded-lg bg-red-600 text-white text-sm font-semibold min-h-[44px] transition-colors"
+              >
+                삭제 진행
+              </button>
+              <button
+                onClick={() => setDialog("idle")}
+                className="flex-1 py-2.5 rounded-lg bg-secondary text-foreground text-sm font-medium min-h-[44px] border border-border transition-colors"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+            <p className="text-sm font-semibold text-red-700 mb-1">⚠️ 마지막 확인</p>
+            <p className="text-xs text-red-600 mb-4">
+              이 작업은 되돌릴 수 없습니다. 계정 삭제를 최종 확인합니다.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => startTransition(async () => {
+                  const result = await deleteAccount();
+                  if (result?.error) alert(result.error);
+                })}
+                disabled={isPending}
+                className="flex-1 py-2.5 rounded-lg bg-red-700 text-white text-sm font-semibold min-h-[44px] disabled:opacity-50 transition-colors"
+              >
+                {isPending ? "삭제 중..." : "완전 삭제"}
+              </button>
+              <button
+                onClick={() => setDialog("idle")}
+                disabled={isPending}
+                className="flex-1 py-2.5 rounded-lg bg-secondary text-foreground text-sm font-medium min-h-[44px] border border-border disabled:opacity-50 transition-colors"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 하단 링크 */}
+        <div className="flex justify-center gap-4 pt-2 pb-2">
+          <Link href="/terms" className="text-xs text-muted-foreground underline underline-offset-2">
+            이용약관
+          </Link>
+          <span className="text-xs text-muted-foreground">·</span>
+          <Link href="/privacy" className="text-xs text-muted-foreground underline underline-offset-2">
+            개인정보처리방침
+          </Link>
+        </div>
       </div>
 
       {/* 개인정보 변경 다이얼로그 */}

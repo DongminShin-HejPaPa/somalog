@@ -6,8 +6,8 @@ import { createClient } from "@/lib/supabase/server";
 function toKoreanError(msg: string): string {
   if (msg.includes("User already registered") || msg.includes("already been registered"))
     return "이미 가입된 이메일입니다.";
-  if (msg.includes("Password should be at least 6"))
-    return "비밀번호는 6자 이상이어야 합니다.";
+  if (msg.includes("Password should be at least"))
+    return "비밀번호는 8자 이상이어야 합니다.";
   if (msg.includes("invalid format") || msg.includes("invalid email") || msg.includes("Unable to validate email"))
     return "유효하지 않은 이메일 형식입니다.";
   if (msg.includes("Email rate limit") || msg.includes("rate limit"))
@@ -63,10 +63,5 @@ export async function signup(
     return { error: toKoreanError(error.message), fields: savedFields };
   }
 
-  redirect(
-    "/login?message=" +
-      encodeURIComponent("🎉 가입이 완료되었습니다. 로그인해주세요!") +
-      "&email=" +
-      encodeURIComponent(email)
-  );
+  redirect("/register/check-email?email=" + encodeURIComponent(email));
 }

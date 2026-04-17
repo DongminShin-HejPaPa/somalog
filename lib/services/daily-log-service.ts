@@ -6,8 +6,8 @@ import {
   computeWeightChange,
   computeAvgWeight3d,
   computeIntensiveDay,
-  getLowestWeightFromLogs,
   enrichIntensiveDay,
+  getLowestWeightFromLogs,
 } from "@/lib/utils/compute-daily";
 import {
   generateDailySummary,
@@ -219,39 +219,55 @@ export async function upsertDailyLog(
   merged.day = computeDay(date, settings.dietStartDate);
 
 
-  // 4. DB에서 전체 로그 가져와 파생 필드 계산 (항상 실행)
-  const { data: allRows } = await supabase
-    .from("daily_logs")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("date", { ascending: false });
+  // 4. DB에서 파생 필드 계산을 위한 최소 데이터만 조회 (100일 전체 스캔 방지)
+  const [
+    { data: recentRows },
+    { data: lowestRow }
+  ] = await Promise.all([
+    supabase
+      .from("daily_logs")
+      .select("date, weight")
+      .eq("user_id", user.id)
+      .lt("date", date)        // 현재 날짜보다 이전 기록만
+      .not("weight", "is", null)
+      .order("date", { ascending: false })
+      .limit(3),               // 3일치 평균을 위해 최근 3개만 조회
+    supabase
+      .from("daily_logs")
+      .select("weight")
+      .eq("user_id", user.id)
+      .neq("date", date)       // 현재 날짜 기록 제외 (새로 입력된 값과 비교)
+      .not("weight", "is", null)
+      .order("weight", { ascending: true })
+      .limit(1)
+      .maybeSingle()
+  ]);
 
-  const allLogs: DailyLog[] = allRows
-    ? allRows.map((r) => rowToDailyLog(r as Record<string, unknown>))
-    : [];
+  const recentDbLogs = (recentRows || []).map((r) => ({
+    date: r.date,
+    weight: r.weight,
+  } as DailyLog));
 
-  // 현재 upsert 대상 포함하여 계산 (기존 로그를 merged로 교체)
-  const logsWithMerged = allLogs.some((l) => l.date === date)
-    ? allLogs.map((l) => (l.date === date ? merged : l))
-    : [merged, ...allLogs];
+  // avgWeight3d 계산을 위해 현재 입력 로그(merged)와 최근 로그들을 합성
+  const subsetLogs = [merged, ...recentDbLogs];
 
-  // 오늘을 제외한 가장 최근 체중 기록 (피드백에 prevWeight로 전달)
-  const prevLog = logsWithMerged.find(
-    (l) => l.date < date && l.weight !== null
-  );
-  const prevWeight = prevLog?.weight ?? null;
+  // 직전 체중 기록 (피드백을 위해 필요)
+  const prevWeight = recentDbLogs.length > 0 ? recentDbLogs[0].weight : null;
 
   // 5. 파생 필드 계산
-  const lowestW = getLowestWeightFromLogs(logsWithMerged);
+  const dbLowestW = (lowestRow?.weight as number | null) ?? Infinity;
+  const currentW = merged.weight ?? Infinity;
+  let lowestW: number | null = Math.min(dbLowestW, currentW);
+  if (lowestW === Infinity) lowestW = null;
 
   if (merged.weight !== null) {
     merged.weightChange = computeWeightChange(merged.weight, settings.startWeight);
-    merged.avgWeight3d = computeAvgWeight3d(date, logsWithMerged);
+    merged.avgWeight3d = computeAvgWeight3d(date, subsetLogs);
     if (settings.intensiveDayOn) {
       merged.intensiveDay = computeIntensiveDay(
         merged.weight,
         settings.intensiveDayCriteria,
-        lowestW
+        lowestW as number
       );
     }
   } else if (settings.intensiveDayOn && prevWeight !== null) {
@@ -259,7 +275,7 @@ export async function upsertDailyLog(
     merged.intensiveDay = computeIntensiveDay(
       prevWeight,
       settings.intensiveDayCriteria,
-      lowestW
+      lowestW as number
     );
   }
 

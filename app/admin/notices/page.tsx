@@ -76,7 +76,7 @@ export default async function AdminNoticesPage() {
                     )}
                   </td>
                   <td className="px-3 py-3 text-right text-muted-foreground hidden sm:table-cell">
-                    {new Date(n.published_at).toLocaleDateString("ko-KR", { month: "short", day: "numeric" })}
+                    {new Date(new Date(n.published_at).getTime() + 9 * 60 * 60 * 1000).toLocaleDateString("ko-KR", { month: "short", day: "numeric" })}
                   </td>
                   <td className="px-3 py-3 hidden sm:table-cell">
                     <div className="flex items-center justify-center gap-1 text-muted-foreground">

@@ -4,6 +4,8 @@ import { generateObject } from "ai";
 import { jsonSchema } from "ai";
 import { openrouter, MODEL } from "@/lib/ai/openrouter";
 import type { DailyLogUpdate } from "@/lib/types";
+import { logAiUsage } from "@/lib/ai/usage-logger";
+import { getAuthUser } from "@/lib/supabase/server";
 
 /**
  * 자유 텍스트를 LLM으로 파싱해 DailyLogUpdate 반환.
@@ -39,7 +41,7 @@ export async function actionParseFreText(
   ].filter(Boolean).join("\n");
 
   try {
-    const { object } = await generateObject({
+    const { object, usage } = await generateObject({
       model: openrouter(MODEL),
       schema: jsonSchema<{
         weight: number | null;
@@ -97,6 +99,19 @@ export async function actionParseFreText(
       maxRetries: 1,
     });
 
+    getAuthUser().then(user => {
+      if (user) {
+        logAiUsage({
+          userId: user.id,
+          callType: "parse",
+          model: MODEL,
+          inputTokens: (usage as any)?.promptTokens,
+          outputTokens: (usage as any)?.completionTokens,
+          success: true,
+        });
+      }
+    });
+
     // null 값은 결과에서 제외해 DailyLogUpdate 형태로 정리
     const update: DailyLogUpdate = {};
     if (object.weight != null) update.weight = Math.round(object.weight * 10) / 10;
@@ -109,6 +124,17 @@ export async function actionParseFreText(
     return update;
   } catch (err) {
     console.error("[parse-actions] actionParseFreText 실패:", err);
+    getAuthUser().then(user => {
+      if (user) {
+        logAiUsage({
+          userId: user.id,
+          callType: "parse",
+          model: MODEL,
+          success: false,
+          errorMessage: err instanceof Error ? err.message : String(err),
+        });
+      }
+    });
     return {};
   }
 }

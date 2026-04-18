@@ -96,6 +96,14 @@ function todayInputCount(log: DailyLog | null): number {
   ].filter((v) => v !== null).length;
 }
 
+function isLogToday(ctx: GreetingContext): boolean {
+  if (!ctx.todayLog) return false;
+  const utcMs = ctx.now.getTime() + ctx.now.getTimezoneOffset() * 60_000;
+  const kst = new Date(utcMs + 9 * 3_600_000);
+  const todayStr = `${kst.getFullYear()}-${String(kst.getMonth() + 1).padStart(2, '0')}-${String(kst.getDate()).padStart(2, '0')}`;
+  return ctx.todayLog.date === todayStr;
+}
+
 // ─────────────────────────────────────────────────────────
 // 룰 정의
 // ─────────────────────────────────────────────────────────
@@ -275,26 +283,36 @@ const rules: GreetingRule[] = [
     messages: (ctx) => [`${ctx.name}님, 오랜만이에요! 일주일 이상 비웠지만 지금 돌아온 거잖아요. 환영해요 🎉`],
   },
 
+  // ── 과거(밀린) 기록 모드 ──
+  {
+    condition: (ctx) => !isLogToday(ctx) && ctx.todayLog !== null && !ctx.todayLog.closed,
+    messages: (ctx) => [
+      `${ctx.name}님, 밀린 기록이 있네요! 어서 마감하고 오늘로 넘어오세요 ⏰`,
+      `과거의 기록을 보고 계시군요. 잊지 않고 적어주셔서 다행이에요 📝`,
+      `${ctx.name}님, 밀린 기록 마무리는 다이어트 성공의 지름길이에요 🏃`,
+    ],
+  },
+
   // ── 오늘 입력 완료 ──
   {
-    condition: (ctx) => todayInputCount(ctx.todayLog) >= 8,
+    condition: (ctx) => isLogToday(ctx) && todayInputCount(ctx.todayLog) >= 8,
     messages: (ctx) => [
       `${ctx.name}님, 오늘 모든 항목 입력 완료! 완벽한 하루예요 ✅`,
       `오늘 항목 8개 모두 채우셨어요, ${ctx.name}님! 마감 버튼만 누르면 완성!`,
     ],
   },
   {
-    condition: (ctx) => todayInputCount(ctx.todayLog) >= 5 && todayInputCount(ctx.todayLog) < 8,
+    condition: (ctx) => isLogToday(ctx) && todayInputCount(ctx.todayLog) >= 5 && todayInputCount(ctx.todayLog) < 8,
     messages: (ctx) => [`${ctx.name}님, 오늘 ${todayInputCount(ctx.todayLog)}개 입력! 조금만 더 채워볼까요? 📝`],
   },
   {
-    condition: (ctx) => todayInputCount(ctx.todayLog) > 0 && todayInputCount(ctx.todayLog) < 5,
+    condition: (ctx) => isLogToday(ctx) && todayInputCount(ctx.todayLog) > 0 && todayInputCount(ctx.todayLog) < 5,
     messages: (ctx) => [`${ctx.name}님, 오늘 시작했어요! 나머지도 틈틈이 채워봐요 📋`],
   },
 
   // ── 오늘의 구체적 입력 내용 ──
   {
-    condition: (ctx) => ctx.todayLog?.exercise === "Y",
+    condition: (ctx) => isLogToday(ctx) && ctx.todayLog?.exercise === "Y",
     messages: (ctx) => [
       `오늘도 운동하신 ${ctx.name}님! 불끈불끈 💪`,
       `${ctx.name}님, 오늘 운동 완료! 이 정도면 진짜 의지의 한국인이에요 🏋️`,
@@ -302,14 +320,14 @@ const rules: GreetingRule[] = [
     ],
   },
   {
-    condition: (ctx) => ctx.todayLog?.exercise === "N" && ctx.todayLog?.lateSnack === "N",
+    condition: (ctx) => isLogToday(ctx) && ctx.todayLog?.exercise === "N" && ctx.todayLog?.lateSnack === "N",
     messages: (ctx) => [
       `${ctx.name}님, 운동은 못 했지만 야식 참으셨어요! 그것만으로도 충분해요 🌙`,
       `야식 참은 ${ctx.name}님, 오늘의 진정한 승자예요 👑`,
     ],
   },
   {
-    condition: (ctx) => ctx.todayLog?.lateSnack === "Y",
+    condition: (ctx) => isLogToday(ctx) && ctx.todayLog?.lateSnack === "Y",
     messages: (ctx) => [
       `${ctx.name}님, 야식은 솔직하게 기록하는 게 포인트예요. 내일은 이겨봐요 😅`,
       `오늘 야식 하셨군요, ${ctx.name}님. 기록한 것만으로도 반은 성공이에요 📝`,
@@ -319,7 +337,7 @@ const rules: GreetingRule[] = [
     condition: (ctx) => {
       const w = ctx.todayLog?.water;
       const goal = ctx.settings.waterGoal;
-      return w !== null && w !== undefined && goal > 0 && w >= goal;
+      return isLogToday(ctx) && w !== null && w !== undefined && goal > 0 && w >= goal;
     },
     messages: (ctx) => [
       `${ctx.name}님, 수분 목표 달성! 벌컥벌컥 보충 완료 💧`,
@@ -330,7 +348,7 @@ const rules: GreetingRule[] = [
     condition: (ctx) => {
       const w = ctx.todayLog?.water;
       const goal = ctx.settings.waterGoal;
-      return w !== null && w !== undefined && goal > 0 && w > 0 && w < goal;
+      return isLogToday(ctx) && w !== null && w !== undefined && goal > 0 && w > 0 && w < goal;
     },
     messages: (ctx) => {
       const remaining = Math.round(((ctx.settings.waterGoal) - (ctx.todayLog!.water ?? 0)) * 10) / 10;
@@ -339,14 +357,14 @@ const rules: GreetingRule[] = [
   },
   {
     condition: (ctx) =>
-      !!ctx.todayLog?.breakfast && !ctx.todayLog?.lunch && !ctx.todayLog?.dinner,
+      isLogToday(ctx) && !!ctx.todayLog?.breakfast && !ctx.todayLog?.lunch && !ctx.todayLog?.dinner,
     messages: (ctx) => [
       `${ctx.name}님, 아침 드셨군요! 하루의 시작이 좋네요 🍳`,
       `아침 챙겨드신 ${ctx.name}님, 아침식사가 다이어트 성공의 열쇠예요 🌅`,
     ],
   },
   {
-    condition: (ctx) => !!ctx.todayLog?.lunch,
+    condition: (ctx) => isLogToday(ctx) && !!ctx.todayLog?.lunch,
     messages: (ctx) => {
       const meal = ctx.todayLog!.lunch!;
       return [
@@ -356,7 +374,7 @@ const rules: GreetingRule[] = [
     },
   },
   {
-    condition: (ctx) => !!ctx.todayLog?.dinner,
+    condition: (ctx) => isLogToday(ctx) && !!ctx.todayLog?.dinner,
     messages: (ctx) => {
       const meal = ctx.todayLog!.dinner!;
       return [
@@ -367,7 +385,7 @@ const rules: GreetingRule[] = [
 
   // ── Hard Reset Day ──
   {
-    condition: (ctx) => ctx.todayLog?.intensiveDay === true,
+    condition: (ctx) => isLogToday(ctx) && ctx.todayLog?.intensiveDay === true,
     messages: (ctx) => [
       `${ctx.name}님, 오늘은 Hard Reset Day예요! 식단 관리가 핵심이에요 🔥`,
       `Hard Reset 발동! ${ctx.name}님, 오늘만 잘 버티면 돼요 💪`,
@@ -396,7 +414,7 @@ const rules: GreetingRule[] = [
 
   // ── 마감 완료 ──
   {
-    condition: (ctx) => ctx.todayLog?.closed === true,
+    condition: (ctx) => isLogToday(ctx) && ctx.todayLog?.closed === true,
     messages: (ctx) => [
       `${ctx.name}님, 오늘 마감 완료! 오늘도 기록으로 완성했어요 ✅`,
       `오늘 하루 마감하셨어요, ${ctx.name}님! 내일도 이렇게 해봐요 🌙`,
@@ -439,11 +457,22 @@ export function getGreetingMessage(
 ): string {
   const ctx: GreetingContext = { name, todayLog, recentLogs, settings, now: new Date() };
 
-  // 매칭된 룰의 모든 메세지 후보를 모음
   const candidates: string[] = [];
-  for (const rule of rules) {
-    if (rule.condition(ctx)) {
-      candidates.push(...rule.messages(ctx));
+  // 1순위: 과거 기록 밀린 상태면 해당 메시지만 제한적으로 반환
+  if (!isLogToday(ctx) && ctx.todayLog !== null && !ctx.todayLog.closed) {
+    for (const rule of rules) {
+      if (rule.condition(ctx) && rule.messages(ctx)[0].includes("밀린 기록")) {
+        candidates.push(...rule.messages(ctx));
+      }
+    }
+  }
+
+  // 2순위: 그 외 일반 룰 (시간별, 목표 도달, 당일 기록 등)
+  if (candidates.length === 0) {
+    for (const rule of rules) {
+      if (rule.condition(ctx)) {
+        candidates.push(...rule.messages(ctx));
+      }
     }
   }
 

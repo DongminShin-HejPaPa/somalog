@@ -110,7 +110,7 @@ describe("generateAiFeedback()", () => {
   it("AI 응답 텍스트를 반환한다", async () => {
     mockGenerateText.mockResolvedValue({ text: "오늘 체중 잘 유지했어." } as never);
 
-    const result = await generateAiFeedback(mockDailyLog, 80.5, mockSettings);
+    const result = await generateAiFeedback(mockDailyLog, 80.5, mockSettings, null);
 
     expect(result).toBe("오늘 체중 잘 유지했어.");
     expect(mockGenerateText).toHaveBeenCalledOnce();
@@ -122,7 +122,8 @@ describe("generateAiFeedback()", () => {
     await generateAiFeedback(
       { ...mockDailyLog, weight: 79.5 },
       80.0,
-      { ...mockSettings, coachName: "테스트코치" }
+      { ...mockSettings, coachName: "테스트코치" },
+      null
     );
 
     const call = mockGenerateText.mock.calls[0][0];
@@ -134,9 +135,10 @@ describe("generateAiFeedback()", () => {
     mockGenerateText.mockRejectedValue(new Error("network error"));
 
     const result = await generateAiFeedback(
-      { ...mockDailyLog, weight: 80.0 },
+      { ...mockDailyLog, intensiveDay: true },
       80.5,
-      mockSettings
+      mockSettings,
+      null
     );
 
     expect(result).toBeTruthy();
@@ -148,7 +150,7 @@ describe("generateAiFeedback()", () => {
   it("API 키 없으면 AI 호출 없이 fallback을 반환한다", async () => {
     process.env.OPENROUTER_API_KEY = "";
 
-    const result = await generateAiFeedback(mockDailyLog, null, mockSettings);
+    const result = await generateAiFeedback(mockDailyLog, null, mockSettings, null);
 
     expect(mockGenerateText).not.toHaveBeenCalled();
     expect(typeof result).toBe("string");

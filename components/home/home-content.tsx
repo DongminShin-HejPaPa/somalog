@@ -37,11 +37,11 @@ export function HomeContent({ todayLog, recentLogs, onCloseToday, isClosingToday
     );
   }
 
-  // 오늘이 마감됐으면 오늘 기준, 아직 미마감이면 어제 기준으로 하루평가 표시
-  const yesterday = recentLogs[1];
-  const isYesterday = !todayLog.closed && !!yesterday?.closed;
+  // 오늘 표시 중인 로그가 마감되지 않았다면, 그 이전의 "가장 최근 마감된 로그"를 찾아 하루평가 표시
+  const lastClosedLog = recentLogs.find(l => l.closed && l.date < todayLog.date);
+  const isYesterday = !todayLog.closed && !!lastClosedLog;
 
-  const shownLog = todayLog.closed ? todayLog : (yesterday ?? null);
+  const shownLog = todayLog.closed ? todayLog : (lastClosedLog ?? null);
   const dailySummary = shownLog?.dailySummary ?? null;
   const oneLiner = shownLog?.oneLiner ?? null;
 

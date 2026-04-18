@@ -342,17 +342,25 @@ export function InputContainer({ userId }: { userId: string | null }) {
     autoCloseFiredRef.current = false;
   }, [currentLog?.date, currentLog?.closed, isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 최신 handleClose를 타이머에서 참조하기 위한 ref
+  const handleCloseRef = useRef(handleClose);
+  useEffect(() => {
+    handleCloseRef.current = handleClose;
+  }, [handleClose]);
+
   // 모든 항목 입력 시 자동 마감 (로드 시점 기준값이 전체 미만이었을 때만)
   useEffect(() => {
-    if (!currentLog || currentLog.closed || isLoading) return;
+    if (isLoading || completedCount < totalCount) return;
+    
+    // 현재 로그가 이미 마감되었는지는 handleClose 내부에서 확인하므로 안심
     if (completedCount === totalCount && !autoCloseFiredRef.current && loadTimeCountRef.current < totalCount) {
       autoCloseFiredRef.current = true;
       const timer = setTimeout(() => {
-        handleClose();
+        handleCloseRef.current();
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [completedCount, currentLog, isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [completedCount, totalCount, isLoading]);
 
   if (isLoading) {
     return (

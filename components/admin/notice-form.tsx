@@ -113,7 +113,14 @@ export function NoticeForm({ mode, notice, adminUserId }: NoticeFormProps) {
     const parsed = parseAiSection(aiSection);
 
     if (parsed.title) setTitle(parsed.title);
-    setContent(parsed.content);
+
+    // AI 고지 문구가 빠진 경우(프롬프트 최상단에 배치되어 파싱에서 누락될 수 있음) 강제 삽입
+    const DISCLAIMER = "* 이 글은 AI가 자동으로 생성한 것입니다.";
+    const finalContent = parsed.content.includes(DISCLAIMER)
+      ? parsed.content
+      : `${DISCLAIMER}\n\n${parsed.content}`;
+
+    setContent(finalContent);
     setHasAiSection(false);
   }
 

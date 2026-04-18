@@ -2,7 +2,8 @@ import { after } from "next/server";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { TabsProviders } from "@/components/layout/tabs-providers";
 import { getSettings } from "@/lib/services/settings-service";
-import { createClient, getAuthUser } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { Settings } from "@/lib/types";
 
 export default async function TabsLayout({
@@ -23,8 +24,9 @@ export default async function TabsLayout({
     // 응답 전송 후 last_seen_at 업데이트 (활성 사용자 추적용)
     if (userId) {
       after(async () => {
-        const supabase = await createClient();
-        await supabase
+        // createClient()는 응답 후엔 쿠키 컨텍스트가 없어 인증 실패 → service_role 사용
+        const adminClient = createAdminClient();
+        await adminClient
           .from("user_profiles")
           .update({ last_seen_at: new Date().toISOString() })
           .eq("user_id", userId);

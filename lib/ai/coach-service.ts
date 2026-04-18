@@ -47,8 +47,8 @@ export async function generateAiFeedback(
           userId: user.id,
           callType: "feedback",
           model: MODEL,
-          inputTokens: usage.promptTokens,
-          outputTokens: usage.completionTokens,
+          inputTokens: usage.inputTokens,
+          outputTokens: usage.outputTokens,
           success: true,
         });
       }
@@ -104,8 +104,8 @@ export async function generateAiDailySummary(
           userId: user.id,
           callType: "daily_summary",
           model: MODEL,
-          inputTokens: usage.promptTokens,
-          outputTokens: usage.completionTokens,
+          inputTokens: usage.inputTokens,
+          outputTokens: usage.outputTokens,
           success: true,
         });
       }
@@ -160,8 +160,8 @@ export async function generateAiOneLiner(
           userId: user.id,
           callType: "one_liner",
           model: MODEL,
-          inputTokens: usage.promptTokens,
-          outputTokens: usage.completionTokens,
+          inputTokens: usage.inputTokens,
+          outputTokens: usage.outputTokens,
           success: true,
         });
       }

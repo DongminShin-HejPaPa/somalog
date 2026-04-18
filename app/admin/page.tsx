@@ -1,14 +1,14 @@
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export default async function AdminDashboardPage() {
-  const supabase = await createClient();
+  const adminClient = createAdminClient();
   
-  // 간단한 통계 데이터 조회 (예시)
-  const { count: usersCount } = await supabase
+  // 관리자 전용 클라이언트를 사용하여 Row Level Security(본인 데이터만 조회) 룰 우회
+  const { count: usersCount } = await adminClient
     .from("user_profiles")
     .select("*", { count: "exact", head: true });
 
-  const { count: logsCount } = await supabase
+  const { count: logsCount } = await adminClient
     .from("daily_logs")
     .select("*", { count: "exact", head: true });
 

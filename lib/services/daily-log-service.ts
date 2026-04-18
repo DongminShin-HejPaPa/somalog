@@ -378,7 +378,7 @@ export async function closeDailyLog(date: string, existingLog?: DailyLog): Promi
   let oneLiner: string;
   try {
     const results = await Promise.all([
-      generateAiDailySummary(existing, prevWeight, settings),
+      generateAiDailySummary(existing, settings, prevWeight),
       generateAiOneLiner(existing, settings)
     ]);
     dailySummary = results[0];

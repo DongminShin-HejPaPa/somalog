@@ -28,16 +28,18 @@ export async function generateAiFeedback(
     ? `"${changedField}"을/를 중심으로 나머지 오늘 맥락과 연결해 코칭 한 마디(2~3문장).`
     : `오늘 입력 내용을 중심으로 코칭 한 마디(2~3문장).`;
 
-  try {
-    const abort = AbortSignal.timeout(5_000);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
     const { text, usage } = await generateText({
       model: openrouter(MODEL),
       system: buildSystemPrompt(settings, log.intensiveDay ?? false),
       prompt: `오늘 입력 데이터:\n${buildContext(log, prevWeight, settings)}${fieldLine}\n\n${focusInstruction} 단순 수치 나열 금지. Hard Reset Mode는 맥락 정보 단서일 뿐야.`,
       maxOutputTokens: 150,
       temperature: 0.7,
-      abortSignal: abort,
+      abortSignal: controller.signal,
     });
+    clearTimeout(timeoutId);
 
     getAuthUser().then(user => {
       if (user) {
@@ -45,8 +47,8 @@ export async function generateAiFeedback(
           userId: user.id,
           callType: "feedback",
           model: MODEL,
-          inputTokens: (usage as any)?.promptTokens,
-          outputTokens: (usage as any)?.completionTokens,
+          inputTokens: usage.promptTokens,
+          outputTokens: usage.completionTokens,
           success: true,
         });
       }
@@ -83,16 +85,18 @@ export async function generateAiDailySummary(
     return generateDailySummary(log, settings.waterGoal);
   }
 
-  try {
-    const abort = AbortSignal.timeout(10_000);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
     const { text, usage } = await generateText({
       model: openrouter(MODEL),
       system: buildSystemPrompt(settings, log.intensiveDay ?? false),
       prompt: `오늘 하루 기록:\n${buildContext(log, prevWeight, settings)}\n\n오늘의 행동과 패턴을 분석하고, 전문가 노력으로 3~4문장 총평해.\n- 단순 데이터 나열 절대 금지\n- 잘한 점과 아쉬운 점을 행동 맥락에서 평가\n- 최근 선택들이 체중과 건강에 어떤 영향을 줄 것인지 짜임새 있게\n- 내일을 위한 한 마디 코치로 마무리\n- Hard Reset Mode가 있다면 하나의 맥락으로만 사용.`,
       maxOutputTokens: 250,
       temperature: 0.7,
-      abortSignal: abort,
+      abortSignal: controller.signal,
     });
+    clearTimeout(timeoutId);
 
     getAuthUser().then(user => {
       if (user) {
@@ -100,8 +104,8 @@ export async function generateAiDailySummary(
           userId: user.id,
           callType: "daily_summary",
           model: MODEL,
-          inputTokens: (usage as any)?.promptTokens,
-          outputTokens: (usage as any)?.completionTokens,
+          inputTokens: usage.promptTokens,
+          outputTokens: usage.completionTokens,
           success: true,
         });
       }
@@ -137,16 +141,18 @@ export async function generateAiOneLiner(
     return fallbackOneLiner(log);
   }
 
-  try {
-    const abort = AbortSignal.timeout(5_000);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
     const { text, usage } = await generateText({
       model: openrouter(MODEL),
       system: buildSystemPrompt(settings, log.intensiveDay ?? false),
       prompt: `오늘 하루 요약:\n${buildContext(log, null, settings)}\n\n20자 이내로 오늘을 한 줄 총평해. 문장 부호 제외, 핵심만.`,
       maxOutputTokens: 60,
       temperature: 0.8,
-      abortSignal: abort,
+      abortSignal: controller.signal,
     });
+    clearTimeout(timeoutId);
 
     getAuthUser().then(user => {
       if (user) {
@@ -154,8 +160,8 @@ export async function generateAiOneLiner(
           userId: user.id,
           callType: "one_liner",
           model: MODEL,
-          inputTokens: (usage as any)?.promptTokens,
-          outputTokens: (usage as any)?.completionTokens,
+          inputTokens: usage.promptTokens,
+          outputTokens: usage.completionTokens,
           success: true,
         });
       }

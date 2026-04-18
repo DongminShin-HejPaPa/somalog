@@ -9,14 +9,14 @@ interface CoachOneLinerProps {
   /** dailySummary(긴 총평)를 우선으로, 없으면 oneLiner(짧은 한마디) 사용 */
   dailySummary?: string | null;
   oneLiner?: string | null;
-  isYesterday?: boolean;
+  badgeText?: string;
 }
 
 export function CoachOneLiner({
   coachName,
   dailySummary,
   oneLiner,
-  isYesterday = false,
+  badgeText,
 }: CoachOneLinerProps) {
   const [expanded, setExpanded] = useState(false);
 
@@ -38,9 +38,9 @@ export function CoachOneLiner({
         </div>
         <div className="flex items-center gap-2 flex-1">
           <span className="text-sm font-semibold">{coachName}의 하루평가</span>
-          {isYesterday && (
+          {badgeText && (
             <span className="text-xs text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">
-              어제 기준
+              {badgeText}
             </span>
           )}
         </div>

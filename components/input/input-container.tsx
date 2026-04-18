@@ -358,7 +358,10 @@ export function InputContainer({ userId }: { userId: string | null }) {
       const timer = setTimeout(() => {
         handleCloseRef.current();
       }, 2000);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+        autoCloseFiredRef.current = false;
+      };
     }
   }, [completedCount, totalCount, isLoading]);
 

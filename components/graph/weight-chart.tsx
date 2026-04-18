@@ -309,7 +309,7 @@ export function WeightChart({
       date: log.date.slice(5),
       fullDate: log.date,
       weight: log.weight,
-      isLowest: log.date === lowestWeightDate,
+      isLowest: log.weight !== null && log.weight === lowestWeight,
       isSurge: surge,
       isMonday: new Date(log.date).getDay() === 1,
     };

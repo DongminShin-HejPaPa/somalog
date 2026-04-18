@@ -1,5 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 
+export const dynamic = 'force-dynamic';
+
 export default async function AdminDashboardPage() {
   const adminClient = createAdminClient();
   
@@ -93,13 +95,13 @@ export default async function AdminDashboardPage() {
 
         {/* AI 비용 추정 */}
         <div className="bg-card border border-border rounded-xl p-5 shadow-sm transition-all hover:shadow-md">
-          <p className="text-sm font-medium text-muted-foreground mb-1">총 AI 사용 비용</p>
+          <p className="text-sm font-medium text-muted-foreground mb-1">누적 총 AI 사용 비용</p>
           <div className="flex items-baseline gap-1">
              <p className="text-3xl font-bold text-rose-600">{formatMoney(totalCostKrw)}</p>
              <span className="text-sm font-bold text-rose-600">원</span>
           </div>
           <p className="text-[10px] text-muted-foreground mt-1 text-right">
-             ${totalCostUsd.toFixed(4)} (환율 {EXCHANGE_RATE}원 적용)
+             올타임 누적 ${totalCostUsd.toFixed(4)} (환율 {EXCHANGE_RATE}원 적용)
           </p>
         </div>
       </div>

@@ -361,11 +361,31 @@ export async function closeDailyLog(date: string, existingLog?: DailyLog): Promi
   if (!existing) return null;
 
   // 1. 총평 + 한줄 요약 생성 (AI 실패 시에도 반드시 upsert 진행)
-  const dailySummary = generateDailySummary(existing, settings.waterGoal);
+  // AI 총평에 필요한 이전 체중(prevWeight) 조회
+  const { data: prevRow } = await supabase
+    .from("daily_logs")
+    .select("weight")
+    .eq("user_id", user.id)
+    .lt("date", date)
+    .not("weight", "is", null)
+    .order("date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const prevWeight = prevRow?.weight ? Number(prevRow.weight) : null;
+
+  let dailySummary: string;
   let oneLiner: string;
   try {
-    oneLiner = await generateAiOneLiner(existing, settings);
+    const results = await Promise.all([
+      generateAiDailySummary(existing, prevWeight, settings),
+      generateAiOneLiner(existing, settings)
+    ]);
+    dailySummary = results[0];
+    oneLiner = results[1];
   } catch {
+    // AI 호출 실패 시에만 Rule-based 생성(Fallback)
+    dailySummary = generateDailySummary(existing, settings.waterGoal);
     oneLiner = "";
   }
 

@@ -60,7 +60,9 @@ export function generateFeedback(
 }
 
 /**
- * 마감 시 일일 총평 생성 — 데이터 나열 아닌 전문가 코칭 관점
+ * [Deprecated] 마감 시 일일 총평 생성 — 데이터 나열 아닌 전문가 코칭 관점
+ * 주의: 더이상 쓰이지 않습니다. 자동 마감 시에도 이제 전부 AI(generateAiDailySummary)가 생성하도록 로직이 변경되었습니다.
+ * 실패 시의 Fallback 용도로만 남겨둡니다.
  */
 export function generateDailySummary(log: DailyLog, waterGoal: number): string {
   const lines: string[] = [];

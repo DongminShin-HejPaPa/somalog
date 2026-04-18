@@ -27,7 +27,7 @@ export async function generateAiFeedback(
   const focusInstruction = changedField
     ? `"${changedField}"을/를 중심으로 나머지 오늘 맥락과 연결해 코칭 한 마디(2~3문장).`
     : `오늘 입력 내용을 중심으로 코칭 한 마디(2~3문장).`;
-
+  try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
 
@@ -84,7 +84,7 @@ export async function generateAiDailySummary(
   if (!process.env.OPENROUTER_API_KEY) {
     return generateDailySummary(log, settings.waterGoal);
   }
-
+  try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
@@ -140,7 +140,7 @@ export async function generateAiOneLiner(
   if (!process.env.OPENROUTER_API_KEY) {
     return fallbackOneLiner(log);
   }
-
+  try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
 

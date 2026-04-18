@@ -237,7 +237,7 @@ function ExtraItemList({
   );
 }
 
-export function SettingsForm() {
+export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
   const { settings, updateSettings, resetAllSettings, loadDemoSettings, isLoaded } = useSettings();
   const [form, setForm] = useState<Settings>(settings);
   const [saved, setSaved] = useState(false);
@@ -1062,6 +1062,16 @@ export function SettingsForm() {
         <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
           계정
         </h3>
+
+        {isAdmin && (
+          <Link
+            href="/admin"
+            className="w-full py-3 rounded-xl text-sm font-semibold min-h-[48px] bg-navy/5 text-navy border border-navy/20 hover:bg-navy/10 transition-colors flex items-center justify-center gap-2 mb-2"
+          >
+            <span className="text-base leading-none">⚙️</span>
+            관리자 페이지
+          </Link>
+        )}
 
         <button
           type="button"

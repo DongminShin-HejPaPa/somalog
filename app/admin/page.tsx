@@ -5,40 +5,40 @@ export const dynamic = 'force-dynamic';
 export default async function AdminDashboardPage() {
   const adminClient = createAdminClient();
   
-  // 1. 데이터 조회 (병렬 처리를 유지하되, 타입을 더 명시적으로 처리하여 빌드 에러 방지)
+  // 오늘 날짜 (KST, YYYY-MM-DD)
+  const todayStr = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+  // 1. 데이터 조회 (병렬)
   const results = await Promise.all([
     adminClient.from("user_profiles").select("*", { count: "exact", head: true }),
     adminClient.from("daily_logs").select("*", { count: "exact", head: true }),
     adminClient.from("ai_usage_logs").select("cost_usd"),
-    adminClient.auth.admin.listUsers()
+    // 오늘 날짜 기록이 있는 user_id (오늘 기록 작성자)
+    adminClient.from("daily_logs").select("user_id").eq("date", todayStr),
+    // last_seen_at 기준 오늘 앱 방문자 (탭 레이아웃 진입 시 갱신)
+    adminClient.from("user_profiles").select("user_id")
+      .gte("last_seen_at", `${todayStr}T00:00:00+09:00`)
+      .lt("last_seen_at", `${new Date(new Date(todayStr).getTime() + 86400000).toISOString().split('T')[0]}T00:00:00+09:00`),
   ]);
 
   const usersCount = (results[0] as any).count ?? 0;
   const logsCount = (results[1] as any).count ?? 0;
-  
+
   const usageRes = results[2] as any;
   const usageData = usageRes.data;
   const usageError = usageRes.error;
 
-  const authRes = results[3] as any;
-  const authData = authRes.data;
-  const authError = authRes.error;
+  // 2. 오늘 기록 작성자 (daily_logs.date 기준)
+  const todayLogsRes = results[3] as any;
+  const dailyLogWriters = new Set(
+    (todayLogsRes.data as { user_id: string }[] | null)?.map((r) => r.user_id) ?? []
+  ).size;
 
-  // 2. 금일 활성 사용자 계산
-  let dailyActiveUsers = 0;
-  if (!authError && authData && Array.isArray(authData.users)) {
-    // 타임존 연산의 복잡도를 낮추기 위해 UTC 기반의 안전한 날짜 추출 방식 사용
-    const todayStr = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().split('T')[0];
-    
-    dailyActiveUsers = authData.users.filter((u: any) => {
-      if (!u.last_sign_in_at) return false;
-      // 유저의 마지막 접속 시간을 KST 날짜 문자열로 변환 (YYYY-MM-DD)
-      const signInStr = new Date(new Date(u.last_sign_in_at).getTime() + 9 * 60 * 60 * 1000).toISOString().split('T')[0];
-      return signInStr === todayStr;
-    }).length;
-  }
+  // 3. 금일 앱 방문자 (last_seen_at 기준, 탭 레이아웃 진입 시 갱신)
+  const todayVisitorsRes = results[4] as any;
+  const dailyActiveUsers = (todayVisitorsRes.data as { user_id: string }[] | null)?.length ?? 0;
 
-  // 3. 총 AI 비용 합산
+  // 4. 총 AI 비용 합산
   const EXCHANGE_RATE = 1380; 
   let totalCostUsd = 0;
   
@@ -83,7 +83,8 @@ export default async function AdminDashboardPage() {
              <p className="text-3xl font-bold text-sky-600">{dailyActiveUsers}</p>
              <span className="text-sm font-bold text-sky-600">명</span>
           </div>
-          <p className="text-[10px] text-muted-foreground mt-1">오늘 로그인(KST) 기준</p>
+          <p className="text-[10px] text-muted-foreground mt-1">오늘 앱 방문(KST) 기준</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">기록 작성자: {dailyLogWriters}명</p>
         </div>
 
         <div className="bg-card border border-border rounded-xl p-5 shadow-sm">

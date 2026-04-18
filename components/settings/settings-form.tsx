@@ -422,6 +422,17 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
 
   return (
     <div>
+      {/* 관리자 페이지 메뉴 (관리자 전용) */}
+      {isAdmin && (
+        <Link
+          href="/admin"
+          className="flex items-center justify-center gap-2 px-4 py-4 border-b border-border bg-navy/5 text-navy hover:bg-navy/10 active:bg-navy/15 transition-colors font-bold"
+        >
+          <span className="text-base leading-none">⚙️</span>
+          관리자 페이지
+        </Link>
+      )}
+
       {/* 공지사항 메뉴 */}
       <Link
         href="/settings/notices"
@@ -1062,16 +1073,6 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
         <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
           계정
         </h3>
-
-        {isAdmin && (
-          <Link
-            href="/admin"
-            className="w-full py-3 rounded-xl text-sm font-semibold min-h-[48px] bg-navy/5 text-navy border border-navy/20 hover:bg-navy/10 transition-colors flex items-center justify-center gap-2 mb-2"
-          >
-            <span className="text-base leading-none">⚙️</span>
-            관리자 페이지
-          </Link>
-        )}
 
         <button
           type="button"

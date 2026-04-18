@@ -1,8 +1,11 @@
 import { ReactNode } from "react";
 import Link from "next/link";
 import { LayoutDashboard, Megaphone, Users, DollarSign, ChevronLeft } from "lucide-react";
+import { requireAdmin } from "@/lib/auth/admin-guard";
 
-export default function AdminLayout({ children }: { children: ReactNode }) {
+export default async function AdminLayout({ children }: { children: ReactNode }) {
+  await requireAdmin();
+
   return (
     <div className="min-h-screen bg-background flex">
       {/* Sidebar Navigation */}

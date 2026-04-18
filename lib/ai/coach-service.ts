@@ -52,7 +52,7 @@ export async function generateAiFeedback(
           success: true,
         });
       }
-    });
+    }).catch(e => console.error("Logging async auth error:", e));
 
     return text.trim();
   } catch (err) {
@@ -67,7 +67,7 @@ export async function generateAiFeedback(
           errorMessage: err instanceof Error ? err.message : String(err),
         });
       }
-    });
+    }).catch(e => console.error("Logging async auth error:", e));
     return fallbackFeedback(log, prevWeight, settings.waterGoal);
   }
 }
@@ -109,7 +109,7 @@ export async function generateAiDailySummary(
           success: true,
         });
       }
-    });
+    }).catch(e => console.error("Logging async auth error:", e));
 
     return text.trim();
   } catch (err) {
@@ -124,7 +124,7 @@ export async function generateAiDailySummary(
           errorMessage: err instanceof Error ? err.message : String(err),
         });
       }
-    });
+    }).catch(e => console.error("Logging async auth error:", e));
     return generateDailySummary(log, settings.waterGoal);
   }
 }
@@ -165,7 +165,7 @@ export async function generateAiOneLiner(
           success: true,
         });
       }
-    });
+    }).catch(e => console.error("Logging async auth error:", e));
 
     return text.trim();
   } catch (err) {
@@ -180,7 +180,7 @@ export async function generateAiOneLiner(
           errorMessage: err instanceof Error ? err.message : String(err),
         });
       }
-    });
+    }).catch(e => console.error("Logging async auth error:", e));
     return fallbackOneLiner(log);
   }
 }

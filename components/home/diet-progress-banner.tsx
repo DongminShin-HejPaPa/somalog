@@ -13,7 +13,8 @@ interface DietProgressBannerProps {
 
 function formatShortDate(dateStr: string) {
   const d = new Date(dateStr + "T00:00:00");
-  return `${d.getMonth() + 1}/${d.getDate()}`;
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  return `${d.getMonth() + 1}/${d.getDate()}(${days[d.getDay()]})`;
 }
 
 export function DietProgressBanner({

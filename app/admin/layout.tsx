@@ -7,7 +7,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   await requireAdmin();
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="fixed inset-0 z-50 bg-background flex overflow-hidden">
       {/* Sidebar Navigation */}
       <aside className="w-64 border-r border-border bg-card hidden md:flex flex-col">
         <div className="p-6 border-b border-border">

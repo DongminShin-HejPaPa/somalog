@@ -2,6 +2,8 @@
 
 import type { DailyLog } from "@/lib/types";
 
+const STALE_MS = 2 * 60 * 1000; // 2 minutes
+
 class LogStore {
   private currentUserId: string | null = null;
   private cache = new Map<string, DailyLog>();
@@ -10,7 +12,9 @@ class LogStore {
   private totalCount: number | null = null;
   private allLogs: DailyLog[] | null = null;
   private lowestWeight: { weight: number; date: string } | null = null;
+  private lowestWeightFetched = false;
   private lastFetchTime = 0;
+  private autoCloseFired = false;
 
   getLog(date: string): DailyLog | undefined {
     return this.cache.get(date);
@@ -18,6 +22,7 @@ class LogStore {
 
   setLog(log: DailyLog) {
     this.cache.set(log.date, log);
+
     if (this.recentLogs) {
       const idx = this.recentLogs.findIndex((l) => l.date === log.date);
       if (idx !== -1) {
@@ -27,7 +32,7 @@ class LogStore {
         this.recentLogs.sort((a, b) => b.date.localeCompare(a.date));
       }
     }
-    // allLogs도 동기화: 그래프가 항상 최신 데이터를 보도록
+
     if (this.allLogs) {
       const idx = this.allLogs.findIndex((l) => l.date === log.date);
       if (idx !== -1) {
@@ -37,12 +42,20 @@ class LogStore {
         this.allLogs.sort((a, b) => b.date.localeCompare(a.date));
       }
     }
-    // 체중 변경 시 lowestWeight 캐시 무효화 (그래프 최저 체중 마커 정확성)
-    this.lowestWeight = null;
-    // 마감 시 weeklyLogs 캐시 무효화: 일요일 마감이면 weekly log가 새로 생성됐을 수 있음
-    if (log.closed) {
-      this.weeklyLogs = null;
+
+    // Smart lowestWeight update: only invalidate when we truly can't determine the new minimum.
+    // - If new weight is ≤ current lowest → update in-place (no fetch needed)
+    // - If new weight is higher → current lowest still correct, no change needed
+    // - If weight was cleared (null) → lowestWeight might be stale, but Graph tab
+    //   background refresh will correct it; no need to block the cache hit
+    if (this.lowestWeightFetched && log.weight !== null && log.weight !== undefined) {
+      if (this.lowestWeight === null || log.weight <= this.lowestWeight.weight) {
+        this.lowestWeight = { weight: log.weight, date: log.date };
+      }
     }
+
+    // weeklyLogs NOT cleared on close: AI summary is generated asynchronously anyway.
+    // Log tab background-refreshes on next visit if stale.
   }
 
   setLogs(logs: DailyLog[]) {
@@ -53,7 +66,6 @@ class LogStore {
     this.recentLogs = [...logs].sort((a, b) => b.date.localeCompare(a.date));
     this.setLogs(logs);
     this.lastFetchTime = Date.now();
-    // allLogs도 변경된 항목 반영: 마감/저장 후 그래프 캐시 최신 유지
     if (this.allLogs) {
       for (const log of logs) {
         const idx = this.allLogs.findIndex((l) => l.date === log.date);
@@ -74,7 +86,7 @@ class LogStore {
   setWeeklyLogs(logs: any[]) {
     this.weeklyLogs = logs;
   }
-  
+
   getWeeklyLogs() {
     return this.weeklyLogs;
   }
@@ -97,10 +109,16 @@ class LogStore {
 
   setLowestWeight(lowest: { weight: number; date: string } | null) {
     this.lowestWeight = lowest;
+    this.lowestWeightFetched = true;
   }
 
   getLowestWeight() {
     return this.lowestWeight;
+  }
+
+  /** true if lowestWeight has been fetched at least once (value may be null = no data) */
+  hasLowestWeight(): boolean {
+    return this.lowestWeightFetched;
   }
 
   getFirstUnclosedLog(): DailyLog | null {
@@ -111,7 +129,21 @@ class LogStore {
   }
 
   isStale(): boolean {
-    return Date.now() - this.lastFetchTime > 5 * 60 * 1000; // 5 minutes
+    return Date.now() - this.lastFetchTime > STALE_MS;
+  }
+
+  /**
+   * Run the auto-close action exactly once per session (deduplicates across
+   * HomeContainer and InputContainer which both call it on mount).
+   * Returns the promise for the first caller; subsequent callers get null.
+   */
+  runAutoCloseOnce<T>(fn: () => Promise<T>): Promise<T> | null {
+    if (this.autoCloseFired) return null;
+    this.autoCloseFired = true;
+    return fn().catch((err) => {
+      this.autoCloseFired = false; // allow retry on error
+      throw err;
+    });
   }
 
   /** userId가 바뀐 경우 캐시 전체 초기화. 각 container 마운트 시 첫 번째로 호출해야 함. */
@@ -129,7 +161,9 @@ class LogStore {
     this.totalCount = null;
     this.allLogs = null;
     this.lowestWeight = null;
+    this.lowestWeightFetched = false;
     this.lastFetchTime = 0;
+    this.autoCloseFired = false;
   }
 }
 

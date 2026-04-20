@@ -956,16 +956,6 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
         </button>
       </div>
 
-      {/* 초기 설정 다시 하기 */}
-      <div className="px-4 py-4 border-b border-border">
-        <Link
-          href="/onboarding"
-          className="block w-full py-3 rounded-xl text-center text-sm font-medium text-coral border border-coral/30 hover:bg-coral-light transition-colors min-h-[48px] leading-[48px]"
-        >
-          시작 도우미 다시 불러오기
-        </Link>
-      </div>
-
       {/* 데이터 관리 */}
       <div className="px-4 py-4 space-y-3 pb-8">
         <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
@@ -974,10 +964,16 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
 
         {dialog === "idle" && (
           <>
+            <Link
+              href="/onboarding"
+              className="block w-full py-3 rounded-xl text-center text-sm font-medium text-coral border border-coral/30 hover:bg-coral-light transition-colors min-h-[48px] leading-[48px]"
+            >
+              시작 도우미 다시 불러오기
+            </Link>
             <button
               onClick={() => setDialog("confirm-demo")}
               data-testid="settings-demo"
-              className="w-full py-3 rounded-xl text-sm font-medium min-h-[48px] bg-secondary text-foreground border border-border hover:bg-secondary/80 transition-colors"
+              className="w-full py-3 rounded-xl text-sm font-medium min-h-[48px] text-coral border border-coral/30 hover:bg-coral-light transition-colors"
             >
               데모 데이터 불러오기
             </button>

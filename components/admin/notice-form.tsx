@@ -115,7 +115,7 @@ export function NoticeForm({ mode, notice, adminUserId }: NoticeFormProps) {
     if (parsed.title) setTitle(parsed.title);
 
     // AI 고지 문구가 빠진 경우(프롬프트 최상단에 배치되어 파싱에서 누락될 수 있음) 강제 삽입
-    const DISCLAIMER = "* 이 글은 AI가 자동으로 생성한 것입니다.";
+    const DISCLAIMER = "> ℹ️ 이 글은 AI가 자동으로 생성한 것입니다.";
     const finalContent = parsed.content.includes(DISCLAIMER)
       ? parsed.content
       : `${DISCLAIMER}\n\n${parsed.content}`;
@@ -320,26 +320,26 @@ export function NoticeForm({ mode, notice, adminUserId }: NoticeFormProps) {
       )}
 
       {/* 버튼 */}
-      <div className="flex gap-3 pt-2 max-w-sm">
+      <div className="flex justify-end gap-3 pt-2">
+        <button
+          type="button"
+          onClick={() => router.push("/admin/notices")}
+          disabled={isPending}
+          className="px-6 py-3 rounded-xl text-sm font-medium border border-border hover:bg-secondary transition-colors"
+        >
+          닫기
+        </button>
         <button
           onClick={handleSave}
           disabled={isPending || !title.trim() || !content.trim()}
           className={cn(
-            "flex-1 py-3 rounded-xl text-sm font-semibold transition-colors min-h-[48px]",
+            "px-10 py-3 rounded-xl text-sm font-semibold transition-colors min-h-[48px]",
             isPending || !title.trim() || !content.trim()
               ? "bg-secondary text-muted-foreground cursor-not-allowed"
               : "bg-navy text-white hover:bg-navy/90"
           )}
         >
           {isPending ? "저장 중..." : mode === "create" ? "게시하기" : "수정 완료"}
-        </button>
-        <button
-          type="button"
-          onClick={() => router.push("/admin/notices")}
-          disabled={isPending}
-          className="px-5 py-3 rounded-xl text-sm font-medium border border-border hover:bg-secondary transition-colors"
-        >
-          닫기
         </button>
       </div>
     </div>

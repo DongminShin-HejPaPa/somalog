@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { getNotice } from "@/lib/services/notice-service";
 import { NoticeDetailClient } from "@/components/notices/notice-detail-client";
+import { MarkdownContent } from "@/components/notices/markdown-content";
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -49,9 +50,7 @@ export default async function NoticeDetailPage({
           <span>·</span>
           <span>{formatDate(notice.publishedAt)}</span>
         </div>
-        <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">
-          {notice.content}
-        </p>
+        <MarkdownContent source={notice.content} />
       </article>
 
       {/* 댓글 영역 (클라이언트 컴포넌트) */}

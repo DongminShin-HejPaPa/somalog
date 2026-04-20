@@ -15,16 +15,16 @@ import type { Notice } from "@/lib/types";
 // SSR 비활성화 — @uiw/react-md-editor 는 브라우저 전용
 const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false });
 
-// AI 재작성 구분자
-const AI_SEPARATOR = "\n---\n신규 내용 (AI 작성)\n";
+// AI 섹션 마커 (에디터 내부용, 게시 시 포함되지 않음)
+const AI_SECTION_MARKER = "<!-- AI_SECTION -->";
+const AI_CONTENT_MARKER = "<!-- AI_CONTENT -->";
+const AI_SEPARATOR = `\n\n${AI_SECTION_MARKER}<div style="display:inline-block;background:#1e293b;color:#f1f5f9;padding:4px 12px;border-radius:6px;font-size:12px;font-weight:700;font-family:sans-serif;margin:4px 0">🤖 신규 내용 (AI 작성)</div>${AI_CONTENT_MARKER}\n\n`;
 
 function applyAiRewrite(current: string, aiText: string): string {
-  if (current.includes(AI_SEPARATOR)) {
-    // 재클릭: 구분자 이후만 교체
-    const idx = current.indexOf(AI_SEPARATOR);
-    return current.slice(0, idx + AI_SEPARATOR.length) + aiText;
+  if (current.includes(AI_SECTION_MARKER)) {
+    const originalContent = current.slice(0, current.indexOf(AI_SECTION_MARKER)).trimEnd();
+    return `${originalContent}${AI_SEPARATOR}${aiText}`;
   }
-  // 최초: 기존 내용 + AI 섹션 추가
   return `${current}${AI_SEPARATOR}${aiText}`;
 }
 
@@ -87,8 +87,8 @@ export function NoticeForm({ mode, notice, adminUserId }: NoticeFormProps) {
     if (!draft) return;
 
     // AI 섹션이 이미 있으면 원본 부분만 초안으로 사용
-    const rawDraft = draft.includes(AI_SEPARATOR)
-      ? draft.split(AI_SEPARATOR)[0].trim()
+    const rawDraft = draft.includes(AI_SECTION_MARKER)
+      ? draft.slice(0, draft.indexOf(AI_SECTION_MARKER)).trim()
       : draft;
 
     setIsAiLoading(true);
@@ -106,10 +106,10 @@ export function NoticeForm({ mode, notice, adminUserId }: NoticeFormProps) {
 
   // AI 내용 반영: 신규 섹션 파싱 → 제목/내용 교체
   function handleApplyAi() {
-    const idx = content.indexOf(AI_SEPARATOR);
-    if (idx === -1) return;
+    const contentMarkerIdx = content.indexOf(AI_CONTENT_MARKER);
+    if (contentMarkerIdx === -1) return;
 
-    const aiSection = content.slice(idx + AI_SEPARATOR.length);
+    const aiSection = content.slice(contentMarkerIdx + AI_CONTENT_MARKER.length + 2); // +2: \n\n
     const parsed = parseAiSection(aiSection);
 
     if (parsed.title) setTitle(parsed.title);
@@ -126,16 +126,16 @@ export function NoticeForm({ mode, notice, adminUserId }: NoticeFormProps) {
 
   // AI 섹션 취소: 원본 내용으로 복원
   function handleCancelAi() {
-    const idx = content.indexOf(AI_SEPARATOR);
-    if (idx === -1) return;
-    setContent(content.slice(0, idx));
+    const markerIdx = content.indexOf(AI_SECTION_MARKER);
+    if (markerIdx === -1) return;
+    setContent(content.slice(0, markerIdx).trimEnd());
     setHasAiSection(false);
   }
 
-  // 에디터에서 직접 AI_SEPARATOR를 지우면 hasAiSection 동기화
+  // 에디터에서 직접 AI 섹션을 지우면 hasAiSection 동기화
   function handleContentChange(v: string) {
     setContent(v);
-    if (hasAiSection && !v.includes(AI_SEPARATOR)) {
+    if (hasAiSection && !v.includes(AI_SECTION_MARKER)) {
       setHasAiSection(false);
     }
   }
@@ -320,7 +320,7 @@ export function NoticeForm({ mode, notice, adminUserId }: NoticeFormProps) {
       )}
 
       {/* 버튼 */}
-      <div className="flex gap-3 pt-2">
+      <div className="flex gap-3 pt-2 max-w-sm">
         <button
           onClick={handleSave}
           disabled={isPending || !title.trim() || !content.trim()}

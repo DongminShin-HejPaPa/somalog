@@ -60,7 +60,7 @@ export default async function AdminDashboardPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
           <p className="text-sm font-medium text-muted-foreground mb-1">총 등록 사용자</p>
           <div className="flex items-baseline gap-1">

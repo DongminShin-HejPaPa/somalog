@@ -11,7 +11,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       {/* Sidebar Navigation */}
       <aside className="w-64 border-r border-border bg-card hidden md:flex flex-col">
         <div className="p-6 border-b border-border">
-          <Link href="/home" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-4 text-xs font-semibold">
+          <Link href="/settings" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-4 text-xs font-semibold">
             <ChevronLeft className="w-4 h-4" />
             앱으로 돌아가기
           </Link>
@@ -49,7 +49,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
             <h2 className="font-bold text-lg text-navy">Soma Log</h2>
             <span className="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded uppercase">Admin</span>
           </div>
-          <Link href="/home" className="text-xs font-semibold text-muted-foreground">
+          <Link href="/settings" className="text-xs font-semibold text-muted-foreground">
             닫기
           </Link>
         </header>

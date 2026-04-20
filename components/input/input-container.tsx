@@ -63,6 +63,13 @@ export function InputContainer({ userId }: { userId: string | null }) {
   const [closeNavMessage, setCloseNavMessage] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  const currentDateRef = useRef(currentDate);
+  useEffect(() => {
+    currentDateRef.current = currentDate;
+  }, [currentDate]);
+
+  const hasSavedRef = useRef(false);
+
   const updateCache = useCallback((log: DailyLog) => {
     logStore.setLog(log);
   }, []);
@@ -147,6 +154,19 @@ export function InputContainer({ userId }: { userId: string | null }) {
             .then(([freshLogs]) => {
               logStore.setRecentLogs(freshLogs);
               applyLogs(freshLogs);
+              // Update currentLog with fresh server data — but only if the user
+              // hasn't saved anything yet in this session. If hasSavedRef is true,
+              // handleModalSave already called setCurrentLog(updated) with the
+              // server response (which is newer than what the background fetch returned),
+              // so overwriting would revert the feedback to a stale value.
+              if (!hasSavedRef.current) {
+                const freshCurrentLog = freshLogs.find(
+                  (l) => l.date === currentDateRef.current
+                );
+                if (freshCurrentLog) {
+                  setCurrentLog(freshCurrentLog);
+                }
+              }
             })
             .catch(() => {});
         }
@@ -206,6 +226,7 @@ export function InputContainer({ userId }: { userId: string | null }) {
     setCurrentLog(currentLog ? { ...currentLog, ...update } as DailyLog : null);
     setModalField(null);
 
+    hasSavedRef.current = true;
     try {
       const updated = await actionUpsertDailyLog(currentDate, update);
       setCurrentLog(updated);
@@ -235,6 +256,7 @@ export function InputContainer({ userId }: { userId: string | null }) {
     const previousLog = currentLog;
     setCurrentLog(currentLog ? { ...currentLog, [field]: null } as DailyLog : null);
     setModalField(null);
+    hasSavedRef.current = true;
     try {
       const updated = await actionClearDailyLogField(currentDate, field);
       if (updated) {
@@ -292,6 +314,7 @@ export function InputContainer({ userId }: { userId: string | null }) {
 
   const handleFreeText = async (text: string) => {
     setIsFreeTextSaving(true);
+    hasSavedRef.current = true;
     try {
       const update = await actionParseFreText(
         text,

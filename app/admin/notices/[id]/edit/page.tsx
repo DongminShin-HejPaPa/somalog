@@ -52,7 +52,7 @@ export default async function AdminNoticesEditPage({
   }));
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="space-y-6">
       <div>
         <Link
           href="/admin/notices"
@@ -64,22 +64,24 @@ export default async function AdminNoticesEditPage({
         <h1 className="text-2xl font-bold tracking-tight">공지사항 수정</h1>
       </div>
 
-      <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
-        <NoticeForm mode="edit" notice={notice} adminUserId={adminUserId} />
-      </div>
-
-      {/* 댓글 관리 */}
-      {comments.length > 0 && (
+      <div className={`grid gap-6 items-start ${comments.length > 0 ? "xl:grid-cols-[1fr_360px]" : ""}`}>
         <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
-          <h2 className="text-base font-semibold mb-4">
-            댓글 관리
-            <span className="ml-2 text-sm text-muted-foreground font-normal">
-              {comments.length}개
-            </span>
-          </h2>
-          <CommentManager comments={comments} />
+          <NoticeForm mode="edit" notice={notice} adminUserId={adminUserId} />
         </div>
-      )}
+
+        {/* 댓글 관리 — xl 이상에서 우측 사이드 패널 */}
+        {comments.length > 0 && (
+          <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
+            <h2 className="text-base font-semibold mb-4">
+              댓글 관리
+              <span className="ml-2 text-sm text-muted-foreground font-normal">
+                {comments.length}개
+              </span>
+            </h2>
+            <CommentManager comments={comments} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

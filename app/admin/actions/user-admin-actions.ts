@@ -64,6 +64,16 @@ export async function actionAdminGeneratePasswordResetLink(
   return { ok: true, link: data.properties.action_link };
 }
 
+// ─── 유저 삭제 ────────────────────────────────────────────────────────────
+// auth user 삭제 → FK cascade로 user_profiles, daily_logs 등 함께 삭제됨
+export async function actionAdminDeleteUser(userId: string) {
+  await requireAdmin();
+  const client = createAdminClient();
+  const { error } = await client.auth.admin.deleteUser(userId);
+  if (error) throw new Error(error.message);
+  revalidatePath("/admin/users");
+}
+
 // ─── 관리자 메모 저장 ─────────────────────────────────────────────────────
 export async function actionAdminUpdateMemo(userId: string, memo: string) {
   await requireAdmin();

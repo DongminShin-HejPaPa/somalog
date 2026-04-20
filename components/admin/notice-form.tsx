@@ -259,7 +259,7 @@ export function NoticeForm({ mode, notice, adminUserId }: NoticeFormProps) {
           <MDEditor
             value={content}
             onChange={(v) => handleContentChange(v ?? "")}
-            height={360}
+            height={520}
             preview="live"
           />
         </div>

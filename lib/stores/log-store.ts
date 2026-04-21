@@ -3,6 +3,7 @@
 import type { DailyLog } from "@/lib/types";
 
 const STALE_MS = 2 * 60 * 1000; // 2 minutes
+const HOME_CACHE_KEY = 'somalog_home_v1';
 
 class LogStore {
   private currentUserId: string | null = null;
@@ -155,6 +156,7 @@ class LogStore {
   }
 
   clear() {
+    this.clearHomeCache();
     this.cache.clear();
     this.recentLogs = null;
     this.weeklyLogs = null;
@@ -164,6 +166,29 @@ class LogStore {
     this.lowestWeightFetched = false;
     this.lastFetchTime = 0;
     this.autoCloseFired = false;
+  }
+
+  saveHomeCache(userId: string, recentLogs: DailyLog[], activeLog: DailyLog | null): void {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(HOME_CACHE_KEY, JSON.stringify({ userId, recentLogs, activeLog }));
+    } catch {}
+  }
+
+  loadHomeCache(userId: string): { recentLogs: DailyLog[]; activeLog: DailyLog | null } | null {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = localStorage.getItem(HOME_CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { userId: string; recentLogs: DailyLog[]; activeLog: DailyLog | null };
+      if (parsed.userId !== userId) return null;
+      return { recentLogs: parsed.recentLogs, activeLog: parsed.activeLog };
+    } catch { return null; }
+  }
+
+  private clearHomeCache(): void {
+    if (typeof window === 'undefined') return;
+    try { localStorage.removeItem(HOME_CACHE_KEY); } catch {}
   }
 }
 

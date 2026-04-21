@@ -59,13 +59,37 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
         // Stale: background refresh without blocking UI
         if (logStore.isStale()) {
           fetchFresh()
-            .then(({ logs, firstUnclosed, todayLog }) => populate(logs, firstUnclosed, todayLog))
+            .then(({ logs, firstUnclosed, todayLog }) => {
+              populate(logs, firstUnclosed, todayLog);
+              if (userId) logStore.saveHomeCache(userId, logs, firstUnclosed ?? todayLog ?? null);
+            })
             .catch(() => {});
         }
       } else {
-        // No cache yet: must fetch (skeleton shows until complete)
-        const { logs, firstUnclosed, todayLog } = await fetchFresh();
-        populate(logs, firstUnclosed, todayLog);
+        // Check localStorage (PWA re-open: in-memory cleared but localStorage persists)
+        const localCache = userId ? logStore.loadHomeCache(userId) : null;
+
+        if (localCache) {
+          // Instant display from localStorage — no skeleton shown
+          setRecentLogs(localCache.recentLogs);
+          setActiveLog(localCache.activeLog);
+          // Populate logStore so other tabs (Input, etc.) benefit from the data
+          logStore.setRecentLogs(localCache.recentLogs);
+          if (localCache.activeLog) logStore.setLog(localCache.activeLog);
+
+          // Always background-refresh: localStorage data may be hours old
+          fetchFresh()
+            .then(({ logs, firstUnclosed, todayLog }) => {
+              populate(logs, firstUnclosed, todayLog);
+              if (userId) logStore.saveHomeCache(userId, logs, firstUnclosed ?? todayLog ?? null);
+            })
+            .catch(() => {});
+        } else {
+          // No cache anywhere: must fetch (skeleton shows until complete)
+          const { logs, firstUnclosed, todayLog } = await fetchFresh();
+          populate(logs, firstUnclosed, todayLog);
+          if (userId) logStore.saveHomeCache(userId, logs, firstUnclosed ?? todayLog ?? null);
+        }
       }
 
       // Background prefetch for Records & Graph tabs (1s delay, non-blocking)
@@ -101,7 +125,9 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
             logStore.setRecentLogs(updatedLogs);
             setRecentLogs(updatedLogs);
             const newFirstUnclosed = logStore.getFirstUnclosedLog();
-            setActiveLog(newFirstUnclosed ?? logStore.getLog(today));
+            const newActiveLog = newFirstUnclosed ?? logStore.getLog(today) ?? null;
+            setActiveLog(newActiveLog);
+            if (userId) logStore.saveHomeCache(userId, updatedLogs, newActiveLog);
           }
         })
         .catch(() => {});
@@ -135,7 +161,9 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
       const nextUnclosed = [...updatedLogs]
         .filter((l) => !l.closed && l.date <= today)
         .sort((a, b) => a.date.localeCompare(b.date))[0] ?? null;
-      setActiveLog(nextUnclosed ?? todayLog);
+      const newActiveLog = nextUnclosed ?? todayLog ?? null;
+      setActiveLog(newActiveLog);
+      if (userId) logStore.saveHomeCache(userId, updatedLogs, newActiveLog);
     } finally {
       setIsClosingDay(false);
     }

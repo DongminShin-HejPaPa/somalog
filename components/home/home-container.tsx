@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { actionGetDailyLog, actionUpsertDailyLog, actionGetRecentDailyLogs, actionCloseDailyLog, actionGetFirstUnclosedLog, actionGetWeeklyLogs, actionGetDailyLogsTotalCount, actionGetAllDailyLogs, actionGetLowestWeight, actionAutoCloseOldLogs } from "@/app/actions/log-actions";
 import { HomeContent } from "./home-content";
@@ -110,20 +110,12 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
     init();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 인사말: 데이터가 처음 준비됐을 때 한 번만 계산
-  const greetingComputed = useRef(false);
+  // 인사말: 필요한 데이터가 준비될 때마다 갱신
   useEffect(() => {
-    if (
-      !greetingComputed.current &&
-      initialDisplayName &&
-      activeLog !== undefined &&
-      recentLogs !== undefined &&
-      settings.onboardingComplete
-    ) {
-      greetingComputed.current = true;
+    if (initialDisplayName && activeLog !== undefined && recentLogs !== undefined && settings.onboardingComplete) {
       setGreeting(getGreetingMessage(initialDisplayName, activeLog ?? null, recentLogs, settings));
     }
-  }, [activeLog, recentLogs, settings, initialDisplayName]);
+  }, [initialDisplayName, activeLog, recentLogs, settings]);
 
   const handleCloseDay = async () => {
     if (!activeLog || activeLog.closed || isClosingDay) return;

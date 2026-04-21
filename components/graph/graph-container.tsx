@@ -15,6 +15,11 @@ export function GraphContainer({ userId }: { userId: string | null }) {
   const [logs, setLogs] = useState<DailyLog[] | undefined>(undefined);
   const [lowest, setLowest] = useState<{ weight: number; date: string } | undefined>(undefined);
 
+  const handleActivityLevelChange = useCallback(
+    (level: number) => updateSettings({ activityLevel: level }),
+    [updateSettings]
+  );
+
   useEffect(() => {
     logStore.invalidateIfUserChanged(userId);
 
@@ -55,11 +60,6 @@ export function GraphContainer({ userId }: { userId: string | null }) {
       </div>
     );
   }
-
-  const handleActivityLevelChange = useCallback(
-    (level: number) => updateSettings({ activityLevel: level }),
-    [updateSettings]
-  );
 
   return (
     <WeightChart

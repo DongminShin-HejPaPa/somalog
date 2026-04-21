@@ -387,6 +387,11 @@ function computeLoess(
 
 type ChartMode = "weight" | "bodyfat";
 
+function BfDot({ cx, cy, payload }: { cx?: number; cy?: number; payload?: { bodyFatEst: number | null } }) {
+  if (!cx || !cy || !payload || payload.bodyFatEst === null) return null;
+  return <circle cx={cx} cy={cy} r={4} fill="#a855f7" stroke="white" strokeWidth={2} />;
+}
+
 export function WeightChart({
   logs,
   startWeight,
@@ -829,7 +834,7 @@ export function WeightChart({
                 dataKey="bodyFatEst"
                 stroke="#a855f7"
                 strokeWidth={2}
-                dot={<circle r={4} fill="#a855f7" stroke="white" strokeWidth={2} />}
+                dot={<BfDot />}
                 activeDot={{ r: 6 }}
                 connectNulls
               />

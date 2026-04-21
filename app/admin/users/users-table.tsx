@@ -14,13 +14,14 @@ import {
   Ban,
   CheckCircle2,
   KeyRound,
-  Copy,
   Check,
+  Trash2,
 } from "lucide-react";
 import {
   actionAdminUpdateRole,
   actionAdminToggleActive,
   actionAdminGeneratePasswordResetLink,
+  actionAdminDeleteUser,
 } from "@/app/admin/actions/user-admin-actions";
 import type { UserRow } from "./page";
 
@@ -161,6 +162,53 @@ function ActiveButton({ userId, isActive }: { userId: string; isActive: boolean 
   );
 }
 
+// 유저 삭제 버튼 (2단계 확인)
+function DeleteButton({ userId, email }: { userId: string; email: string }) {
+  const [step, setStep] = useState<"idle" | "confirm">("idle");
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+
+  function handleDelete() {
+    startTransition(async () => {
+      await actionAdminDeleteUser(userId);
+      router.refresh();
+    });
+  }
+
+  if (step === "confirm") {
+    return (
+      <div className="flex items-center gap-1">
+        <button
+          onClick={handleDelete}
+          disabled={isPending}
+          className={cn(
+            "px-2 py-0.5 text-[10px] font-bold rounded-full bg-rose-700 text-white",
+            isPending && "opacity-50"
+          )}
+        >
+          {isPending ? "..." : "삭제확인"}
+        </button>
+        <button
+          onClick={() => setStep("idle")}
+          className="text-[10px] text-muted-foreground"
+        >
+          취소
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => setStep("confirm")}
+      title={`${email} 영구 삭제`}
+      className="p-1.5 rounded-lg hover:bg-rose-50 transition-colors text-muted-foreground hover:text-rose-600"
+    >
+      <Trash2 className="w-4 h-4" />
+    </button>
+  );
+}
+
 // ─── 메인 테이블 ──────────────────────────────────────────────────────────
 const PAGE_SIZE = 20;
 
@@ -293,7 +341,7 @@ export function UsersTable({ users }: { users: UserRow[] }) {
                 >
                   <span className="flex items-center justify-end gap-1">로그 <SortIcon k="logCount" /></span>
                 </th>
-                <th className="w-28 px-3 py-3" />
+                <th className="w-36 px-3 py-3" />
               </tr>
             </thead>
             <tbody>
@@ -340,6 +388,7 @@ export function UsersTable({ users }: { users: UserRow[] }) {
                       <div className="flex items-center justify-end gap-0.5">
                         <ResetLinkButton email={u.email} />
                         <ActiveButton userId={u.id} isActive={u.isActive} />
+                        <DeleteButton userId={u.id} email={u.email} />
                         <Link
                           href={`/admin/users/${u.id}`}
                           className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"

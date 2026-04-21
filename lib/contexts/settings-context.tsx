@@ -55,6 +55,8 @@ export const DEFAULT_SETTINGS: Settings = {
   height: 0,
   currentWeight: 0,
   gender: "남성",
+  birthDate: null,
+  activityLevel: 1.2,
   dietStartDate: "",
   startWeight: 0,
   targetWeight: 0,

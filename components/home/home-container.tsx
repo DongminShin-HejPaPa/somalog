@@ -13,7 +13,6 @@ import { logStore } from "@/lib/stores/log-store";
 
 export function HomeContainer({ userId }: { userId: string | null }) {
   const [displayName, setDisplayName] = useState<string | null | undefined>(undefined);
-  // activeLog: 홈에서 보여줄 로그 (초기=오늘, 마감 후=다음 미마감)
   const [activeLog, setActiveLog] = useState<DailyLog | null | undefined>(undefined);
   const [recentLogs, setRecentLogs] = useState<DailyLog[] | undefined>(undefined);
   const [greeting, setGreeting] = useState<string | null>(null);
@@ -34,46 +33,55 @@ export function HomeContainer({ userId }: { userId: string | null }) {
       );
     });
 
-    const init = async () => {
-      logStore.invalidateIfUserChanged(userId);
-      const today = formatDate(new Date());
+    logStore.invalidateIfUserChanged(userId);
+    const today = formatDate(new Date());
 
-      let logs: DailyLog[];
-      let firstUnclosed: DailyLog | null = null;
-      let todayLog: DailyLog | null = null;
-
-      if (!logStore.isStale() && logStore.getRecentLogs()) {
-        logs = logStore.getRecentLogs()!;
-        firstUnclosed = logStore.getFirstUnclosedLog();
-        todayLog = logStore.getLog(today) ?? await actionGetDailyLog(today);
-        if (todayLog) logStore.setLog(todayLog);
-      } else {
-        const [fetchedFirst, fetchedLogs, fetchedToday] = await Promise.all([
-          actionGetFirstUnclosedLog(),
-          actionGetRecentDailyLogs(30),
-          actionGetDailyLog(today),
-        ]);
-        logs = fetchedLogs;
-        firstUnclosed = fetchedFirst;
-        todayLog = fetchedToday;
-        // 오늘 로그가 없으면 빈 로그 자동 생성 (시험 일자 동일 처리)
-        if (!todayLog) {
-          todayLog = await actionUpsertDailyLog(today, {});
-        }
-        logStore.setRecentLogs(logs);
-        if (todayLog) logStore.setLog(todayLog);
-      }
-
+    const populate = (logs: DailyLog[], firstUnclosed: DailyLog | null, todayLog: DailyLog | null) => {
       setRecentLogs(logs);
       setActiveLog(firstUnclosed ?? todayLog);
     };
 
-    init().then(() => {
-      // 백그라운드 프리페치: Records & Graph 탭 데이터 (1초 지연)
+    const fetchFresh = async () => {
+      const [fetchedFirst, fetchedLogs, fetchedToday] = await Promise.all([
+        actionGetFirstUnclosedLog(),
+        actionGetRecentDailyLogs(30),
+        actionGetDailyLog(today),
+      ]);
+      let todayLog = fetchedToday;
+      if (!todayLog) {
+        todayLog = await actionUpsertDailyLog(today, {});
+      }
+      logStore.setRecentLogs(fetchedLogs);
+      if (todayLog) logStore.setLog(todayLog);
+      return { logs: fetchedLogs, firstUnclosed: fetchedFirst, todayLog };
+    };
+
+    const init = async () => {
+      const cachedLogs = logStore.getRecentLogs();
+
+      if (cachedLogs) {
+        // Instant display from cache — no skeleton shown
+        const firstUnclosed = logStore.getFirstUnclosedLog();
+        const cachedToday = logStore.getLog(today) ?? cachedLogs.find((l) => l.date === today) ?? null;
+        populate(cachedLogs, firstUnclosed, cachedToday);
+
+        // Stale: background refresh without blocking UI
+        if (logStore.isStale()) {
+          fetchFresh()
+            .then(({ logs, firstUnclosed, todayLog }) => populate(logs, firstUnclosed, todayLog))
+            .catch(() => {});
+        }
+      } else {
+        // No cache yet: must fetch (skeleton shows until complete)
+        const { logs, firstUnclosed, todayLog } = await fetchFresh();
+        populate(logs, firstUnclosed, todayLog);
+      }
+
+      // Background prefetch for Records & Graph tabs (1s delay, non-blocking)
       setTimeout(() => {
         const promises: Promise<any>[] = [];
         const fetchRecords = !logStore.getWeeklyLogs() || logStore.getTotalCount() === null;
-        const fetchGraph = !logStore.getAllLogs() || !logStore.getLowestWeight();
+        const fetchGraph = !logStore.getAllLogs() || !logStore.hasLowestWeight();
 
         if (fetchRecords) {
           promises.push(
@@ -94,21 +102,22 @@ export function HomeContainer({ userId }: { userId: string | null }) {
         Promise.all(promises).catch(() => {});
       }, 1000);
 
-      // 백그라운드 구형 로그 마감 처리 (이곳에서도 처리하여 홈뷰 마감 일치성 달성)
-      actionAutoCloseOldLogs()
-        .then(async (result) => {
+      // Auto-close: deduplicated via logStore so only one container fires per session
+      logStore.runAutoCloseOnce(() => actionAutoCloseOldLogs())
+        ?.then(async (result) => {
           if (result.filledCount + result.closedCount > 0) {
             const updatedLogs = await actionGetRecentDailyLogs(30);
             logStore.setRecentLogs(updatedLogs);
             setRecentLogs(updatedLogs);
-
             const newFirstUnclosed = logStore.getFirstUnclosedLog();
-            setActiveLog(newFirstUnclosed ?? logStore.getLog(formatDate(new Date())));
+            setActiveLog(newFirstUnclosed ?? logStore.getLog(today));
           }
         })
         .catch(() => {});
-    });
-  }, []);
+    };
+
+    init();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (displayName && activeLog !== undefined && recentLogs !== undefined && settings.onboardingComplete) {
@@ -117,10 +126,6 @@ export function HomeContainer({ userId }: { userId: string | null }) {
     }
   }, [displayName, activeLog, recentLogs, settings]);
 
-  /**
-   * "이날은 이대로 마감하기" — 마감 후 다음 미마감 날짜로 이동
-   * recentLogs(내림차순)에서 날짜 제한 없이 첫 번째 미마감 로그를 다음 활성 날짜로 설정
-   */
   const handleCloseDay = async () => {
     if (!activeLog || activeLog.closed || isClosingDay) return;
     setIsClosingDay(true);
@@ -136,7 +141,6 @@ export function HomeContainer({ userId }: { userId: string | null }) {
       if (todayLog) logStore.setLog(todayLog);
       setRecentLogs(updatedLogs);
 
-      // 마감 후 남은 미마감 중 가장 오래된 날짜로 이동
       const nextUnclosed = [...updatedLogs]
         .filter((l) => !l.closed && l.date <= today)
         .sort((a, b) => a.date.localeCompare(b.date))[0] ?? null;

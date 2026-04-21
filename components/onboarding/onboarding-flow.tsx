@@ -54,6 +54,7 @@ export function OnboardingFlow() {
   const [height, setHeight] = useState("178");
   const [weight, setWeight] = useState("93.5");
   const [gender, setGender] = useState<"남성" | "여성">("남성");
+  const [birthDate, setBirthDate] = useState<string | null>(null);
 
   // Step 3
   const [targetWeight, setTargetWeight] = useState("");
@@ -164,6 +165,7 @@ export function OnboardingFlow() {
       height: Number(height) || 0,
       currentWeight: weightNum,
       gender,
+      birthDate,
       dietStartDate: today,
       startWeight: weightNum,
       targetWeight: Number(targetWeight) || 0,
@@ -176,6 +178,7 @@ export function OnboardingFlow() {
       intensiveDayCriteria,
       coachStylePreset: selectedStyle as Settings["coachStylePreset"],
       coachStyleExtra: [],
+      activityLevel: 1.2,
     });
 
     router.push("/home");
@@ -203,6 +206,7 @@ export function OnboardingFlow() {
       height: Number(height) || 0,
       currentWeight: weightNum,
       gender,
+      birthDate,
       dietStartDate: today,
       startWeight: weightNum,
       targetWeight: Number(targetWeight) || 0,
@@ -215,6 +219,7 @@ export function OnboardingFlow() {
       intensiveDayCriteria,
       coachStylePreset: selectedStyle as Settings["coachStylePreset"],
       coachStyleExtra: [],
+      activityLevel: 1.2,
     });
     router.push("/home");
   };
@@ -341,6 +346,21 @@ export function OnboardingFlow() {
                     {g}
                   </button>
                 ))}
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={birthDate ?? ""}
+                    onChange={(e) => setBirthDate(e.target.value || null)}
+                    max={new Date().toISOString().split("T")[0]}
+                    className="flex-1 px-3 py-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[48px]"
+                  />
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">생년월일 (선택)</span>
+                </div>
+                <p className="text-xs text-muted-foreground/70 px-1">
+                  입력하면 BMI·대사량·체성분 등 더 정확한 정보를 제공받을 수 있어요.
+                </p>
               </div>
             </div>
           )}

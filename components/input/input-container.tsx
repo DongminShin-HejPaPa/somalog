@@ -26,7 +26,6 @@ import type { DailyLog, DailyLogUpdate, ClearableField } from "@/lib/types";
 import { logStore } from "@/lib/stores/log-store";
 
 function fmtShort(dateStr: string): string {
-  // "2026-04-01" → "4/1"
   const [, m, d] = dateStr.split("-");
   return `${parseInt(m)}/${parseInt(d)}`;
 }
@@ -50,7 +49,6 @@ export function InputContainer({ userId }: { userId: string | null }) {
   const [autoCloseToast, setAutoCloseToast] = useState<string | null>(null);
   const [pendingOldClose, setPendingOldClose] = useState<{ from: string; to: string } | null>(null);
 
-  // currentDate 기준 이전 최신 체중 (날짜 이동 시마다 자동 재계산)
   const prevWeight = useMemo(() => {
     const before = allLogs
       .filter((l) => l.weight !== null && l.date < currentDate)
@@ -65,12 +63,18 @@ export function InputContainer({ userId }: { userId: string | null }) {
   const [closeNavMessage, setCloseNavMessage] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  const currentDateRef = useRef(currentDate);
+  useEffect(() => {
+    currentDateRef.current = currentDate;
+  }, [currentDate]);
+
+  const hasSavedRef = useRef(false);
+
   const updateCache = useCallback((log: DailyLog) => {
     logStore.setLog(log);
   }, []);
 
   const loadLog = useCallback(async (date: string) => {
-    // 글로벌 캐시 히트
     const cached = logStore.getLog(date);
     if (cached) {
       setCurrentLog(cached);
@@ -82,7 +86,6 @@ export function InputContainer({ userId }: { userId: string | null }) {
     setIsLoading(true);
     try {
       let log = await actionGetDailyLog(date);
-      // 로그가 없으면 빈 로그 자동 생성 (오늘 포함, 과거 날짜도 동일하게 적용)
       if (!log && date <= formatDate(new Date())) {
         log = await actionUpsertDailyLog(date, {});
       }
@@ -98,61 +101,88 @@ export function InputContainer({ userId }: { userId: string | null }) {
   }, []);
 
   useEffect(() => {
+    logStore.invalidateIfUserChanged(userId);
+    const today = formatDate(new Date());
+
+    const applyLogs = (logs: DailyLog[]) => {
+      const unclosed = logs.filter((l) => !l.closed);
+      setPendingDays(unclosed.length);
+      setAllLogs(logs);
+      const dietStart = settings.dietStartDate;
+      const dates = logs.map((l) => l.date).sort();
+      setMinDate(dietStart || (dates.length > 0 ? dates[0] : today));
+    };
+
     const init = async () => {
-      logStore.invalidateIfUserChanged(userId);
-      actionAutoCloseOldLogs().then(async (result) => {
-        // 7일 이상 미마감 → 사용자에게 확인 요청 (자동 마감 안 함)
-        if (result.hadOldUnclosed && result.oldUnclosedRange) {
-          setPendingOldClose(result.oldUnclosedRange);
-        }
-        // 30일 초과 자동 마감 또는 누락 날짜 채움이 발생한 경우
-        const total = result.filledCount + result.closedCount;
-        if (total > 0) {
-          if (!result.hadOldUnclosed) {
-            setAutoCloseToast(`한 달 넘게 지난 미마감 날짜 ${result.closedCount}일을 자동 마감했어요`);
-            setTimeout(() => setAutoCloseToast(null), 5000);
+      // Auto-close: deduplicated via logStore so only one container fires per session
+      logStore.runAutoCloseOnce(() => actionAutoCloseOldLogs())
+        ?.then(async (result) => {
+          if (result.hadOldUnclosed && result.oldUnclosedRange) {
+            setPendingOldClose(result.oldUnclosedRange);
           }
-          const updatedLogs = await actionGetRecentDailyLogs(30);
-          logStore.setRecentLogs(updatedLogs);
-          setAllLogs(updatedLogs);
-          const newFirstUnclosed = logStore.getFirstUnclosedLog();
-          const newTargetDate = newFirstUnclosed?.date ?? formatDate(new Date());
-          await loadLog(newTargetDate);
+          const total = result.filledCount + result.closedCount;
+          if (total > 0) {
+            if (!result.hadOldUnclosed) {
+              setAutoCloseToast(`한 달 넘게 지난 미마감 날짜 ${result.closedCount}일을 자동 마감했어요`);
+              setTimeout(() => setAutoCloseToast(null), 5000);
+            }
+            const updatedLogs = await actionGetRecentDailyLogs(30);
+            logStore.setRecentLogs(updatedLogs);
+            applyLogs(updatedLogs);
+            const newFirstUnclosed = logStore.getFirstUnclosedLog();
+            const newTargetDate = newFirstUnclosed?.date ?? formatDate(new Date());
+            await loadLog(newTargetDate);
+          }
+        })
+        .catch(() => {});
+
+      const cachedLogs = logStore.getRecentLogs();
+
+      if (cachedLogs) {
+        // Instant display from cache — no skeleton shown
+        applyLogs(cachedLogs);
+        const firstUnclosed = logStore.getFirstUnclosedLog();
+        const targetDate = firstUnclosed?.date ?? today;
+        await loadLog(targetDate); // per-date cache hit → instant; else single fetch
+
+        // Stale: background refresh without blocking UI
+        if (logStore.isStale()) {
+          Promise.all([
+            actionGetRecentDailyLogs(30),
+            actionGetFirstUnclosedLog(),
+          ])
+            .then(([freshLogs]) => {
+              logStore.setRecentLogs(freshLogs);
+              applyLogs(freshLogs);
+              // Update currentLog with fresh server data — but only if the user
+              // hasn't saved anything yet in this session. If hasSavedRef is true,
+              // handleModalSave already called setCurrentLog(updated) with the
+              // server response (which is newer than what the background fetch returned),
+              // so overwriting would revert the feedback to a stale value.
+              if (!hasSavedRef.current) {
+                const freshCurrentLog = freshLogs.find(
+                  (l) => l.date === currentDateRef.current
+                );
+                if (freshCurrentLog) {
+                  setCurrentLog(freshCurrentLog);
+                }
+              }
+            })
+            .catch(() => {});
         }
-      }).catch(() => { });
-
-      // 2. 글로벌 캐시 유효성 확인
-      const today = formatDate(new Date());
-      let logs: DailyLog[];
-      let firstUnclosed: DailyLog | null;
-
-      if (!logStore.isStale() && logStore.getRecentLogs()) {
-        logs = logStore.getRecentLogs()!;
-        firstUnclosed = logStore.getFirstUnclosedLog();
       } else {
+        // No cache yet: fetch (skeleton shows until complete)
         const [fetchedLogs, fetchedFirstUnclosed] = await Promise.all([
           actionGetRecentDailyLogs(30),
           actionGetFirstUnclosedLog(),
         ]);
-        logs = fetchedLogs;
-        firstUnclosed = fetchedFirstUnclosed;
-        logStore.setRecentLogs(logs);
+        logStore.setRecentLogs(fetchedLogs);
+        applyLogs(fetchedLogs);
+        const targetDate = fetchedFirstUnclosed?.date ?? today;
+        await loadLog(targetDate);
       }
-
-      const unclosed = logs.filter((l) => !l.closed);
-      setPendingDays(unclosed.length);
-      setAllLogs(logs);
-
-      // 네비게이션 하한선
-      const dietStart = settings.dietStartDate;
-      const dates = logs.map((l) => l.date).sort();
-      const lowerBound = dietStart || (dates.length > 0 ? dates[0] : today);
-      setMinDate(lowerBound);
-
-      // 타겟 날짜: DB에서 직접 조회한 첫 미마감 날짜 (없으면 오늘)
-      const targetDate = firstUnclosed?.date ?? today;
-      await loadLog(targetDate);
     };
+
     init();
   }, [loadLog]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -193,15 +223,14 @@ export function InputContainer({ userId }: { userId: string | null }) {
   const handleModalSave = async (update: DailyLogUpdate) => {
     const previousLog = currentLog;
 
-    // 낙관적 업데이트: 모달 즉시 닫고 UI 먼저 반영
     setCurrentLog(currentLog ? { ...currentLog, ...update } as DailyLog : null);
     setModalField(null);
 
+    hasSavedRef.current = true;
     try {
       const updated = await actionUpsertDailyLog(currentDate, update);
       setCurrentLog(updated);
       updateCache(updated);
-      // prevWeight 파생값이 다음 날짜 이동 시 올바르도록 allLogs 동기화
       setAllLogs((prev) => {
         const exists = prev.some((l) => l.date === currentDate);
         if (exists) return prev.map((l) => (l.date === currentDate ? updated : l));
@@ -209,7 +238,6 @@ export function InputContainer({ userId }: { userId: string | null }) {
       });
     } catch {
       setCurrentLog(previousLog);
-      // 롤백 시 자동 마감 ref 초기화: 재입력 후 자동 마감 재시도 가능하도록
       autoCloseFiredRef.current = false;
       setSaveError("저장에 실패했습니다. 다시 시도해주세요.");
       setTimeout(() => setSaveError(null), 4000);
@@ -226,9 +254,9 @@ export function InputContainer({ userId }: { userId: string | null }) {
 
   const handleDelete = async (field: ClearableField) => {
     const previousLog = currentLog;
-    // 낙관적 업데이트: 즉시 UI 반영
     setCurrentLog(currentLog ? { ...currentLog, [field]: null } as DailyLog : null);
     setModalField(null);
+    hasSavedRef.current = true;
     try {
       const updated = await actionClearDailyLogField(currentDate, field);
       if (updated) {
@@ -255,7 +283,6 @@ export function InputContainer({ userId }: { userId: string | null }) {
       setCurrentLog(updated);
       updateCache(updated);
 
-      // 마감 후 상태 갱신
       const logs = await actionGetRecentDailyLogs(30);
       logStore.setRecentLogs(logs);
       const unclosed = logs.filter((l) => !l.closed);
@@ -265,7 +292,6 @@ export function InputContainer({ userId }: { userId: string | null }) {
       const dates = logs.map((l) => l.date).sort();
       if (dates.length > 0) setMinDate(dates[0]);
 
-      // 마감 후 가장 오래된 미마감 날짜로 이동
       const sortedUnclosed = [...unclosed]
         .filter((l) => l.date <= today)
         .sort((a, b) => a.date.localeCompare(b.date));
@@ -275,7 +301,6 @@ export function InputContainer({ userId }: { userId: string | null }) {
         setTimeout(() => setCloseNavMessage(null), 3000);
         await loadLog(nextTarget);
       } else {
-        // 모든 날 마감 완료
         setCloseNavMessage("모든 날을 마감했습니다! 오늘 하루도 수고 많으셨어요 🎉");
         setTimeout(() => setCloseNavMessage(null), 4000);
         await loadLog(today);
@@ -289,6 +314,7 @@ export function InputContainer({ userId }: { userId: string | null }) {
 
   const handleFreeText = async (text: string) => {
     setIsFreeTextSaving(true);
+    hasSavedRef.current = true;
     try {
       const update = await actionParseFreText(
         text,
@@ -310,14 +336,12 @@ export function InputContainer({ userId }: { userId: string | null }) {
     }
   };
 
-  // URL ?open= 파라미터로 모달 자동 열기
   const hasAutoOpened = useRef(false);
   useEffect(() => {
     const open = searchParams.get("open") as ItemKey | null;
     if (open && !isLoading && currentLog && !currentLog.closed && !hasAutoOpened.current) {
       setModalField(open);
       hasAutoOpened.current = true;
-      // Optional: Replace URL state to remove query parameter
       window.history.replaceState(null, '', '/input');
     }
   }, [searchParams, isLoading, currentLog]);
@@ -332,8 +356,6 @@ export function InputContainer({ userId }: { userId: string | null }) {
     ? allFields.filter((k) => currentLog[k] != null).length
     : 0;
 
-  // 로그가 로드(또는 재오픈)될 때의 completedCount를 기준으로 저장
-  // → 이미 전체가 채워진 상태로 열렸다면 자동 마감 비활성화
   const loadTimeCountRef = useRef<number>(0);
   const autoCloseFiredRef = useRef(false);
   useEffect(() => {
@@ -342,17 +364,13 @@ export function InputContainer({ userId }: { userId: string | null }) {
     autoCloseFiredRef.current = false;
   }, [currentLog?.date, currentLog?.closed, isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 최신 handleClose를 타이머에서 참조하기 위한 ref
   const handleCloseRef = useRef(handleClose);
   useEffect(() => {
     handleCloseRef.current = handleClose;
   }, [handleClose]);
 
-  // 모든 항목 입력 시 자동 마감 (로드 시점 기준값이 전체 미만이었을 때만)
   useEffect(() => {
     if (isLoading || completedCount < totalCount) return;
-    
-    // 현재 로그가 이미 마감되었는지는 handleClose 내부에서 확인하므로 안심
     if (completedCount === totalCount && !autoCloseFiredRef.current && loadTimeCountRef.current < totalCount) {
       autoCloseFiredRef.current = true;
       const timer = setTimeout(() => {

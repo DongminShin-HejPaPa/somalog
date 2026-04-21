@@ -19,33 +19,44 @@ export function LogContainer({ userId }: { userId: string | null }) {
   const [totalCount, setTotalCount] = useState(0);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-  const fetchInitial = useCallback(async () => {
-    logStore.invalidateIfUserChanged(userId);
-    if (!logStore.isStale() && logStore.getRecentLogs() && logStore.getWeeklyLogs() && logStore.getTotalCount() !== null) {
-      setLogs(logStore.getRecentLogs()!);
-      setWeeklyLogs(logStore.getWeeklyLogs()!);
-      setTotalCount(logStore.getTotalCount()!);
-      return;
-    }
-
-    const [fetchedLogs, fetchedWeekly, count] = await Promise.all([
-      actionGetRecentDailyLogs(PAGE_SIZE),
-      actionGetWeeklyLogs(4),
-      actionGetDailyLogsTotalCount(),
-    ]);
-    
-    logStore.setRecentLogs(fetchedLogs);
-    logStore.setWeeklyLogs(fetchedWeekly);
-    logStore.setTotalCount(count);
-    
-    setLogs(fetchedLogs);
-    setWeeklyLogs(fetchedWeekly);
-    setTotalCount(count);
-  }, []);
-
   useEffect(() => {
-    fetchInitial();
-  }, [fetchInitial]);
+    logStore.invalidateIfUserChanged(userId);
+
+    const cachedLogs = logStore.getRecentLogs();
+    const cachedWeekly = logStore.getWeeklyLogs();
+    const cachedCount = logStore.getTotalCount();
+
+    const applyFresh = (freshLogs: DailyLog[], freshWeekly: WeeklyLog[], count: number) => {
+      logStore.setRecentLogs(freshLogs);
+      logStore.setWeeklyLogs(freshWeekly);
+      logStore.setTotalCount(count);
+      setLogs(freshLogs);
+      setWeeklyLogs(freshWeekly);
+      setTotalCount(count);
+    };
+
+    const fetchAll = () =>
+      Promise.all([
+        actionGetRecentDailyLogs(PAGE_SIZE),
+        actionGetWeeklyLogs(4),
+        actionGetDailyLogsTotalCount(),
+      ]).then(([freshLogs, freshWeekly, count]) => applyFresh(freshLogs, freshWeekly, count));
+
+    if (cachedLogs && cachedWeekly !== null && cachedCount !== null) {
+      // Instant display from cache — no skeleton shown
+      setLogs(cachedLogs);
+      setWeeklyLogs(cachedWeekly);
+      setTotalCount(cachedCount);
+
+      // Stale: background refresh without blocking UI
+      if (logStore.isStale()) {
+        fetchAll().catch(() => {});
+      }
+    } else {
+      // No cache yet: fetch (skeleton shows until complete)
+      fetchAll().catch(() => {});
+    }
+  }, [userId]);
 
   const handleLoadMore = async () => {
     if (!logs || isLoadingMore) return;
@@ -69,7 +80,7 @@ export function LogContainer({ userId }: { userId: string | null }) {
     logStore.setRecentLogs(refreshedLogs);
     logStore.setWeeklyLogs(refreshedWeekly);
     logStore.setTotalCount(newTotalCount);
-    
+
     setLogs(refreshedLogs);
     setWeeklyLogs(refreshedWeekly);
     setTotalCount(newTotalCount);

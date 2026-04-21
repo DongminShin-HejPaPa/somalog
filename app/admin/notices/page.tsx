@@ -65,7 +65,9 @@ export default async function AdminNoticesPage() {
               {notices.map((n) => (
                 <tr key={n.id} className="border-b border-border last:border-0 hover:bg-secondary/20 transition-colors">
                   <td className="px-4 py-3">
-                    <span className="font-medium line-clamp-1">{n.title}</span>
+                    <Link href={`/admin/notices/${n.id}/edit`} className="font-medium line-clamp-1 hover:text-navy transition-colors">
+                      {n.title}
+                    </Link>
                     <span className="text-xs text-muted-foreground ml-2">{n.author}</span>
                   </td>
                   <td className="px-3 py-3 text-center">

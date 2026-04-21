@@ -1,13 +1,14 @@
 import { ReactNode } from "react";
 import Link from "next/link";
-import { LayoutDashboard, Megaphone, Users, DollarSign, ChevronLeft } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { requireAdmin } from "@/lib/auth/admin-guard";
+import { AdminSidebarNav, AdminMobileNav } from "@/app/admin/components/admin-nav";
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   await requireAdmin();
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="fixed inset-0 z-50 bg-background flex overflow-hidden">
       {/* Sidebar Navigation */}
       <aside className="w-64 border-r border-border bg-card hidden md:flex flex-col">
         <div className="p-6 border-b border-border">
@@ -20,25 +21,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
             <span className="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded uppercase">Admin</span>
           </div>
         </div>
-        
-        <nav className="flex-1 p-4 space-y-1">
-          <Link href="/admin" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-secondary transition-colors text-foreground">
-            <LayoutDashboard className="w-4 h-4" />
-            대시보드
-          </Link>
-          <Link href="/admin/notices" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-secondary transition-colors text-muted-foreground">
-            <Megaphone className="w-4 h-4" />
-            공지사항 관리
-          </Link>
-          <Link href="/admin/users" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-secondary transition-colors text-muted-foreground">
-            <Users className="w-4 h-4" />
-            유저 관리
-          </Link>
-          <Link href="/admin/billing" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-secondary transition-colors text-muted-foreground">
-            <DollarSign className="w-4 h-4" />
-            API 비용 관리
-          </Link>
-        </nav>
+        <AdminSidebarNav />
       </aside>
 
       {/* Main Content */}
@@ -53,14 +36,8 @@ export default async function AdminLayout({ children }: { children: ReactNode })
             닫기
           </Link>
         </header>
-        
-        {/* Mobile Navigation Tabs (Scrollable) */}
-        <nav className="md:hidden flex overflow-x-auto p-2 border-b border-border bg-card gap-2 no-scrollbar">
-          <Link href="/admin" className="whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold bg-navy text-white">대시보드</Link>
-          <Link href="/admin/notices" className="whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:bg-secondary">공지사항</Link>
-          <Link href="/admin/users" className="whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:bg-secondary">유저</Link>
-          <Link href="/admin/billing" className="whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:bg-secondary">비용</Link>
-        </nav>
+
+        <AdminMobileNav />
 
         <div className="flex-1 p-6 overflow-y-auto">
           {children}

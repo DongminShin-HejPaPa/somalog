@@ -14,9 +14,8 @@ export default async function TabsLayout({
   let initialSettings: Settings | null = null;
   let userId: string | null = null;
   try {
-    const user = await getAuthUser();
+    const [user, s] = await Promise.all([getAuthUser(), getSettings()]);
     userId = user?.id ?? null;
-    const s = await getSettings();
     // onboardingComplete=false 는 DB에 설정이 없거나 인증 일시 실패인 경우.
     // null로 처리해 클라이언트가 localStorage 캐시 → actionGetSettings() 순으로 재시도하도록 함.
     initialSettings = s.onboardingComplete ? s : null;

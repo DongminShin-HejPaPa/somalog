@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { createBrowserClient } from "@supabase/ssr";
 import { actionGetDailyLog, actionUpsertDailyLog, actionGetRecentDailyLogs, actionCloseDailyLog, actionGetFirstUnclosedLog, actionGetWeeklyLogs, actionGetDailyLogsTotalCount, actionGetAllDailyLogs, actionGetLowestWeight, actionAutoCloseOldLogs } from "@/app/actions/log-actions";
 import { HomeContent } from "./home-content";
 import { formatDate } from "@/lib/utils/date-utils";
@@ -11,8 +10,13 @@ import { useSettings } from "@/lib/contexts/settings-context";
 import type { DailyLog } from "@/lib/types";
 import { logStore } from "@/lib/stores/log-store";
 
-export function HomeContainer({ userId }: { userId: string | null }) {
-  const [displayName, setDisplayName] = useState<string | null | undefined>(undefined);
+interface HomeContainerProps {
+  userId: string | null;
+  /** 서버에서 계산된 표시 이름 — getSession() 브라우저 호출 없이 즉시 사용 */
+  initialDisplayName: string | null;
+}
+
+export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps) {
   const [activeLog, setActiveLog] = useState<DailyLog | null | undefined>(undefined);
   const [recentLogs, setRecentLogs] = useState<DailyLog[] | undefined>(undefined);
   const [greeting, setGreeting] = useState<string | null>(null);
@@ -20,19 +24,6 @@ export function HomeContainer({ userId }: { userId: string | null }) {
   const { settings } = useSettings();
 
   useEffect(() => {
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!
-    );
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      const user = session?.user;
-      setDisplayName(
-        (user?.user_metadata?.full_name as string) ??
-        user?.email?.split("@")[0] ??
-        null
-      );
-    });
-
     logStore.invalidateIfUserChanged(userId);
     const today = formatDate(new Date());
 
@@ -119,12 +110,20 @@ export function HomeContainer({ userId }: { userId: string | null }) {
     init();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 인사말: 데이터가 처음 준비됐을 때 한 번만 계산
+  const greetingComputed = useRef(false);
   useEffect(() => {
-    if (displayName && activeLog !== undefined && recentLogs !== undefined && settings.onboardingComplete) {
-      const msg = getGreetingMessage(displayName, activeLog ?? null, recentLogs ?? [], settings);
-      setGreeting(msg);
+    if (
+      !greetingComputed.current &&
+      initialDisplayName &&
+      activeLog !== undefined &&
+      recentLogs !== undefined &&
+      settings.onboardingComplete
+    ) {
+      greetingComputed.current = true;
+      setGreeting(getGreetingMessage(initialDisplayName, activeLog ?? null, recentLogs, settings));
     }
-  }, [displayName, activeLog, recentLogs, settings]);
+  }, [activeLog, recentLogs, settings, initialDisplayName]);
 
   const handleCloseDay = async () => {
     if (!activeLog || activeLog.closed || isClosingDay) return;
@@ -162,7 +161,8 @@ export function HomeContainer({ userId }: { userId: string | null }) {
               b.{process.env.NEXT_PUBLIC_BUILD_TIME}-{process.env.NEXT_PUBLIC_COMMIT_SHA}
             </span>
           </div>
-          {displayName !== undefined && !displayName && (
+          {/* 비로그인 상태일 때 즉시 표시 (getSession 대기 없음) */}
+          {userId === null && (
             <Link
               href="/login"
               className="px-3 py-1.5 rounded-lg border border-navy text-navy text-xs font-semibold hover:bg-navy hover:text-white active:scale-[0.97] transition-all"
@@ -174,8 +174,8 @@ export function HomeContainer({ userId }: { userId: string | null }) {
         {greeting && (
           <p className="text-xs text-rose-500 mt-1 leading-relaxed">{greeting}</p>
         )}
-        {!greeting && displayName && (
-          <p className="text-xs text-muted-foreground mt-1">{displayName} 님</p>
+        {!greeting && initialDisplayName && (
+          <p className="text-xs text-muted-foreground mt-1">{initialDisplayName} 님</p>
         )}
       </header>
 

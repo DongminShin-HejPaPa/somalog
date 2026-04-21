@@ -42,9 +42,13 @@ export default function PrivacyPage() {
                   <td className="px-3 py-2">이메일 주소, 성명(닉네임)</td>
                   <td className="px-3 py-2">회원 가입 시</td>
                 </tr>
-                <tr>
+                <tr className="border-b border-border">
                   <td className="px-3 py-2">체중, 식단 기록, 운동 기록, 수분 섭취량 등 건강 데이터</td>
                   <td className="px-3 py-2">서비스 이용 중 직접 입력</td>
+                </tr>
+                <tr>
+                  <td className="px-3 py-2">생년월일, 키, 성별 (선택)</td>
+                  <td className="px-3 py-2">설정 또는 온보딩 시 선택 입력 — BMI·대사량·체성분 추정 등 건강 정보 제공 목적</td>
                 </tr>
               </tbody>
             </table>

@@ -65,6 +65,9 @@ export function GraphContainer({ userId }: { userId: string | null }) {
       targetMonths={settings.targetMonths}
       lowestWeight={lowest.weight}
       lowestWeightDate={lowest.date}
+      height={settings.height}
+      gender={settings.gender}
+      birthDate={settings.birthDate}
     />
   );
 }

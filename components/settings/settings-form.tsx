@@ -479,6 +479,24 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
             ))}
           </div>
         </div>
+        <div className="py-2 space-y-1.5">
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="text-sm text-muted-foreground">생년월일</label>
+              <span className="ml-1.5 text-xs text-muted-foreground/60">(선택)</span>
+            </div>
+            <input
+              type="date"
+              value={form.birthDate ?? ""}
+              onChange={(e) => handleChange("birthDate", e.target.value || null)}
+              max={new Date().toISOString().split("T")[0]}
+              className="text-sm px-2 py-1.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[36px] text-right"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground/70">
+            입력 시 BMI·대사량·체성분 추정 등 더 정확한 건강 정보를 확인할 수 있어요.
+          </p>
+        </div>
       </Section>
 
       <Section title="다이어트 목표">

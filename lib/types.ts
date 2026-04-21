@@ -39,6 +39,7 @@ export interface Settings {
   height: number;
   currentWeight: number;
   gender: "남성" | "여성";
+  birthDate: string | null; // YYYY-MM-DD, null = 미입력
   dietStartDate: string;
   startWeight: number;
   targetWeight: number;

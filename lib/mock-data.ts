@@ -13,6 +13,7 @@ export const mockSettings: Settings = {
   height: 163.0,
   currentWeight: 66.5,
   gender: "여성",
+  birthDate: null,
   dietStartDate: "2026-01-01",
   startWeight: 70.0,
   targetWeight: 59.0,

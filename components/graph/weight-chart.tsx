@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Expand, X, GripHorizontal } from "lucide-react";
+import { Expand, X, GripHorizontal, Info } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -23,6 +23,187 @@ interface WeightChartProps {
   targetMonths: number;
   lowestWeight: number;
   lowestWeightDate: string;
+  height: number;
+  gender: "남성" | "여성";
+  birthDate: string | null;
+}
+
+// ── 건강 지표 계산 헬퍼 ──────────────────────────────────────────────────────
+
+function calcAge(birthDate: string): number {
+  const today = new Date();
+  const birth = new Date(birthDate + "T00:00:00");
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  return Math.max(0, age);
+}
+
+function calcBMI(weight: number, heightCm: number): number {
+  if (heightCm <= 0 || weight <= 0) return 0;
+  return weight / Math.pow(heightCm / 100, 2);
+}
+
+type BmiLevel = "낮음" | "건강" | "높음" | "비만";
+
+function getBmiLevel(bmi: number): BmiLevel {
+  if (bmi < 18.5) return "낮음";
+  if (bmi < 24) return "건강";
+  if (bmi < 30) return "높음";
+  return "비만";
+}
+
+function getBmiAdvice(level: BmiLevel): string {
+  switch (level) {
+    case "낮음": return "체중이 다소 적습니다. 균형 잡힌 식단으로 건강을 챙기세요.";
+    case "건강": return "건강 체중 범위예요. 지금처럼 꾸준히 유지하세요!";
+    case "높음": return "체중이 다소 높습니다. 꾸준한 운동과 식단 관리를 권장해요.";
+    case "비만": return "비만 범위입니다. 전문가 상담과 함께 체중 감량을 시작하세요.";
+  }
+}
+
+// Mifflin-St Jeor 공식
+function calcBMR(weight: number, heightCm: number, age: number, gender: "남성" | "여성"): number {
+  const base = 10 * weight + 6.25 * heightCm - 5 * age;
+  return Math.round(gender === "남성" ? base + 5 : base - 161);
+}
+
+// Deurenberg (1991) 체지방률 공식
+function calcBodyFatPct(bmi: number, age: number, gender: "남성" | "여성"): number {
+  const sex = gender === "남성" ? 1 : 0;
+  return (1.20 * bmi) + (0.23 * age) - (10.8 * sex) - 5.4;
+}
+
+// ── 미니 BMI 게이지 바 ───────────────────────────────────────────────────────
+// 표시 범위: 14 ~ 40 / 구분: 낮음(~18.5), 건강(~24), 높음(~30), 비만(30~)
+
+function BmiGaugeBar({ bmi }: { bmi: number }) {
+  const MIN = 14, MAX = 40, RANGE = MAX - MIN;
+  const pct = Math.min(100, Math.max(0, ((bmi - MIN) / RANGE) * 100));
+  // 세그먼트 비율: 낮음 4.5, 건강 5.5, 높음 6, 비만 10 → 합 26
+  return (
+    <div className="mt-2.5">
+      <div className="relative">
+        <div className="flex h-2.5 rounded-full overflow-hidden">
+          <div style={{ flex: 4.5 }} className="bg-amber-400" />
+          <div style={{ flex: 5.5 }} className="bg-teal-400" />
+          <div style={{ flex: 6 }} className="bg-orange-400" />
+          <div style={{ flex: 10 }} className="bg-red-500" />
+        </div>
+        <div
+          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-white border-2 border-slate-700 rounded-full shadow"
+          style={{ left: `${pct}%` }}
+        />
+      </div>
+      <div className="flex mt-1.5 text-[9px] text-muted-foreground">
+        <div style={{ flex: 4.5 }}>낮음</div>
+        <div style={{ flex: 5.5 }}>건강</div>
+        <div style={{ flex: 6 }}>높음</div>
+        <div style={{ flex: 10 }}>비만</div>
+      </div>
+    </div>
+  );
+}
+
+// 상세 BMI 게이지 (정보 시트용)
+function BmiGaugeDetail({ bmi }: { bmi: number }) {
+  const MIN = 14, MAX = 40, RANGE = MAX - MIN;
+  const pct = Math.min(100, Math.max(0, ((bmi - MIN) / RANGE) * 100));
+  const cutpoints = [{ v: 18.5 }, { v: 24 }, { v: 30 }];
+  return (
+    <div className="my-4">
+      <div className="relative">
+        <div className="flex h-4 rounded-full overflow-hidden">
+          <div style={{ flex: 4.5 }} className="bg-amber-400" />
+          <div style={{ flex: 5.5 }} className="bg-teal-400" />
+          <div style={{ flex: 6 }} className="bg-orange-400" />
+          <div style={{ flex: 10 }} className="bg-red-500" />
+        </div>
+        {cutpoints.map(({ v }) => (
+          <div
+            key={v}
+            className="absolute top-0 bottom-0 w-0.5 bg-white/60"
+            style={{ left: `${((v - MIN) / RANGE) * 100}%` }}
+          />
+        ))}
+        <div
+          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-5 bg-white border-2 border-slate-700 rounded-full shadow flex items-center justify-center"
+          style={{ left: `${pct}%` }}
+        >
+          <div className="w-1.5 h-1.5 rounded-full bg-slate-700" />
+        </div>
+      </div>
+      <div className="relative flex mt-1 text-[10px] text-muted-foreground">
+        <div style={{ flex: 4.5 }}>낮음</div>
+        <div style={{ flex: 5.5 }}>건강</div>
+        <div style={{ flex: 6 }}>높음</div>
+        <div style={{ flex: 10 }}>비만</div>
+      </div>
+      <div className="relative flex mt-0.5 text-[10px] font-medium text-foreground/50">
+        {cutpoints.map(({ v }) => (
+          <div
+            key={v}
+            className="absolute -translate-x-1/2"
+            style={{ left: `${((v - MIN) / RANGE) * 100}%` }}
+          >
+            {v}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── 정보 바텀시트 ────────────────────────────────────────────────────────────
+
+function InfoSheet({
+  open,
+  onClose,
+  title,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col justify-end">
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <div className="relative bg-background rounded-t-2xl max-h-[80dvh] overflow-y-auto">
+        <div className="sticky top-0 bg-background flex items-center justify-between px-5 pt-5 pb-3 border-b border-border">
+          <h3 className="font-bold text-base">{title}</h3>
+          <button onClick={onClose} className="p-1.5 text-muted-foreground hover:bg-secondary rounded-lg transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="px-5 py-4 space-y-3 text-sm text-muted-foreground leading-relaxed pb-10">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── 카드 제목 + 정보 아이콘 ──────────────────────────────────────────────────
+
+function CardTitle({ children, onInfo }: { children: React.ReactNode; onInfo: () => void }) {
+  return (
+    <div className="flex items-center gap-1 mb-1">
+      <p className="text-xs text-muted-foreground">{children}</p>
+      <button
+        onClick={onInfo}
+        className="text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+        aria-label="자세히 보기"
+      >
+        <Info size={12} />
+      </button>
+    </div>
+  );
 }
 
 type Period = "2w" | "1m" | "3m" | "all";
@@ -190,12 +371,16 @@ export function WeightChart({
   targetMonths,
   lowestWeight,
   lowestWeightDate,
+  height,
+  gender,
+  birthDate,
 }: WeightChartProps) {
   const [period, setPeriod] = useState<Period>("all");
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPortrait, setIsPortrait] = useState(false);
   const [legendPos, setLegendPos] = useState({ x: 0, y: 0 });
+  const [infoSheet, setInfoSheet] = useState<"bmi" | "metabolism" | "body" | null>(null);
   const isDragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
 
@@ -365,6 +550,21 @@ export function WeightChart({
   const daysToGoal = dailyRate > 0 ? Math.ceil(remaining / dailyRate) : null;
   const estimatedDate = daysToGoal
     ? new Date(Date.now() + daysToGoal * 86400000)
+    : null;
+
+  // ── 건강 지표 계산 ──────────────────────────────────────────────────────────
+  const age = birthDate ? calcAge(birthDate) : null;
+  const bmi = height > 0 && currentWeight > 0 ? calcBMI(currentWeight, height) : null;
+  const bmiLv = bmi ? getBmiLevel(bmi) : null;
+  const bmr = (age !== null && height > 0 && currentWeight > 0)
+    ? calcBMR(currentWeight, height, age, gender)
+    : null;
+  const tdee = bmr ? Math.round(bmr * 1.2) : null;
+  const bodyFatPct = (bmi !== null && age !== null)
+    ? Math.max(0, calcBodyFatPct(bmi, age, gender))
+    : null;
+  const leanBodyMass = (bodyFatPct !== null)
+    ? currentWeight * (1 - bodyFatPct / 100)
     : null;
 
   const finalChartData = chartData.map((d, i) => ({
@@ -574,33 +774,225 @@ export function WeightChart({
       </div>
 
       {!isFullscreen && (
-        <div className="px-4 mt-4 grid grid-cols-2 gap-3">
-          <div className="p-3 bg-secondary rounded-xl">
-            <p className="text-xs text-muted-foreground">시작 체중</p>
-            <p className="text-lg font-bold">{startWeight} kg</p>
-            <p className="text-xs text-muted-foreground">{fmtCardDate(new Date(startDate + "T00:00:00"))}</p>
+        <div className="px-4 mt-4 space-y-3 pb-4">
+          {/* ── 기존 4개 카드 ── */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 bg-secondary rounded-xl">
+              <p className="text-xs text-muted-foreground">시작 체중</p>
+              <p className="text-lg font-bold">{startWeight} kg</p>
+              <p className="text-xs text-muted-foreground">{fmtCardDate(new Date(startDate + "T00:00:00"))}</p>
+            </div>
+            <div className="p-3 bg-secondary rounded-xl">
+              <p className="text-xs text-muted-foreground">목표 체중</p>
+              <p className="text-lg font-bold">{targetWeight} kg</p>
+              <p className="text-xs text-muted-foreground">{fmtCardDate(targetEndDate)}</p>
+            </div>
+            <div className="p-3 bg-secondary rounded-xl">
+              <p className="text-xs text-muted-foreground">역대 최저</p>
+              <p className="text-lg font-bold">{lowestWeight} kg</p>
+              <p className="text-xs text-muted-foreground">{fmtCardDate(new Date(lowestWeightDate + "T00:00:00"))}</p>
+            </div>
+            <div className="p-3 bg-secondary rounded-xl">
+              <p className="text-xs text-muted-foreground">목표까지</p>
+              <p className="text-lg font-bold">{remaining.toFixed(1)} kg</p>
+              {estimatedDate && (
+                <p className="text-xs text-muted-foreground">
+                  예상 {fmtCardDate(estimatedDate)}
+                </p>
+              )}
+            </div>
           </div>
-          <div className="p-3 bg-secondary rounded-xl">
-            <p className="text-xs text-muted-foreground">목표 체중</p>
-            <p className="text-lg font-bold">{targetWeight} kg</p>
-            <p className="text-xs text-muted-foreground">{fmtCardDate(targetEndDate)}</p>
-          </div>
-          <div className="p-3 bg-secondary rounded-xl">
-            <p className="text-xs text-muted-foreground">역대 최저</p>
-            <p className="text-lg font-bold">{lowestWeight} kg</p>
-            <p className="text-xs text-muted-foreground">{fmtCardDate(new Date(lowestWeightDate + "T00:00:00"))}</p>
-          </div>
-          <div className="p-3 bg-secondary rounded-xl">
-            <p className="text-xs text-muted-foreground">목표까지</p>
-            <p className="text-lg font-bold">{remaining.toFixed(1)} kg</p>
-            {estimatedDate && (
-              <p className="text-xs text-muted-foreground">
-                예상 {fmtCardDate(estimatedDate)}
+
+          {/* ── 신체 정보 + BMI 행 ── */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* 신체 정보 */}
+            <div className="p-3 bg-secondary rounded-xl">
+              <p className="text-xs text-muted-foreground">신체 정보</p>
+              <p className="text-sm font-bold mt-1 leading-snug">
+                {gender === "남성" ? "남자" : "여자"}
+                {height > 0 && <> | {height} cm</>}
               </p>
+              {age !== null ? (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  만 {age}세 ({new Date(birthDate! + "T00:00:00").getFullYear()})
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground/60 mt-0.5">나이 미입력</p>
+              )}
+            </div>
+
+            {/* BMI */}
+            {bmi !== null && bmiLv !== null ? (
+              <div className="p-3 bg-secondary rounded-xl">
+                <CardTitle onInfo={() => setInfoSheet("bmi")}>
+                  BMI ({bmiLv})
+                </CardTitle>
+                <p className="text-lg font-bold">{bmi.toFixed(1)}</p>
+                <BmiGaugeBar bmi={bmi} />
+              </div>
+            ) : (
+              <div className="p-3 bg-secondary rounded-xl">
+                <p className="text-xs text-muted-foreground">BMI</p>
+                <p className="text-xs text-muted-foreground/60 mt-1">
+                  키·체중 정보를 입력하시면 확인할 수 있어요.
+                </p>
+              </div>
             )}
+          </div>
+
+          {/* ── 대사량/에너지 + 체성분 추정 행 ── */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* 대사량/에너지 */}
+            <div className="p-3 bg-secondary rounded-xl">
+              <CardTitle onInfo={() => setInfoSheet("metabolism")}>
+                대사량/에너지
+              </CardTitle>
+              {bmr !== null && tdee !== null ? (
+                <>
+                  <p className="text-sm font-bold">BMR: {bmr.toLocaleString()} kcal</p>
+                  <p className="text-sm font-bold">TDEE: {tdee.toLocaleString()} kcal</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">사무직 기준</p>
+                </>
+              ) : (
+                <p className="text-xs text-muted-foreground/70 mt-1 leading-relaxed">
+                  생년월일을 입력하시면 더 상세한 정보를 확인하실 수 있습니다.
+                </p>
+              )}
+            </div>
+
+            {/* 체성분 추정 */}
+            <div className="p-3 bg-secondary rounded-xl">
+              <CardTitle onInfo={() => setInfoSheet("body")}>
+                체성분 추정 ({gender === "남성" ? "남성" : "여성"})
+              </CardTitle>
+              {bodyFatPct !== null && leanBodyMass !== null ? (
+                <>
+                  <p className="text-sm font-bold">제지방량: {leanBodyMass.toFixed(1)} kg</p>
+                  <p className="text-sm font-bold">체지방률: {bodyFatPct.toFixed(1)} %</p>
+                </>
+              ) : (
+                <p className="text-xs text-muted-foreground/70 mt-1 leading-relaxed">
+                  생년월일을 입력하시면 더 상세한 정보를 확인하실 수 있습니다.
+                </p>
+              )}
+            </div>
           </div>
         </div>
       )}
+
+      {/* ── 정보 바텀시트 ── */}
+      <InfoSheet
+        open={infoSheet === "bmi"}
+        onClose={() => setInfoSheet(null)}
+        title="BMI (체질량지수)"
+      >
+        <p>
+          BMI(Body Mass Index)는 체중(kg)을 신장(m)의 제곱으로 나눈 값으로, 전 세계적으로
+          비만 여부를 판단하는 표준 지표로 사용됩니다.
+        </p>
+        <div className="p-3 bg-secondary rounded-xl text-sm">
+          <p className="font-semibold text-foreground mb-1">계산 공식</p>
+          <p>BMI = 체중(kg) ÷ 신장(m)²</p>
+          {bmi !== null && (
+            <p className="mt-1 text-navy font-medium">
+              현재: {currentWeight} ÷ {(height / 100).toFixed(2)}² = <strong>{bmi.toFixed(1)}</strong>
+            </p>
+          )}
+        </div>
+        {bmi !== null && <BmiGaugeDetail bmi={bmi} />}
+        <div className="space-y-2">
+          <div className="flex items-start gap-2">
+            <span className="mt-0.5 w-2 h-2 rounded-sm bg-amber-400 flex-shrink-0" />
+            <p><strong className="text-foreground">낮음 (18.5 미만)</strong> — 저체중. 영양 불균형에 주의하세요.</p>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="mt-0.5 w-2 h-2 rounded-sm bg-teal-400 flex-shrink-0" />
+            <p><strong className="text-foreground">건강 (18.5–24)</strong> — 정상 체중. 현재 상태를 유지하세요.</p>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="mt-0.5 w-2 h-2 rounded-sm bg-orange-400 flex-shrink-0" />
+            <p><strong className="text-foreground">높음 (24–30)</strong> — 과체중. 생활 습관 개선을 권장해요.</p>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="mt-0.5 w-2 h-2 rounded-sm bg-red-500 flex-shrink-0" />
+            <p><strong className="text-foreground">비만 (30 이상)</strong> — 건강 위험 증가. 전문가 상담을 권장합니다.</p>
+          </div>
+        </div>
+        <p className="text-xs bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-amber-800">
+          ⚠ BMI는 근육량을 구별하지 못해 운동선수 등에선 부정확할 수 있습니다. 참고 지표로만 활용하세요.
+        </p>
+      </InfoSheet>
+
+      <InfoSheet
+        open={infoSheet === "metabolism"}
+        onClose={() => setInfoSheet(null)}
+        title="대사량 / 에너지"
+      >
+        <div className="space-y-3">
+          <div>
+            <p className="font-semibold text-foreground">BMR (기초대사량)</p>
+            <p>아무것도 하지 않고 누워만 있어도 생명 유지에 필요한 최소 칼로리예요.</p>
+            <div className="mt-2 p-3 bg-secondary rounded-xl text-xs">
+              <p className="font-medium text-foreground mb-1">Mifflin-St Jeor 공식</p>
+              <p>남성: 10 × 체중 + 6.25 × 키 - 5 × 나이 + 5</p>
+              <p>여성: 10 × 체중 + 6.25 × 키 - 5 × 나이 - 161</p>
+            </div>
+          </div>
+          <div>
+            <p className="font-semibold text-foreground">TDEE (총 에너지 소비량)</p>
+            <p>실제 하루 동안 소비하는 총 칼로리입니다. 활동 수준에 따라 BMR에 계수를 곱해 계산해요.</p>
+            <div className="mt-2 p-3 bg-secondary rounded-xl text-xs space-y-1">
+              <p className="font-medium text-foreground mb-1">활동 계수</p>
+              <p>• <strong>× 1.2</strong> — 거의 운동 안 함 (사무직, 현재 적용)</p>
+              <p>• × 1.375 — 가벼운 운동 (주 1~3일)</p>
+              <p>• × 1.55 — 중간 운동 (주 3~5일)</p>
+              <p>• × 1.725 — 강한 운동 (주 6~7일)</p>
+            </div>
+          </div>
+          <p className="text-xs bg-navy/5 border border-navy/10 rounded-lg px-3 py-2 text-navy">
+            💡 TDEE보다 적게 먹으면 체중이 감소합니다. 하루 약 500 kcal 적게 섭취하면 주당 약 0.5 kg 감량이 가능해요.
+          </p>
+        </div>
+      </InfoSheet>
+
+      <InfoSheet
+        open={infoSheet === "body"}
+        onClose={() => setInfoSheet(null)}
+        title="체성분 추정"
+      >
+        <p>
+          Deurenberg(1991) 공식을 이용해 BMI·나이·성별로 체지방률을 추정합니다.
+          실제 체성분 측정(InBody 등)과 차이가 있을 수 있으므로 참고 수치로 활용하세요.
+        </p>
+        <div className="p-3 bg-secondary rounded-xl text-xs space-y-1">
+          <p className="font-medium text-foreground mb-1">계산 공식</p>
+          <p>체지방률 = (1.20 × BMI) + (0.23 × 나이) - (10.8 × 성별*) - 5.4</p>
+          <p className="text-muted-foreground">* 성별: 남성 = 1, 여성 = 0</p>
+          <p className="mt-1">제지방량 = 체중 × (1 - 체지방률 / 100)</p>
+        </div>
+        <div className="space-y-2 text-xs">
+          <p className="font-semibold text-foreground">건강 체지방률 기준 (참고)</p>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="p-2 bg-secondary rounded-lg">
+              <p className="font-medium">남성</p>
+              <p>저체지방: ~8%</p>
+              <p>건강: 8~20%</p>
+              <p>과체지방: 20~25%</p>
+              <p>비만: 25% 이상</p>
+            </div>
+            <div className="p-2 bg-secondary rounded-lg">
+              <p className="font-medium">여성</p>
+              <p>저체지방: ~15%</p>
+              <p>건강: 15~30%</p>
+              <p>과체지방: 30~35%</p>
+              <p>비만: 35% 이상</p>
+            </div>
+          </div>
+        </div>
+        <p className="text-xs bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-amber-800">
+          ⚠ 이 수치는 통계적 추정이며 근육량, 수분, 연령대에 따라 오차가 발생할 수 있습니다.
+        </p>
+      </InfoSheet>
     </div>
   );
 }

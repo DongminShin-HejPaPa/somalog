@@ -178,6 +178,7 @@ export function OnboardingFlow() {
       intensiveDayCriteria,
       coachStylePreset: selectedStyle as Settings["coachStylePreset"],
       coachStyleExtra: [],
+      activityLevel: 1.2,
     });
 
     router.push("/home");
@@ -218,6 +219,7 @@ export function OnboardingFlow() {
       intensiveDayCriteria,
       coachStylePreset: selectedStyle as Settings["coachStylePreset"],
       coachStyleExtra: [],
+      activityLevel: 1.2,
     });
     router.push("/home");
   };

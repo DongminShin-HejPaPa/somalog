@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSettings } from "@/lib/contexts/settings-context";
 import {
   actionGetAllDailyLogs,
@@ -11,7 +11,7 @@ import type { DailyLog } from "@/lib/types";
 import { logStore } from "@/lib/stores/log-store";
 
 export function GraphContainer({ userId }: { userId: string | null }) {
-  const { settings } = useSettings();
+  const { settings, updateSettings } = useSettings();
   const [logs, setLogs] = useState<DailyLog[] | undefined>(undefined);
   const [lowest, setLowest] = useState<{ weight: number; date: string } | undefined>(undefined);
 
@@ -56,6 +56,11 @@ export function GraphContainer({ userId }: { userId: string | null }) {
     );
   }
 
+  const handleActivityLevelChange = useCallback(
+    (level: number) => updateSettings({ activityLevel: level }),
+    [updateSettings]
+  );
+
   return (
     <WeightChart
       logs={logs}
@@ -68,6 +73,8 @@ export function GraphContainer({ userId }: { userId: string | null }) {
       height={settings.height}
       gender={settings.gender}
       birthDate={settings.birthDate}
+      activityLevel={settings.activityLevel}
+      onActivityLevelChange={handleActivityLevelChange}
     />
   );
 }

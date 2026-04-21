@@ -40,6 +40,7 @@ export interface Settings {
   currentWeight: number;
   gender: "남성" | "여성";
   birthDate: string | null; // YYYY-MM-DD, null = 미입력
+  activityLevel: number;    // TDEE 활동 계수 (1.2/1.375/1.55/1.725)
   dietStartDate: string;
   startWeight: number;
   targetWeight: number;

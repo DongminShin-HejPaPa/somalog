@@ -26,6 +26,8 @@ interface WeightChartProps {
   height: number;
   gender: "남성" | "여성";
   birthDate: string | null;
+  activityLevel: number;
+  onActivityLevelChange: (level: number) => void;
 }
 
 // ── 건강 지표 계산 헬퍼 ──────────────────────────────────────────────────────
@@ -37,6 +39,26 @@ function calcAge(birthDate: string): number {
   const m = today.getMonth() - birth.getMonth();
   if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
   return Math.max(0, age);
+}
+
+function calcAgeAtDate(birthDate: string, dateStr: string): number {
+  const birth = new Date(birthDate + "T00:00:00");
+  const at = new Date(dateStr + "T00:00:00");
+  let age = at.getFullYear() - birth.getFullYear();
+  const m = at.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && at.getDate() < birth.getDate())) age--;
+  return Math.max(0, age);
+}
+
+const ACTIVITY_OPTIONS = [
+  { level: 1.2,   label: "거의 안 움직임", sublabel: "(사무직)" },
+  { level: 1.375, label: "가벼운 운동",     sublabel: "(주 1~3일)" },
+  { level: 1.55,  label: "중간 운동",       sublabel: "(주 3~5일)" },
+  { level: 1.725, label: "강한 운동",       sublabel: "(주 6~7일)" },
+];
+
+function activityLabel(level: number): string {
+  return ACTIVITY_OPTIONS.find((o) => o.level === level)?.label ?? "사무직";
 }
 
 function calcBMI(weight: number, heightCm: number): number {
@@ -169,7 +191,7 @@ function InfoSheet({
 }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end">
+    <div className="fixed inset-0 z-[100] flex flex-col justify-end">
       <div
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
@@ -363,6 +385,8 @@ function computeLoess(
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+type ChartMode = "weight" | "bodyfat";
+
 export function WeightChart({
   logs,
   startWeight,
@@ -374,8 +398,11 @@ export function WeightChart({
   height,
   gender,
   birthDate,
+  activityLevel,
+  onActivityLevelChange,
 }: WeightChartProps) {
   const [period, setPeriod] = useState<Period>("all");
+  const [chartMode, setChartMode] = useState<ChartMode>("weight");
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPortrait, setIsPortrait] = useState(false);
@@ -490,17 +517,25 @@ export function WeightChart({
       prevLog?.weight !== undefined &&
       log.weight - prevLog.weight >= 1.0;
 
+    let bodyFatEst: number | null = null;
+    if (height > 0 && birthDate && log.weight !== null) {
+      const ageAt = calcAgeAtDate(birthDate, log.date);
+      const bmiAt = calcBMI(log.weight, height);
+      bodyFatEst = parseFloat(Math.max(0, calcBodyFatPct(bmiAt, ageAt, gender)).toFixed(1));
+    }
+
     return {
       date: log.date.slice(5),
       fullDate: log.date,
       weight: log.weight,
+      bodyFatEst,
       isLowest: log.weight !== null && log.weight === lowestWeight,
       isSurge: surge,
       isMonday: new Date(log.date).getDay() === 1,
     };
   });
 
-  // LOESS 추세 곡선 계산
+  // LOESS 추세 곡선 — 체중
   const validPts = chartData
     .map((d, i) => ({ i, y: d.weight as number }))
     .filter((p) => chartData[p.i].weight !== null);
@@ -513,6 +548,22 @@ export function WeightChart({
         0.8
       )
     : chartData.map(() => null);
+
+  // LOESS 추세 곡선 — 체지방률 추정
+  const bfValidPts = chartData
+    .map((d, i) => ({ i, y: d.bodyFatEst as number }))
+    .filter((p) => chartData[p.i].bodyFatEst !== null);
+
+  const bfLoessValues = bfValidPts.length >= 3
+    ? computeLoess(
+        bfValidPts.map((p) => p.i),
+        bfValidPts.map((p) => p.y),
+        chartData.map((_, i) => i),
+        0.8
+      )
+    : chartData.map(() => null);
+
+  const canShowBodyFat = height > 0 && birthDate !== null;
 
   const targetEndDate = new Date(startDate);
   targetEndDate.setMonth(targetEndDate.getMonth() + targetMonths);
@@ -559,7 +610,7 @@ export function WeightChart({
   const bmr = (age !== null && height > 0 && currentWeight > 0)
     ? calcBMR(currentWeight, height, age, gender)
     : null;
-  const tdee = bmr ? Math.round(bmr * 1.2) : null;
+  const tdee = bmr ? Math.round(bmr * activityLevel) : null;
   const bodyFatPct = (bmi !== null && age !== null)
     ? Math.max(0, calcBodyFatPct(bmi, age, gender))
     : null;
@@ -569,12 +620,14 @@ export function WeightChart({
 
   const finalChartData = chartData.map((d, i) => ({
     ...d,
-    loessTrend:
-      loessValues[i] !== null
-        ? Math.round(loessValues[i]! * 10) / 10
-        : null,
+    loessTrend: loessValues[i] !== null ? Math.round(loessValues[i]! * 10) / 10 : null,
+    bfLoessTrend: bfLoessValues[i] !== null ? Math.round(bfLoessValues[i]! * 10) / 10 : null,
     goalWeight: goalLineData[i],
   }));
+
+  const allBF = finalChartData.map((d) => d.bodyFatEst).filter((v): v is number => v !== null);
+  const minBF = allBF.length ? Number((Math.min(...allBF) - 1).toFixed(1)) : 0;
+  const maxBF = allBF.length ? Number((Math.max(...allBF) + 1).toFixed(1)) : 50;
 
   return (
     <div
@@ -600,6 +653,26 @@ export function WeightChart({
           >
             전체화면 닫기
           </button>
+        </div>
+      )}
+
+      {/* 차트 모드 토글 (체지방 가능할 때만) */}
+      {!isFullscreen && canShowBodyFat && (
+        <div className="px-4 mb-2 flex items-center gap-1.5">
+          {(["weight", "bodyfat"] as ChartMode[]).map((m) => (
+            <button
+              key={m}
+              onClick={() => setChartMode(m)}
+              className={cn(
+                "px-3 py-1 rounded-full text-xs font-medium transition-colors",
+                chartMode === m
+                  ? "bg-navy text-white"
+                  : "bg-secondary text-muted-foreground"
+              )}
+            >
+              {m === "weight" ? "체중" : "체지방률 추정"}
+            </button>
+          ))}
         </div>
       )}
 
@@ -641,47 +714,41 @@ export function WeightChart({
             <GripHorizontal size={16} />
           </div>
         )}
-        {/* 선 범례 */}
-        <div className={cn("flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-muted-foreground", !isFullscreen && "pointer-events-auto")}>
-          <span className="flex items-center gap-1">
-            <span className="w-4 h-0.5 bg-navy inline-block" /> 일별 체중
-          </span>
-          <span className="flex items-center gap-1">
-            {/* 주황 점선 */}
-            <svg width="16" height="4" className="inline-block">
-              <line x1="0" y1="2" x2="16" y2="2" stroke="#f97316" strokeWidth="2" strokeDasharray="5 3" />
-            </svg>
-            <span>추세</span>
-          </span>
-          <span className="flex items-center gap-1">
-            {/* 연초록 점선 */}
-            <svg width="16" height="4" className="inline-block">
-              <line x1="0" y1="2" x2="16" y2="2" stroke="#86efac" strokeWidth="2" strokeDasharray="5 3" />
-            </svg>
-            목표 감량선
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-4 h-0.5 bg-green-600 inline-block" /> 목표 체중
-          </span>
-        </div>
-        {/* 점 마커 범례 */}
-        <div className={cn("flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-muted-foreground", !isFullscreen && "pointer-events-auto")}>
-          <span className="flex items-center gap-1.5">
-            <svg width="12" height="12" viewBox="0 0 12 12">
-              <polygon
-                points="6,1 7.18,4.38 10.76,4.45 7.9,6.62 8.94,10.05 6,8 3.06,10.05 4.1,6.62 1.24,4.45 4.82,4.38"
-                fill="#1e3a5f"
-              />
-            </svg>
-            역대 최저
-          </span>
-          <span className="flex items-center gap-1.5">
-            <svg width="12" height="12" viewBox="0 0 12 12">
-              <rect x="2" y="2" width="8" height="8" fill="#1e3a5f" />
-            </svg>
-            전일 대비 1kg↑
-          </span>
-        </div>
+        {chartMode === "weight" ? (
+          <>
+            <div className={cn("flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-muted-foreground", !isFullscreen && "pointer-events-auto")}>
+              <span className="flex items-center gap-1"><span className="w-4 h-0.5 bg-navy inline-block" /> 일별 체중</span>
+              <span className="flex items-center gap-1">
+                <svg width="16" height="4" className="inline-block"><line x1="0" y1="2" x2="16" y2="2" stroke="#f97316" strokeWidth="2" strokeDasharray="5 3" /></svg>
+                추세
+              </span>
+              <span className="flex items-center gap-1">
+                <svg width="16" height="4" className="inline-block"><line x1="0" y1="2" x2="16" y2="2" stroke="#86efac" strokeWidth="2" strokeDasharray="5 3" /></svg>
+                목표 감량선
+              </span>
+              <span className="flex items-center gap-1"><span className="w-4 h-0.5 bg-green-600 inline-block" /> 목표 체중</span>
+            </div>
+            <div className={cn("flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-muted-foreground", !isFullscreen && "pointer-events-auto")}>
+              <span className="flex items-center gap-1.5">
+                <svg width="12" height="12" viewBox="0 0 12 12"><polygon points="6,1 7.18,4.38 10.76,4.45 7.9,6.62 8.94,10.05 6,8 3.06,10.05 4.1,6.62 1.24,4.45 4.82,4.38" fill="#1e3a5f" /></svg>
+                역대 최저
+              </span>
+              <span className="flex items-center gap-1.5">
+                <svg width="12" height="12" viewBox="0 0 12 12"><rect x="2" y="2" width="8" height="8" fill="#1e3a5f" /></svg>
+                전일 대비 1kg↑
+              </span>
+            </div>
+          </>
+        ) : (
+          <div className={cn("flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-muted-foreground", !isFullscreen && "pointer-events-auto")}>
+            <span className="flex items-center gap-1"><span className="w-4 h-0.5 bg-purple-500 inline-block" /> 체지방률 추정</span>
+            <span className="flex items-center gap-1">
+              <svg width="16" height="4" className="inline-block"><line x1="0" y1="2" x2="16" y2="2" stroke="#f97316" strokeWidth="2" strokeDasharray="5 3" /></svg>
+              추세
+            </span>
+            <span className="text-muted-foreground/60 text-[9px] pl-1">Deurenberg 공식 추정값</span>
+          </div>
+        )}
       </div>
 
       <div className={cn("relative", isFullscreen ? "flex-1 w-full h-[100dvh]" : "px-2 h-[300px]")}>
@@ -700,46 +767,29 @@ export function WeightChart({
             margin={{ top: 10, right: 30, left: 0, bottom: 5 }}
             data={finalChartData}
           >
-            <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="#e2e8f0"
-              vertical={false}
-            />
-            <XAxis
-              dataKey="date"
-              tick={{ fontSize: 10 }}
-              tickLine={false}
-              axisLine={false}
-              interval="preserveStartEnd"
-            />
-            <YAxis
-              domain={[minW, maxW]}
-              tick={{ fontSize: 10 }}
-              tickLine={false}
-              axisLine={false}
-              width={35}
-            />
+            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+            <XAxis dataKey="date" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+            {chartMode === "weight" ? (
+              <YAxis domain={[minW, maxW]} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={35} unit=" kg" />
+            ) : (
+              <YAxis domain={[minBF, maxBF]} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={35} unit="%" />
+            )}
             <Tooltip
-              contentStyle={{
-                fontSize: 12,
-                borderRadius: 8,
-                border: "1px solid #e2e8f0",
-              }}
+              contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" }}
               formatter={(value: number, name: string) => {
-                const labels: Record<string, string> = {
-                  weight: "체중",
-                  loessTrend: "추세",
-                  goalWeight: "목표선",
-                };
+                if (chartMode === "bodyfat") {
+                  const labels: Record<string, string> = { bodyFatEst: "체지방률 추정", bfLoessTrend: "추세" };
+                  return [`${value} %`, labels[name] ?? name];
+                }
+                const labels: Record<string, string> = { weight: "체중", loessTrend: "추세", goalWeight: "목표선" };
                 return [`${value} kg`, labels[name] ?? name];
               }}
             />
-            <ReferenceLine
-              y={targetWeight}
-              stroke="#16a34a"
-              strokeWidth={1.5}
-            />
-            {/* 목표 감량선 */}
+            {chartMode === "weight" && (
+              <ReferenceLine y={targetWeight} stroke="#16a34a" strokeWidth={1.5} />
+            )}
+            {/* 목표 감량선 (체중 모드만) */}
+            {chartMode === "weight" && (
             <Line
               type="linear"
               dataKey="goalWeight"
@@ -749,26 +799,41 @@ export function WeightChart({
               dot={false}
               connectNulls
             />
+            )}
             {/* 추세 곡선 */}
             <Line
               type="monotone"
-              dataKey="loessTrend"
+              dataKey={chartMode === "weight" ? "loessTrend" : "bfLoessTrend"}
               stroke="#f97316"
               strokeWidth={2}
               strokeDasharray="6 3"
               dot={false}
               connectNulls
             />
-            {/* 일별 체중 */}
-            <Line
-              type="monotone"
-              dataKey="weight"
-              stroke="#1e3a5f"
-              strokeWidth={2}
-              dot={<CustomDot />}
-              activeDot={{ r: 6 }}
-              connectNulls
-            />
+            {/* 일별 체중 (체중 모드) */}
+            {chartMode === "weight" && (
+              <Line
+                type="monotone"
+                dataKey="weight"
+                stroke="#1e3a5f"
+                strokeWidth={2}
+                dot={<CustomDot />}
+                activeDot={{ r: 6 }}
+                connectNulls
+              />
+            )}
+            {/* 일별 체지방률 (체지방 모드) */}
+            {chartMode === "bodyfat" && (
+              <Line
+                type="monotone"
+                dataKey="bodyFatEst"
+                stroke="#a855f7"
+                strokeWidth={2}
+                dot={<circle r={4} fill="#a855f7" stroke="white" strokeWidth={2} />}
+                activeDot={{ r: 6 }}
+                connectNulls
+              />
+            )}
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -796,100 +861,89 @@ export function WeightChart({
               <p className="text-xs text-muted-foreground">목표까지</p>
               <p className="text-lg font-bold">{remaining.toFixed(1)} kg</p>
               {estimatedDate && (
-                <p className="text-xs text-muted-foreground">
-                  예상 {fmtCardDate(estimatedDate)}
-                </p>
+                <p className="text-xs text-muted-foreground">예상 {fmtCardDate(estimatedDate)}</p>
               )}
             </div>
           </div>
 
-          {/* ── 신체 정보 + BMI 행 ── */}
-          <div className="grid grid-cols-2 gap-3">
-            {/* 신체 정보 */}
+          {/* ── 스마트 바디 분석 (full width, compact) ── */}
+          <div className="px-3 py-2 bg-secondary rounded-xl flex items-center gap-3">
+            <p className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">스마트 바디 분석</p>
+            <p className="text-sm font-bold truncate">
+              {gender === "남성" ? "남자" : "여자"}
+              {height > 0 && ` | ${height}cm`}
+              {currentWeight > 0 && ` | ${currentWeight}kg`}
+              {age !== null
+                ? ` | 만 ${age}세 (${new Date(birthDate! + "T00:00:00").getFullYear()}년생)`
+                : " | 나이 미입력"}
+            </p>
+          </div>
+
+          {/* ── BMI (full width) ── */}
+          {bmi !== null && bmiLv !== null ? (
             <div className="p-3 bg-secondary rounded-xl">
-              <p className="text-xs text-muted-foreground">신체 정보</p>
-              <p className="text-sm font-bold mt-1 leading-snug">
-                {gender === "남성" ? "남자" : "여자"}
-                {height > 0 && <> | {height} cm</>}
-              </p>
-              {age !== null ? (
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  만 {age}세 ({new Date(birthDate! + "T00:00:00").getFullYear()})
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground/60 mt-0.5">나이 미입력</p>
-              )}
+              <CardTitle onInfo={() => setInfoSheet("bmi")}>BMI</CardTitle>
+              <p className="text-lg font-bold">{bmi.toFixed(1)} <span className="text-sm font-medium text-muted-foreground">({bmiLv})</span></p>
+              <BmiGaugeBar bmi={bmi} />
+              <p className="text-xs text-muted-foreground mt-2">{getBmiAdvice(bmiLv)}</p>
             </div>
+          ) : (
+            <div className="p-3 bg-secondary rounded-xl">
+              <p className="text-xs text-muted-foreground">BMI</p>
+              <p className="text-xs text-muted-foreground/60 mt-1">키·체중 정보를 입력하시면 확인할 수 있어요.</p>
+            </div>
+          )}
 
-            {/* BMI */}
-            {bmi !== null && bmiLv !== null ? (
-              <div className="p-3 bg-secondary rounded-xl">
-                <CardTitle onInfo={() => setInfoSheet("bmi")}>
-                  BMI ({bmiLv})
-                </CardTitle>
-                <p className="text-lg font-bold">{bmi.toFixed(1)}</p>
-                <BmiGaugeBar bmi={bmi} />
-              </div>
-            ) : (
-              <div className="p-3 bg-secondary rounded-xl">
-                <p className="text-xs text-muted-foreground">BMI</p>
-                <p className="text-xs text-muted-foreground/60 mt-1">
-                  키·체중 정보를 입력하시면 확인할 수 있어요.
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* ── 대사량/에너지 + 체성분 추정 행 ── */}
+          {/* ── 대사량/에너지 + 체성분 추정 ── */}
           <div className="grid grid-cols-2 gap-3">
             {/* 대사량/에너지 */}
             <div className="p-3 bg-secondary rounded-xl">
-              <CardTitle onInfo={() => setInfoSheet("metabolism")}>
-                대사량/에너지
-              </CardTitle>
+              <CardTitle onInfo={() => setInfoSheet("metabolism")}>대사량/에너지</CardTitle>
               {bmr !== null && tdee !== null ? (
                 <>
                   <p className="text-sm font-bold">BMR: {bmr.toLocaleString()} kcal</p>
                   <p className="text-sm font-bold">TDEE: {tdee.toLocaleString()} kcal</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">사무직 기준</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{activityLabel(activityLevel)} 기준</p>
+                  <p className="text-[10px] text-muted-foreground/60 mt-1">오늘의 칼로리: (곧 오픈)</p>
                 </>
               ) : (
-                <p className="text-xs text-muted-foreground/70 mt-1 leading-relaxed">
-                  생년월일을 입력하시면 더 상세한 정보를 확인하실 수 있습니다.
-                </p>
+                <div className="mt-1 space-y-2">
+                  <p className="text-xs text-muted-foreground/80 leading-relaxed">
+                    생년월일을 알면 <strong className="text-foreground">기초대사량(BMR)</strong>과 <strong className="text-foreground">하루 권장 칼로리(TDEE)</strong>를 딱 맞게 계산해 드려요.
+                  </p>
+                  <a href="/settings?highlightBirthDate=true" className="block text-xs text-navy font-medium underline underline-offset-2">
+                    생년월일 입력하러 가기 →
+                  </a>
+                </div>
               )}
             </div>
 
             {/* 체성분 추정 */}
             <div className="p-3 bg-secondary rounded-xl">
-              <CardTitle onInfo={() => setInfoSheet("body")}>
-                체성분 추정 ({gender === "남성" ? "남성" : "여성"})
-              </CardTitle>
+              <CardTitle onInfo={() => setInfoSheet("body")}>체성분 추정</CardTitle>
               {bodyFatPct !== null && leanBodyMass !== null ? (
                 <>
                   <p className="text-sm font-bold">제지방량: {leanBodyMass.toFixed(1)} kg</p>
                   <p className="text-sm font-bold">체지방률: {bodyFatPct.toFixed(1)} %</p>
                 </>
               ) : (
-                <p className="text-xs text-muted-foreground/70 mt-1 leading-relaxed">
-                  생년월일을 입력하시면 더 상세한 정보를 확인하실 수 있습니다.
-                </p>
+                <div className="mt-1 space-y-2">
+                  <p className="text-xs text-muted-foreground/80 leading-relaxed">
+                    나이를 알면 <strong className="text-foreground">체지방률</strong>과 <strong className="text-foreground">근육 추정량</strong>까지 보여드릴 수 있어요.
+                  </p>
+                  <a href="/settings?highlightBirthDate=true" className="block text-xs text-navy font-medium underline underline-offset-2">
+                    생년월일 입력하러 가기 →
+                  </a>
+                </div>
               )}
             </div>
           </div>
         </div>
       )}
 
-      {/* ── 정보 바텀시트 ── */}
-      <InfoSheet
-        open={infoSheet === "bmi"}
-        onClose={() => setInfoSheet(null)}
-        title="BMI (체질량지수)"
-      >
-        <p>
-          BMI(Body Mass Index)는 체중(kg)을 신장(m)의 제곱으로 나눈 값으로, 전 세계적으로
-          비만 여부를 판단하는 표준 지표로 사용됩니다.
-        </p>
+      {/* ── 정보 바텀시트 (z-[100]로 하단 탭바 위에 표시) ── */}
+      <InfoSheet open={infoSheet === "bmi"} onClose={() => setInfoSheet(null)} title="BMI (체질량지수)">
+        <p>BMI(Body Mass Index)는 체중(kg)을 신장(m)의 제곱으로 나눈 값으로, 비만 여부를 판단하는 표준 지표입니다.</p>
         <div className="p-3 bg-secondary rounded-xl text-sm">
           <p className="font-semibold text-foreground mb-1">계산 공식</p>
           <p>BMI = 체중(kg) ÷ 신장(m)²</p>
@@ -901,96 +955,89 @@ export function WeightChart({
         </div>
         {bmi !== null && <BmiGaugeDetail bmi={bmi} />}
         <div className="space-y-2">
-          <div className="flex items-start gap-2">
-            <span className="mt-0.5 w-2 h-2 rounded-sm bg-amber-400 flex-shrink-0" />
-            <p><strong className="text-foreground">낮음 (18.5 미만)</strong> — 저체중. 영양 불균형에 주의하세요.</p>
-          </div>
-          <div className="flex items-start gap-2">
-            <span className="mt-0.5 w-2 h-2 rounded-sm bg-teal-400 flex-shrink-0" />
-            <p><strong className="text-foreground">건강 (18.5–24)</strong> — 정상 체중. 현재 상태를 유지하세요.</p>
-          </div>
-          <div className="flex items-start gap-2">
-            <span className="mt-0.5 w-2 h-2 rounded-sm bg-orange-400 flex-shrink-0" />
-            <p><strong className="text-foreground">높음 (24–30)</strong> — 과체중. 생활 습관 개선을 권장해요.</p>
-          </div>
-          <div className="flex items-start gap-2">
-            <span className="mt-0.5 w-2 h-2 rounded-sm bg-red-500 flex-shrink-0" />
-            <p><strong className="text-foreground">비만 (30 이상)</strong> — 건강 위험 증가. 전문가 상담을 권장합니다.</p>
-          </div>
+          {[
+            { color: "bg-amber-400", label: "낮음 (18.5 미만)", desc: "저체중. 영양 불균형에 주의하세요." },
+            { color: "bg-teal-400", label: "건강 (18.5–24)", desc: "정상 체중. 현재 상태를 유지하세요." },
+            { color: "bg-orange-400", label: "높음 (24–30)", desc: "과체중. 생활 습관 개선을 권장해요." },
+            { color: "bg-red-500", label: "비만 (30 이상)", desc: "건강 위험 증가. 전문가 상담을 권장합니다." },
+          ].map(({ color, label, desc }) => (
+            <div key={label} className="flex items-start gap-2">
+              <span className={`mt-0.5 w-2 h-2 rounded-sm ${color} flex-shrink-0`} />
+              <p><strong className="text-foreground">{label}</strong> — {desc}</p>
+            </div>
+          ))}
         </div>
         <p className="text-xs bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-amber-800">
           ⚠ BMI는 근육량을 구별하지 못해 운동선수 등에선 부정확할 수 있습니다. 참고 지표로만 활용하세요.
         </p>
       </InfoSheet>
 
-      <InfoSheet
-        open={infoSheet === "metabolism"}
-        onClose={() => setInfoSheet(null)}
-        title="대사량 / 에너지"
-      >
+      <InfoSheet open={infoSheet === "metabolism"} onClose={() => setInfoSheet(null)} title="대사량 / 에너지">
         <div className="space-y-3">
           <div>
             <p className="font-semibold text-foreground">BMR (기초대사량)</p>
-            <p>아무것도 하지 않고 누워만 있어도 생명 유지에 필요한 최소 칼로리예요.</p>
+            <p>아무것도 안 해도 생명 유지에 필요한 최소 칼로리예요.</p>
             <div className="mt-2 p-3 bg-secondary rounded-xl text-xs">
               <p className="font-medium text-foreground mb-1">Mifflin-St Jeor 공식</p>
-              <p>남성: 10 × 체중 + 6.25 × 키 - 5 × 나이 + 5</p>
-              <p>여성: 10 × 체중 + 6.25 × 키 - 5 × 나이 - 161</p>
+              <p>남성: 10 × 체중 + 6.25 × 키 − 5 × 나이 + 5</p>
+              <p>여성: 10 × 체중 + 6.25 × 키 − 5 × 나이 − 161</p>
             </div>
           </div>
           <div>
-            <p className="font-semibold text-foreground">TDEE (총 에너지 소비량)</p>
-            <p>실제 하루 동안 소비하는 총 칼로리입니다. 활동 수준에 따라 BMR에 계수를 곱해 계산해요.</p>
-            <div className="mt-2 p-3 bg-secondary rounded-xl text-xs space-y-1">
-              <p className="font-medium text-foreground mb-1">활동 계수</p>
-              <p>• <strong>× 1.2</strong> — 거의 운동 안 함 (사무직, 현재 적용)</p>
-              <p>• × 1.375 — 가벼운 운동 (주 1~3일)</p>
-              <p>• × 1.55 — 중간 운동 (주 3~5일)</p>
-              <p>• × 1.725 — 강한 운동 (주 6~7일)</p>
+            <p className="font-semibold text-foreground mb-2">내 활동 수준 선택</p>
+            <div className="space-y-1.5">
+              {ACTIVITY_OPTIONS.map(({ level, label, sublabel }) => (
+                <button
+                  key={level}
+                  onClick={() => { onActivityLevelChange(level); setInfoSheet(null); }}
+                  className={cn(
+                    "w-full flex items-center justify-between px-3 py-2.5 rounded-xl border text-left transition-colors text-sm",
+                    activityLevel === level
+                      ? "border-navy bg-navy/5 text-foreground font-medium"
+                      : "border-border text-muted-foreground"
+                  )}
+                >
+                  <span>{label} <span className="text-xs opacity-70">{sublabel}</span></span>
+                  <span className="text-xs font-mono">× {level}</span>
+                </button>
+              ))}
             </div>
+            {bmr !== null && (
+              <p className="mt-2 text-xs text-navy font-medium">
+                현재 적용 TDEE: {Math.round(bmr * activityLevel).toLocaleString()} kcal/일
+              </p>
+            )}
           </div>
           <p className="text-xs bg-navy/5 border border-navy/10 rounded-lg px-3 py-2 text-navy">
-            💡 TDEE보다 적게 먹으면 체중이 감소합니다. 하루 약 500 kcal 적게 섭취하면 주당 약 0.5 kg 감량이 가능해요.
+            💡 TDEE보다 하루 약 500 kcal 적게 먹으면 주당 약 0.5 kg 감량이 가능해요.
           </p>
         </div>
       </InfoSheet>
 
-      <InfoSheet
-        open={infoSheet === "body"}
-        onClose={() => setInfoSheet(null)}
-        title="체성분 추정"
-      >
-        <p>
-          Deurenberg(1991) 공식을 이용해 BMI·나이·성별로 체지방률을 추정합니다.
-          실제 체성분 측정(InBody 등)과 차이가 있을 수 있으므로 참고 수치로 활용하세요.
-        </p>
+      <InfoSheet open={infoSheet === "body"} onClose={() => setInfoSheet(null)} title="체성분 추정">
+        <p>Deurenberg(1991) 공식으로 BMI·나이·성별에 따른 체지방률을 추정합니다. 실제 InBody 측정과 차이가 있을 수 있으니 참고로 활용하세요.</p>
         <div className="p-3 bg-secondary rounded-xl text-xs space-y-1">
           <p className="font-medium text-foreground mb-1">계산 공식</p>
-          <p>체지방률 = (1.20 × BMI) + (0.23 × 나이) - (10.8 × 성별*) - 5.4</p>
+          <p>체지방률 = (1.20 × BMI) + (0.23 × 나이) − (10.8 × 성별*) − 5.4</p>
           <p className="text-muted-foreground">* 성별: 남성 = 1, 여성 = 0</p>
-          <p className="mt-1">제지방량 = 체중 × (1 - 체지방률 / 100)</p>
+          <p className="mt-1">제지방량 = 체중 × (1 − 체지방률 / 100)</p>
         </div>
         <div className="space-y-2 text-xs">
           <p className="font-semibold text-foreground">건강 체지방률 기준 (참고)</p>
           <div className="grid grid-cols-2 gap-2">
-            <div className="p-2 bg-secondary rounded-lg">
-              <p className="font-medium">남성</p>
-              <p>저체지방: ~8%</p>
-              <p>건강: 8~20%</p>
-              <p>과체지방: 20~25%</p>
-              <p>비만: 25% 이상</p>
-            </div>
-            <div className="p-2 bg-secondary rounded-lg">
-              <p className="font-medium">여성</p>
-              <p>저체지방: ~15%</p>
-              <p>건강: 15~30%</p>
-              <p>과체지방: 30~35%</p>
-              <p>비만: 35% 이상</p>
-            </div>
+            {[
+              { title: "남성", items: ["저체지방: ~8%", "건강: 8~20%", "과체지방: 20~25%", "비만: 25%↑"] },
+              { title: "여성", items: ["저체지방: ~15%", "건강: 15~30%", "과체지방: 30~35%", "비만: 35%↑"] },
+            ].map(({ title, items }) => (
+              <div key={title} className="p-2 bg-secondary rounded-lg">
+                <p className="font-medium mb-1">{title}</p>
+                {items.map((i) => <p key={i}>{i}</p>)}
+              </div>
+            ))}
           </div>
         </div>
         <p className="text-xs bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-amber-800">
-          ⚠ 이 수치는 통계적 추정이며 근육량, 수분, 연령대에 따라 오차가 발생할 수 있습니다.
+          ⚠ 이 수치는 통계적 추정이며 근육량·수분 상태에 따라 오차가 발생할 수 있습니다.
         </p>
       </InfoSheet>
     </div>

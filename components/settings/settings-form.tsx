@@ -257,6 +257,11 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
     type: "text",
     options: ["", "", ""],
   });
+  // 생년월일 하이라이트 상태
+  const [isBirthDateFromDirectLink, setIsBirthDateFromDirectLink] = useState(false);
+  const [birthDateBlinkOn, setBirthDateBlinkOn] = useState(false);
+  const birthDateRef = useRef<HTMLDivElement>(null);
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const customFieldNameRef = useRef<HTMLInputElement>(null);
@@ -276,6 +281,11 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
       setIsAddingCustomField(true);
       setIsFromDirectLink(true);
       setBlinkOn(true);
+    }
+    // 그래프 탭 생년월일 입력 유도 링크에서 직접 진입
+    if (searchParams.get("highlightBirthDate") === "true") {
+      setIsBirthDateFromDirectLink(true);
+      setBirthDateBlinkOn(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
@@ -301,13 +311,13 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
     return () => clearTimeout(id);
   }, [isAddingCustomField]);
 
-  // 350ms 간격으로 깜빡이다 2.5초 후 자동 종료
+  // 350ms 간격으로 깜빡이다 2.5초 후 자동 종료 (맞춤 입력)
   useEffect(() => {
     if (!blinkOn && !isFromDirectLink) return;
     if (!isFromDirectLink) return;
 
     let count = 0;
-    const totalBlinks = 4; // 약 2.8초 (700ms × 4 = 2800ms)
+    const totalBlinks = 4;
     setBlinkOn(true);
 
     const interval = setInterval(() => {
@@ -323,6 +333,37 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFromDirectLink]);
+
+  // 생년월일 입력칸으로 스크롤
+  useEffect(() => {
+    if (!isBirthDateFromDirectLink) return;
+    const id = setTimeout(() => {
+      birthDateRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 50);
+    return () => clearTimeout(id);
+  }, [isBirthDateFromDirectLink]);
+
+  // 생년월일 하이라이트 깜빡임
+  useEffect(() => {
+    if (!isBirthDateFromDirectLink) return;
+
+    let count = 0;
+    const totalBlinks = 4;
+    setBirthDateBlinkOn(true);
+
+    const interval = setInterval(() => {
+      count++;
+      setBirthDateBlinkOn((v) => !v);
+      if (count >= totalBlinks * 2) {
+        clearInterval(interval);
+        setBirthDateBlinkOn(false);
+        setIsBirthDateFromDirectLink(false);
+      }
+    }, 700);
+
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isBirthDateFromDirectLink]);
 
   const handleChange = <K extends keyof Settings>(key: K, value: Settings[K]) => {
     setForm((prev) => {
@@ -479,21 +520,41 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
             ))}
           </div>
         </div>
-        <div className="py-2 space-y-1.5">
-          <div className="flex items-center justify-between">
+        <div
+          ref={birthDateRef}
+          className={cn(
+            "py-2 space-y-1.5 relative rounded-lg transition-colors",
+            birthDateBlinkOn && "bg-amber-50"
+          )}
+        >
+          {birthDateBlinkOn && (
+            <div className="absolute inset-0 ring-[3px] ring-inset ring-amber-400 rounded-lg pointer-events-none" />
+          )}
+          <div className="flex items-center justify-between relative">
             <div>
               <label className="text-sm text-muted-foreground">생년월일</label>
               <span className="ml-1.5 text-xs text-muted-foreground/60">(선택)</span>
             </div>
-            <input
-              type="date"
-              value={form.birthDate ?? ""}
-              onChange={(e) => handleChange("birthDate", e.target.value || null)}
-              max={new Date().toISOString().split("T")[0]}
-              className="text-sm px-2 py-1.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[36px] text-right"
-            />
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={form.birthDate ?? ""}
+                onChange={(e) => handleChange("birthDate", e.target.value || null)}
+                max={new Date().toISOString().split("T")[0]}
+                className="text-sm px-2 py-1.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[36px] text-right"
+              />
+              {/* TODO: 테스트용 임시 삭제 버튼 — 배포 전 제거 */}
+              {form.birthDate && (
+                <button
+                  onClick={() => handleChange("birthDate", null)}
+                  className="text-xs text-red-500 px-2 py-1 rounded border border-red-200 min-h-[36px]"
+                >
+                  삭제
+                </button>
+              )}
+            </div>
           </div>
-          <p className="text-xs text-muted-foreground/70">
+          <p className="text-xs text-muted-foreground/70 relative">
             입력 시 BMI·대사량·체성분 추정 등 더 정확한 건강 정보를 확인할 수 있어요.
           </p>
         </div>

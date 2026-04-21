@@ -41,14 +41,6 @@ function calcAge(birthDate: string): number {
   return Math.max(0, age);
 }
 
-function calcAgeAtDate(birthDate: string, dateStr: string): number {
-  const birth = new Date(birthDate + "T00:00:00");
-  const at = new Date(dateStr + "T00:00:00");
-  let age = at.getFullYear() - birth.getFullYear();
-  const m = at.getMonth() - birth.getMonth();
-  if (m < 0 || (m === 0 && at.getDate() < birth.getDate())) age--;
-  return Math.max(0, age);
-}
 
 const ACTIVITY_OPTIONS = [
   { level: 1.2,   label: "거의 안 움직임", sublabel: "(사무직)" },
@@ -385,13 +377,6 @@ function computeLoess(
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-type ChartMode = "weight" | "bodyfat";
-
-function BfDot({ cx, cy, payload }: { cx?: number; cy?: number; payload?: { bodyFatEst: number | null } }) {
-  if (!cx || !cy || !payload || payload.bodyFatEst === null) return null;
-  return <circle cx={cx} cy={cy} r={4} fill="#a855f7" stroke="white" strokeWidth={2} />;
-}
-
 export function WeightChart({
   logs,
   startWeight,
@@ -407,7 +392,6 @@ export function WeightChart({
   onActivityLevelChange,
 }: WeightChartProps) {
   const [period, setPeriod] = useState<Period>("all");
-  const [chartMode, setChartMode] = useState<ChartMode>("weight");
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPortrait, setIsPortrait] = useState(false);
@@ -522,18 +506,10 @@ export function WeightChart({
       prevLog?.weight !== undefined &&
       log.weight - prevLog.weight >= 1.0;
 
-    let bodyFatEst: number | null = null;
-    if (height > 0 && birthDate && log.weight !== null) {
-      const ageAt = calcAgeAtDate(birthDate, log.date);
-      const bmiAt = calcBMI(log.weight, height);
-      bodyFatEst = parseFloat(Math.max(0, calcBodyFatPct(bmiAt, ageAt, gender)).toFixed(1));
-    }
-
     return {
       date: log.date.slice(5),
       fullDate: log.date,
       weight: log.weight,
-      bodyFatEst,
       isLowest: log.weight !== null && log.weight === lowestWeight,
       isSurge: surge,
       isMonday: new Date(log.date).getDay() === 1,
@@ -553,22 +529,6 @@ export function WeightChart({
         0.8
       )
     : chartData.map(() => null);
-
-  // LOESS 추세 곡선 — 체지방률 추정
-  const bfValidPts = chartData
-    .map((d, i) => ({ i, y: d.bodyFatEst as number }))
-    .filter((p) => chartData[p.i].bodyFatEst !== null);
-
-  const bfLoessValues = bfValidPts.length >= 3
-    ? computeLoess(
-        bfValidPts.map((p) => p.i),
-        bfValidPts.map((p) => p.y),
-        chartData.map((_, i) => i),
-        0.8
-      )
-    : chartData.map(() => null);
-
-  const canShowBodyFat = height > 0 && birthDate !== null;
 
   const targetEndDate = new Date(startDate);
   targetEndDate.setMonth(targetEndDate.getMonth() + targetMonths);
@@ -626,13 +586,8 @@ export function WeightChart({
   const finalChartData = chartData.map((d, i) => ({
     ...d,
     loessTrend: loessValues[i] !== null ? Math.round(loessValues[i]! * 10) / 10 : null,
-    bfLoessTrend: bfLoessValues[i] !== null ? Math.round(bfLoessValues[i]! * 10) / 10 : null,
     goalWeight: goalLineData[i],
   }));
-
-  const allBF = finalChartData.map((d) => d.bodyFatEst).filter((v): v is number => v !== null);
-  const minBF = allBF.length ? Number((Math.min(...allBF) - 1).toFixed(1)) : 0;
-  const maxBF = allBF.length ? Number((Math.max(...allBF) + 1).toFixed(1)) : 50;
 
   return (
     <div
@@ -658,26 +613,6 @@ export function WeightChart({
           >
             전체화면 닫기
           </button>
-        </div>
-      )}
-
-      {/* 차트 모드 토글 (체지방 가능할 때만) */}
-      {!isFullscreen && canShowBodyFat && (
-        <div className="px-4 mb-2 flex items-center gap-1.5">
-          {(["weight", "bodyfat"] as ChartMode[]).map((m) => (
-            <button
-              key={m}
-              onClick={() => setChartMode(m)}
-              className={cn(
-                "px-3 py-1 rounded-full text-xs font-medium transition-colors",
-                chartMode === m
-                  ? "bg-navy text-white"
-                  : "bg-secondary text-muted-foreground"
-              )}
-            >
-              {m === "weight" ? "체중" : "체지방률 추정"}
-            </button>
-          ))}
         </div>
       )}
 
@@ -719,41 +654,28 @@ export function WeightChart({
             <GripHorizontal size={16} />
           </div>
         )}
-        {chartMode === "weight" ? (
-          <>
-            <div className={cn("flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-muted-foreground", !isFullscreen && "pointer-events-auto")}>
-              <span className="flex items-center gap-1"><span className="w-4 h-0.5 bg-navy inline-block" /> 일별 체중</span>
-              <span className="flex items-center gap-1">
-                <svg width="16" height="4" className="inline-block"><line x1="0" y1="2" x2="16" y2="2" stroke="#f97316" strokeWidth="2" strokeDasharray="5 3" /></svg>
-                추세
-              </span>
-              <span className="flex items-center gap-1">
-                <svg width="16" height="4" className="inline-block"><line x1="0" y1="2" x2="16" y2="2" stroke="#86efac" strokeWidth="2" strokeDasharray="5 3" /></svg>
-                목표 감량선
-              </span>
-              <span className="flex items-center gap-1"><span className="w-4 h-0.5 bg-green-600 inline-block" /> 목표 체중</span>
-            </div>
-            <div className={cn("flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-muted-foreground", !isFullscreen && "pointer-events-auto")}>
-              <span className="flex items-center gap-1.5">
-                <svg width="12" height="12" viewBox="0 0 12 12"><polygon points="6,1 7.18,4.38 10.76,4.45 7.9,6.62 8.94,10.05 6,8 3.06,10.05 4.1,6.62 1.24,4.45 4.82,4.38" fill="#1e3a5f" /></svg>
-                역대 최저
-              </span>
-              <span className="flex items-center gap-1.5">
-                <svg width="12" height="12" viewBox="0 0 12 12"><rect x="2" y="2" width="8" height="8" fill="#1e3a5f" /></svg>
-                전일 대비 1kg↑
-              </span>
-            </div>
-          </>
-        ) : (
-          <div className={cn("flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-muted-foreground", !isFullscreen && "pointer-events-auto")}>
-            <span className="flex items-center gap-1"><span className="w-4 h-0.5 bg-purple-500 inline-block" /> 체지방률 추정</span>
-            <span className="flex items-center gap-1">
-              <svg width="16" height="4" className="inline-block"><line x1="0" y1="2" x2="16" y2="2" stroke="#f97316" strokeWidth="2" strokeDasharray="5 3" /></svg>
-              추세
-            </span>
-            <span className="text-muted-foreground/60 text-[9px] pl-1">Deurenberg 공식 추정값</span>
-          </div>
-        )}
+        <div className={cn("flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-muted-foreground", !isFullscreen && "pointer-events-auto")}>
+          <span className="flex items-center gap-1"><span className="w-4 h-0.5 bg-navy inline-block" /> 일별 체중</span>
+          <span className="flex items-center gap-1">
+            <svg width="16" height="4" className="inline-block"><line x1="0" y1="2" x2="16" y2="2" stroke="#f97316" strokeWidth="2" strokeDasharray="5 3" /></svg>
+            추세
+          </span>
+          <span className="flex items-center gap-1">
+            <svg width="16" height="4" className="inline-block"><line x1="0" y1="2" x2="16" y2="2" stroke="#86efac" strokeWidth="2" strokeDasharray="5 3" /></svg>
+            목표 감량선
+          </span>
+          <span className="flex items-center gap-1"><span className="w-4 h-0.5 bg-green-600 inline-block" /> 목표 체중</span>
+        </div>
+        <div className={cn("flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-muted-foreground", !isFullscreen && "pointer-events-auto")}>
+          <span className="flex items-center gap-1.5">
+            <svg width="12" height="12" viewBox="0 0 12 12"><polygon points="6,1 7.18,4.38 10.76,4.45 7.9,6.62 8.94,10.05 6,8 3.06,10.05 4.1,6.62 1.24,4.45 4.82,4.38" fill="#1e3a5f" /></svg>
+            역대 최저
+          </span>
+          <span className="flex items-center gap-1.5">
+            <svg width="12" height="12" viewBox="0 0 12 12"><rect x="2" y="2" width="8" height="8" fill="#1e3a5f" /></svg>
+            전일 대비 1kg↑
+          </span>
+        </div>
       </div>
 
       <div className={cn("relative", isFullscreen ? "flex-1 w-full h-[100dvh]" : "px-2 h-[300px]")}>
@@ -774,27 +696,15 @@ export function WeightChart({
           >
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
             <XAxis dataKey="date" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-            {chartMode === "weight" ? (
-              <YAxis domain={[minW, maxW]} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={35} unit=" kg" />
-            ) : (
-              <YAxis domain={[minBF, maxBF]} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={35} unit="%" />
-            )}
+            <YAxis domain={[minW, maxW]} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={35} unit=" kg" />
             <Tooltip
               contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" }}
               formatter={(value: number, name: string) => {
-                if (chartMode === "bodyfat") {
-                  const labels: Record<string, string> = { bodyFatEst: "체지방률 추정", bfLoessTrend: "추세" };
-                  return [`${value} %`, labels[name] ?? name];
-                }
                 const labels: Record<string, string> = { weight: "체중", loessTrend: "추세", goalWeight: "목표선" };
                 return [`${value} kg`, labels[name] ?? name];
               }}
             />
-            {chartMode === "weight" && (
-              <ReferenceLine y={targetWeight} stroke="#16a34a" strokeWidth={1.5} />
-            )}
-            {/* 목표 감량선 (체중 모드만) */}
-            {chartMode === "weight" && (
+            <ReferenceLine y={targetWeight} stroke="#16a34a" strokeWidth={1.5} />
             <Line
               type="linear"
               dataKey="goalWeight"
@@ -804,41 +714,24 @@ export function WeightChart({
               dot={false}
               connectNulls
             />
-            )}
-            {/* 추세 곡선 */}
             <Line
               type="monotone"
-              dataKey={chartMode === "weight" ? "loessTrend" : "bfLoessTrend"}
+              dataKey="loessTrend"
               stroke="#f97316"
               strokeWidth={2}
               strokeDasharray="6 3"
               dot={false}
               connectNulls
             />
-            {/* 일별 체중 (체중 모드) */}
-            {chartMode === "weight" && (
-              <Line
-                type="monotone"
-                dataKey="weight"
-                stroke="#1e3a5f"
-                strokeWidth={2}
-                dot={<CustomDot />}
-                activeDot={{ r: 6 }}
-                connectNulls
-              />
-            )}
-            {/* 일별 체지방률 (체지방 모드) */}
-            {chartMode === "bodyfat" && (
-              <Line
-                type="monotone"
-                dataKey="bodyFatEst"
-                stroke="#a855f7"
-                strokeWidth={2}
-                dot={<BfDot />}
-                activeDot={{ r: 6 }}
-                connectNulls
-              />
-            )}
+            <Line
+              type="monotone"
+              dataKey="weight"
+              stroke="#1e3a5f"
+              strokeWidth={2}
+              dot={<CustomDot />}
+              activeDot={{ r: 6 }}
+              connectNulls
+            />
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -871,10 +764,10 @@ export function WeightChart({
             </div>
           </div>
 
-          {/* ── 스마트 바디 분석 (full width, compact) ── */}
-          <div className="px-3 py-2 bg-secondary rounded-xl flex items-center gap-3">
-            <p className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">스마트 바디 분석</p>
-            <p className="text-sm font-bold truncate">
+          {/* ── 스마트 바디 분석 (full width) ── */}
+          <div className="px-3 py-2.5 bg-secondary rounded-xl">
+            <p className="text-xs text-muted-foreground mb-0.5">스마트 바디 분석</p>
+            <p className="text-sm font-bold">
               {gender === "남성" ? "남자" : "여자"}
               {height > 0 && ` | ${height}cm`}
               {currentWeight > 0 && ` | ${currentWeight}kg`}

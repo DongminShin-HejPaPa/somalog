@@ -543,15 +543,6 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
                 max={new Date().toISOString().split("T")[0]}
                 className="text-sm px-2 py-1.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[36px] text-right"
               />
-              {/* TODO: 테스트용 임시 삭제 버튼 — 배포 전 제거 */}
-              {form.birthDate && (
-                <button
-                  onClick={() => handleChange("birthDate", null)}
-                  className="text-xs text-red-500 px-2 py-1 rounded border border-red-200 min-h-[36px]"
-                >
-                  삭제
-                </button>
-              )}
             </div>
           </div>
           <p className="text-xs text-muted-foreground/70 relative">

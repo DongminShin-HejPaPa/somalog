@@ -130,3 +130,36 @@ export async function actionClearDailyLogField(
   revalidatePath("/graph");
   return result;
 }
+
+export async function actionGetPrefetchData(
+  fetchRecords: boolean,
+  fetchGraph: boolean
+): Promise<{
+  w?: WeeklyLog[];
+  c?: number;
+  all?: DailyLog[];
+  low?: { weight: number; date: string } | null;
+}> {
+  const promises: Promise<any>[] = [];
+  let resW, resC, resAll, resLow;
+
+  if (fetchRecords) {
+    promises.push(
+      getWeeklyLogs(4).then((d) => (resW = d)),
+      getDailyLogsTotalCount().then((d) => (resC = d))
+    );
+  }
+  if (fetchGraph) {
+    promises.push(
+      getAllDailyLogs().then((d) => (resAll = d)),
+      getLowestWeight().then((d) => (resLow = d))
+    );
+  }
+
+  await Promise.all(promises);
+
+  return {
+    ...(fetchRecords && { w: resW, c: resC }),
+    ...(fetchGraph && { all: resAll, low: resLow }),
+  };
+}

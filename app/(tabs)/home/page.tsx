@@ -1,5 +1,6 @@
 import { HomeContainer } from "@/components/home/home-container";
 import { getAuthUser } from "@/lib/supabase/server";
+import { getHomeInitialData } from "@/lib/services/home-service";
 
 export default async function HomePage() {
   const user = await getAuthUser();
@@ -7,5 +8,13 @@ export default async function HomePage() {
     (user?.user_metadata?.full_name as string | undefined) ??
     user?.email?.split("@")[0] ??
     null;
-  return <HomeContainer userId={user?.id ?? null} initialDisplayName={displayName} />;
+  const initialData = await getHomeInitialData(user?.id ?? null);
+
+  return (
+    <HomeContainer 
+      userId={user?.id ?? null} 
+      initialDisplayName={displayName} 
+      initialData={initialData}
+    />
+  );
 }

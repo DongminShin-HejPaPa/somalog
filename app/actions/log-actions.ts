@@ -165,8 +165,9 @@ export async function actionGetPrefetchData(
 }
 
 import { getHomeInitialData, type HomeInitialData } from "@/lib/services/home-service";
+import { getAuthUser } from "@/lib/supabase/server";
 
 export async function actionGetHomeInitialData(): Promise<HomeInitialData> {
-  const { data: { user } } = await (await import("@/lib/supabase/server")).createClient().auth.getUser();
+  const user = await getAuthUser();
   return getHomeInitialData(user?.id ?? null);
 }

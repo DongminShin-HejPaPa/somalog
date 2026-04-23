@@ -8,13 +8,11 @@ export default async function HomePage() {
     (user?.user_metadata?.full_name as string | undefined) ??
     user?.email?.split("@")[0] ??
     null;
-  const initialData = await getHomeInitialData(user?.id ?? null);
 
   return (
     <HomeContainer 
       userId={user?.id ?? null} 
       initialDisplayName={displayName} 
-      initialData={initialData}
     />
   );
 }

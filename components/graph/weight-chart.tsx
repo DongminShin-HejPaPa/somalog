@@ -538,7 +538,8 @@ export function WeightChart({
         await navigator.share({
           files: [file],
           title: "SomaLog 다이어트 기록",
-          text: "나 요즘 SomaLog로 다이어트 기록 중! 📉 체중 그래프·BMI 분석·AI 코치까지 무료야. 같이 써볼래? → somalog.vercel.app",
+          text: "나 요즘 SomaLog로 다이어트 기록 중! 📉 체중 그래프·BMI 분석·AI 코치까지 무료야. 같이 써볼래?",
+          url: "https://somalog.vercel.app",
         });
       } else {
         const a = document.createElement("a");

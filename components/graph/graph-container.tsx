@@ -10,7 +10,7 @@ import { WeightChart } from "./weight-chart";
 import type { DailyLog } from "@/lib/types";
 import { logStore } from "@/lib/stores/log-store";
 
-export function GraphContainer({ userId }: { userId: string | null }) {
+export function GraphContainer({ userId, userName }: { userId: string | null; userName: string }) {
   const { settings, updateSettings } = useSettings();
   const [logs, setLogs] = useState<DailyLog[] | undefined>(undefined);
   const [lowest, setLowest] = useState<{ weight: number; date: string } | undefined>(undefined);
@@ -75,6 +75,7 @@ export function GraphContainer({ userId }: { userId: string | null }) {
       birthDate={settings.birthDate}
       activityLevel={settings.activityLevel}
       onActivityLevelChange={handleActivityLevelChange}
+      userName={userName}
     />
   );
 }

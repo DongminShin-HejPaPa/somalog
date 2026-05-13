@@ -28,6 +28,7 @@ interface WeightChartProps {
   birthDate: string | null;
   activityLevel: number;
   onActivityLevelChange: (level: number) => void;
+  userName: string;
 }
 
 // ── 건강 지표 계산 헬퍼 ──────────────────────────────────────────────────────
@@ -428,6 +429,7 @@ export function WeightChart({
   birthDate,
   activityLevel,
   onActivityLevelChange,
+  userName,
 }: WeightChartProps) {
   const [period, setPeriod] = useState<Period>("all");
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1093,8 +1095,16 @@ export function WeightChart({
             >
               {/* 앱 브랜딩 */}
               <div className="text-center mb-4">
-                <p className="text-xl font-black text-[#1e3a5f] tracking-tight">SomaLog</p>
-                <p className="text-xs text-gray-400 mt-0.5">다이어트 기록</p>
+                <p className="text-xl font-black text-[#1e3a5f] tracking-tight">
+                  {userName ? `${userName}님 다이어트 ` : "다이어트 "}
+                  <span style={{ fontVariantNumeric: "tabular-nums" }}>{daysSoFar}일째</span>
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  SomaLog와 함께{" "}
+                  {(startWeight - currentWeight) > 0
+                    ? `${(startWeight - currentWeight).toFixed(1)} kg 줄여가는중`
+                    : `${Math.abs(startWeight - currentWeight).toFixed(1)} kg 함께하는중`}
+                </p>
               </div>
 
               {/* 차트 — y축: 시작 대비 감량량 표시 */}

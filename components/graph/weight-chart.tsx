@@ -111,9 +111,12 @@ const BMI_SEGMENTS = [
   { flex: 5,   color: "#b91c1c", label: "비만3" },     // red-700
 ];
 
-function BmiGaugeBar({ bmi }: { bmi: number }) {
+function BmiGaugeBar({ bmi, startBmi }: { bmi: number; startBmi?: number }) {
   const MIN = 14, MAX = 40, RANGE = MAX - MIN;
   const pct = Math.min(100, Math.max(0, ((bmi - MIN) / RANGE) * 100));
+  const startPct = startBmi !== undefined
+    ? Math.min(100, Math.max(0, ((startBmi - MIN) / RANGE) * 100))
+    : null;
   return (
     <div className="mt-2.5">
       <div className="relative">
@@ -122,6 +125,16 @@ function BmiGaugeBar({ bmi }: { bmi: number }) {
             <div key={s.label} style={{ flex: s.flex, backgroundColor: s.color }} />
           ))}
         </div>
+        {/* 시작 BMI — 눈에 덜 띄는 세로 눈금 */}
+        {startPct !== null && (
+          <div
+            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 opacity-50"
+            style={{ left: `${startPct}%` }}
+          >
+            <div className="w-0.5 h-4 bg-slate-500 rounded-full" />
+          </div>
+        )}
+        {/* 현재 BMI — 흰 동그라미 */}
         <div
           className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-white border-2 border-slate-700 rounded-full shadow"
           style={{ left: `${pct}%` }}
@@ -137,9 +150,12 @@ function BmiGaugeBar({ bmi }: { bmi: number }) {
 }
 
 // 상세 BMI 게이지 (정보 시트용) — 대한비만학회 기준 컷포인트: 18.5, 23, 25, 30, 35
-function BmiGaugeDetail({ bmi }: { bmi: number }) {
+function BmiGaugeDetail({ bmi, startBmi }: { bmi: number; startBmi?: number }) {
   const MIN = 14, MAX = 40, RANGE = MAX - MIN;
   const pct = Math.min(100, Math.max(0, ((bmi - MIN) / RANGE) * 100));
+  const startPct = startBmi !== undefined
+    ? Math.min(100, Math.max(0, ((startBmi - MIN) / RANGE) * 100))
+    : null;
   const cutpoints = [18.5, 23, 25, 30, 35];
   return (
     <div className="my-4">
@@ -156,6 +172,16 @@ function BmiGaugeDetail({ bmi }: { bmi: number }) {
             style={{ left: `${((v - MIN) / RANGE) * 100}%` }}
           />
         ))}
+        {/* 시작 BMI — 반투명 세로 눈금 */}
+        {startPct !== null && (
+          <div
+            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 opacity-40"
+            style={{ left: `${startPct}%` }}
+          >
+            <div className="w-0.5 h-6 bg-slate-700 rounded-full" />
+          </div>
+        )}
+        {/* 현재 BMI — 흰 동그라미 */}
         <div
           className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-5 bg-white border-2 border-slate-700 rounded-full shadow flex items-center justify-center"
           style={{ left: `${pct}%` }}
@@ -620,6 +646,7 @@ export function WeightChart({
   // ── 건강 지표 계산 ──────────────────────────────────────────────────────────
   const age = birthDate ? calcAge(birthDate) : null;
   const bmi = height > 0 && currentWeight > 0 ? calcBMI(currentWeight, height) : null;
+  const startBmi = height > 0 && startWeight > 0 ? calcBMI(startWeight, height) : undefined;
   const bmiLv = bmi ? getBmiLevel(bmi) : null;
   const bmr = (age !== null && height > 0 && currentWeight > 0)
     ? calcBMR(currentWeight, height, age, gender)
@@ -859,7 +886,7 @@ export function WeightChart({
             <div className="p-3 bg-secondary rounded-xl">
               <CardTitle onInfo={() => setInfoSheet("bmi")}>BMI (아시아 기준)</CardTitle>
               <p className="text-lg font-bold">{bmi.toFixed(1)} <span className="text-sm font-medium text-muted-foreground">({bmiLv})</span></p>
-              <BmiGaugeBar bmi={bmi} />
+              <BmiGaugeBar bmi={bmi} startBmi={startBmi} />
               <p className="text-xs text-muted-foreground mt-2">{getBmiAdvice(bmiLv)}</p>
             </div>
           ) : (
@@ -928,7 +955,7 @@ export function WeightChart({
             </p>
           )}
         </div>
-        {bmi !== null && <BmiGaugeDetail bmi={bmi} />}
+        {bmi !== null && <BmiGaugeDetail bmi={bmi} startBmi={startBmi} />}
         <div className="space-y-2">
           {[
             {
@@ -1146,10 +1173,13 @@ export function WeightChart({
                     {bmi.toFixed(1)}{" "}
                     <span style={{ fontSize: 13, fontWeight: 500, color: "#64748b" }}>({bmiLv})</span>
                   </p>
-                  {/* 인라인 게이지 — dot 포함, 6단계, html-to-image 호환 */}
+                  {/* 인라인 게이지 — dot + 시작 마커 포함, 6단계, html-to-image 호환 */}
                   {(() => {
                     const MIN = 14, MAX = 40, RANGE = MAX - MIN;
                     const pct = Math.min(100, Math.max(0, ((bmi - MIN) / RANGE) * 100));
+                    const sPct = startBmi !== undefined
+                      ? Math.min(100, Math.max(0, ((startBmi - MIN) / RANGE) * 100))
+                      : null;
                     return (
                       <div style={{ marginTop: 8 }}>
                         <div style={{ position: "relative" }}>
@@ -1158,7 +1188,21 @@ export function WeightChart({
                               <div key={s.label} style={{ flex: s.flex, backgroundColor: s.color }} />
                             ))}
                           </div>
-                          {/* 위치 dot */}
+                          {/* 시작 BMI — 반투명 세로 눈금 */}
+                          {sPct !== null && (
+                            <div style={{
+                              position: "absolute",
+                              top: "50%",
+                              left: `${sPct}%`,
+                              transform: "translate(-50%, -50%)",
+                              width: 2,
+                              height: 16,
+                              backgroundColor: "#475569",
+                              borderRadius: 1,
+                              opacity: 0.4,
+                            }} />
+                          )}
+                          {/* 현재 BMI — 흰 동그라미 */}
                           <div style={{
                             position: "absolute",
                             top: "50%",
@@ -1185,9 +1229,16 @@ export function WeightChart({
               )}
 
               {/* 푸터 */}
-              <p style={{ textAlign: "center", fontSize: 9, color: "#cbd5e1", marginTop: 12 }}>
-                somalog.vercel.app
-              </p>
+              <div style={{ textAlign: "center", marginTop: 12 }}>
+                <a
+                  href="https://somalog.vercel.app"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ fontSize: 9, color: "#94a3b8", textDecoration: "underline" }}
+                >
+                  somalog.vercel.app
+                </a>
+              </div>
             </div>
           </div>
 

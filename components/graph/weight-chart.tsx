@@ -58,22 +58,26 @@ function calcBMI(weight: number, heightCm: number): number {
   return weight / Math.pow(heightCm / 100, 2);
 }
 
-type BmiLevel = "낮음" | "건강" | "높음" | "비만";
+type BmiLevel = "낮음" | "정상" | "과체중" | "비만 1단계" | "비만 2단계" | "비만 3단계";
 
-// 아시아·태평양 기준 (WHO 아시아 기준): 18.5 / 23 / 25
+// 대한비만학회 기준 (아시아): 18.5 / 23 / 25 / 30 / 35
 function getBmiLevel(bmi: number): BmiLevel {
   if (bmi < 18.5) return "낮음";
-  if (bmi < 23)   return "건강";
-  if (bmi < 25)   return "높음";
-  return "비만";
+  if (bmi < 23)   return "정상";
+  if (bmi < 25)   return "과체중";
+  if (bmi < 30)   return "비만 1단계";
+  if (bmi < 35)   return "비만 2단계";
+  return "비만 3단계";
 }
 
 function getBmiAdvice(level: BmiLevel): string {
   switch (level) {
-    case "낮음": return "체중이 다소 적습니다. 균형 잡힌 식단으로 건강을 챙기세요.";
-    case "건강": return "건강 체중 범위예요 (아시아 기준). 지금처럼 꾸준히 유지하세요!";
-    case "높음": return "과체중 범위입니다 (아시아 기준). 꾸준한 운동과 식단 관리를 권장해요.";
-    case "비만": return "비만 범위입니다 (아시아 기준). 전문가 상담과 함께 체중 감량을 시작하세요.";
+    case "낮음":      return "저체중입니다. 균형 잡힌 식단으로 건강 체중을 만들어 보세요.";
+    case "정상":      return "정상 체중이에요 (아시아 기준). 지금처럼 꾸준히 유지하세요!";
+    case "과체중":    return "과체중 범위입니다. 가벼운 운동과 식단 조절로 정상 범위를 목표로 해요.";
+    case "비만 1단계": return "비만 1단계입니다. 생활 습관 개선과 꾸준한 운동을 시작해 보세요.";
+    case "비만 2단계": return "비만 2단계입니다. 전문가 상담과 함께 체계적인 감량 계획을 세우세요.";
+    case "비만 3단계": return "고도비만입니다. 의료 전문가의 도움을 받아 체중 관리를 시작하세요.";
   }
 }
 
@@ -95,8 +99,17 @@ function bmiToWeight(bmi: number, heightCm: number): number {
 }
 
 // ── 미니 BMI 게이지 바 ───────────────────────────────────────────────────────
-// 표시 범위: 14 ~ 40 / 아시아 기준: 낮음(~18.5), 건강(~23), 높음(~25), 비만(25~)
-// 세그먼트: 낮음 4.5, 건강 4.5, 높음 2, 비만 15 → 합 26
+// 표시 범위: 14 ~ 40 / 대한비만학회 6단계: 18.5 / 23 / 25 / 30 / 35
+// 세그먼트 flex: 낮음 4.5 / 정상 4.5 / 과체중 2 / 비만1 5 / 비만2 5 / 비만3 5 → 합 26
+
+const BMI_SEGMENTS = [
+  { flex: 4.5, color: "#60a5fa", label: "낮음" },      // sky-400
+  { flex: 4.5, color: "#34d399", label: "정상" },      // emerald-400
+  { flex: 2,   color: "#facc15", label: "과체중" },    // yellow-400
+  { flex: 5,   color: "#fb923c", label: "비만1" },     // orange-400
+  { flex: 5,   color: "#f87171", label: "비만2" },     // red-400
+  { flex: 5,   color: "#b91c1c", label: "비만3" },     // red-700
+];
 
 function BmiGaugeBar({ bmi }: { bmi: number }) {
   const MIN = 14, MAX = 40, RANGE = MAX - MIN;
@@ -105,10 +118,9 @@ function BmiGaugeBar({ bmi }: { bmi: number }) {
     <div className="mt-2.5">
       <div className="relative">
         <div className="flex h-2.5 rounded-full overflow-hidden">
-          <div style={{ flex: 4.5 }} className="bg-amber-400" />
-          <div style={{ flex: 4.5 }} className="bg-teal-400" />
-          <div style={{ flex: 2 }} className="bg-orange-400" />
-          <div style={{ flex: 15 }} className="bg-red-500" />
+          {BMI_SEGMENTS.map((s) => (
+            <div key={s.label} style={{ flex: s.flex, backgroundColor: s.color }} />
+          ))}
         </div>
         <div
           className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-white border-2 border-slate-700 rounded-full shadow"
@@ -116,30 +128,28 @@ function BmiGaugeBar({ bmi }: { bmi: number }) {
         />
       </div>
       <div className="flex mt-1.5 text-[9px] text-muted-foreground">
-        <div style={{ flex: 4.5 }}>낮음</div>
-        <div style={{ flex: 4.5 }}>건강</div>
-        <div style={{ flex: 2 }}>높음</div>
-        <div style={{ flex: 15 }}>비만</div>
+        {BMI_SEGMENTS.map((s) => (
+          <div key={s.label} style={{ flex: s.flex }}>{s.label}</div>
+        ))}
       </div>
     </div>
   );
 }
 
-// 상세 BMI 게이지 (정보 시트용) — 아시아 기준 컷포인트: 18.5, 23, 25
+// 상세 BMI 게이지 (정보 시트용) — 대한비만학회 기준 컷포인트: 18.5, 23, 25, 30, 35
 function BmiGaugeDetail({ bmi }: { bmi: number }) {
   const MIN = 14, MAX = 40, RANGE = MAX - MIN;
   const pct = Math.min(100, Math.max(0, ((bmi - MIN) / RANGE) * 100));
-  const cutpoints = [{ v: 18.5 }, { v: 23 }, { v: 25 }];
+  const cutpoints = [18.5, 23, 25, 30, 35];
   return (
     <div className="my-4">
       <div className="relative">
         <div className="flex h-4 rounded-full overflow-hidden">
-          <div style={{ flex: 4.5 }} className="bg-amber-400" />
-          <div style={{ flex: 4.5 }} className="bg-teal-400" />
-          <div style={{ flex: 2 }} className="bg-orange-400" />
-          <div style={{ flex: 15 }} className="bg-red-500" />
+          {BMI_SEGMENTS.map((s) => (
+            <div key={s.label} style={{ flex: s.flex, backgroundColor: s.color }} />
+          ))}
         </div>
-        {cutpoints.map(({ v }) => (
+        {cutpoints.map((v) => (
           <div
             key={v}
             className="absolute top-0 bottom-0 w-0.5 bg-white/60"
@@ -154,13 +164,12 @@ function BmiGaugeDetail({ bmi }: { bmi: number }) {
         </div>
       </div>
       <div className="relative flex mt-1 text-[10px] text-muted-foreground">
-        <div style={{ flex: 4.5 }}>낮음</div>
-        <div style={{ flex: 4.5 }}>건강</div>
-        <div style={{ flex: 2 }}>높음</div>
-        <div style={{ flex: 15 }}>비만</div>
+        {BMI_SEGMENTS.map((s) => (
+          <div key={s.label} style={{ flex: s.flex }}>{s.label}</div>
+        ))}
       </div>
       <div className="relative flex mt-0.5 text-[10px] font-medium text-foreground/50">
-        {cutpoints.map(({ v }) => (
+        {cutpoints.map((v) => (
           <div
             key={v}
             className="absolute -translate-x-1/2"
@@ -500,7 +509,11 @@ export function WeightChart({
       const file = new File([blob], "somalog-progress.png", { type: "image/png" });
 
       if (typeof navigator !== "undefined" && navigator.share && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: "SomaLog 다이어트 기록" });
+        await navigator.share({
+          files: [file],
+          title: "SomaLog 다이어트 기록",
+          text: "나 요즘 SomaLog로 다이어트 기록 중! 📉 체중 그래프·BMI 분석·AI 코치까지 무료야. 같이 써볼래? → somalog.vercel.app",
+        });
       } else {
         const a = document.createElement("a");
         a.href = dataUrl;
@@ -919,28 +932,38 @@ export function WeightChart({
         <div className="space-y-2">
           {[
             {
-              color: "bg-amber-400",
+              hex: "#60a5fa",
               label: `낮음 (18.5 미만${height > 0 ? `, ${bmiToWeight(18.5, height)}kg 미만` : ""})`,
-              desc: "저체중. 영양 불균형에 주의하세요.",
+              desc: "저체중. 균형 잡힌 식단으로 건강 체중을 만들어 보세요.",
             },
             {
-              color: "bg-teal-400",
-              label: `건강 (18.5–23${height > 0 ? `, ${bmiToWeight(18.5, height)}–${bmiToWeight(23, height)}kg` : ""})`,
-              desc: "정상 체중 (아시아 기준). 현재 상태를 유지하세요.",
+              hex: "#34d399",
+              label: `정상 (18.5–23${height > 0 ? `, ${bmiToWeight(18.5, height)}–${bmiToWeight(23, height)}kg` : ""})`,
+              desc: "정상 체중. 지금처럼 꾸준히 유지하세요!",
             },
             {
-              color: "bg-orange-400",
-              label: `높음 (23–25${height > 0 ? `, ${bmiToWeight(23, height)}–${bmiToWeight(25, height)}kg` : ""})`,
-              desc: "과체중 (아시아 기준). 생활 습관 개선을 권장해요.",
+              hex: "#facc15",
+              label: `과체중 (23–25${height > 0 ? `, ${bmiToWeight(23, height)}–${bmiToWeight(25, height)}kg` : ""})`,
+              desc: "과체중. 가벼운 운동과 식단 조절을 권장해요.",
             },
             {
-              color: "bg-red-500",
-              label: `비만 (25 이상${height > 0 ? `, ${bmiToWeight(25, height)}kg 이상` : ""})`,
-              desc: "비만 (아시아 기준). 전문가 상담을 권장합니다.",
+              hex: "#fb923c",
+              label: `비만 1단계 (25–30${height > 0 ? `, ${bmiToWeight(25, height)}–${bmiToWeight(30, height)}kg` : ""})`,
+              desc: "비만 1단계. 생활 습관 개선과 꾸준한 운동을 시작해 보세요.",
             },
-          ].map(({ color, label, desc }) => (
+            {
+              hex: "#f87171",
+              label: `비만 2단계 (30–35${height > 0 ? `, ${bmiToWeight(30, height)}–${bmiToWeight(35, height)}kg` : ""})`,
+              desc: "비만 2단계. 전문가 상담과 체계적인 감량 계획을 세우세요.",
+            },
+            {
+              hex: "#b91c1c",
+              label: `비만 3단계 (35 이상${height > 0 ? `, ${bmiToWeight(35, height)}kg 이상` : ""})`,
+              desc: "고도비만. 의료 전문가의 도움이 필요합니다.",
+            },
+          ].map(({ hex, label, desc }) => (
             <div key={label} className="flex items-start gap-2">
-              <span className={`mt-0.5 w-2 h-2 rounded-sm ${color} flex-shrink-0`} />
+              <span className="mt-0.5 w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: hex }} />
               <p><strong className="text-foreground">{label}</strong> — {desc}</p>
             </div>
           ))}
@@ -1123,21 +1146,40 @@ export function WeightChart({
                     {bmi.toFixed(1)}{" "}
                     <span style={{ fontSize: 13, fontWeight: 500, color: "#64748b" }}>({bmiLv})</span>
                   </p>
-                  {/* 인라인 게이지 (html-to-image 호환) */}
-                  <div style={{ marginTop: 8 }}>
-                    <div style={{ display: "flex", height: 10, borderRadius: 99, overflow: "hidden", position: "relative" }}>
-                      <div style={{ flex: 4.5, backgroundColor: "#fbbf24" }} />
-                      <div style={{ flex: 4.5, backgroundColor: "#2dd4bf" }} />
-                      <div style={{ flex: 2, backgroundColor: "#fb923c" }} />
-                      <div style={{ flex: 15, backgroundColor: "#ef4444" }} />
-                    </div>
-                    <div style={{ display: "flex", marginTop: 4, fontSize: 8, color: "#94a3b8" }}>
-                      <div style={{ flex: 4.5 }}>낮음</div>
-                      <div style={{ flex: 4.5 }}>건강</div>
-                      <div style={{ flex: 2 }}>높음</div>
-                      <div style={{ flex: 15 }}>비만</div>
-                    </div>
-                  </div>
+                  {/* 인라인 게이지 — dot 포함, 6단계, html-to-image 호환 */}
+                  {(() => {
+                    const MIN = 14, MAX = 40, RANGE = MAX - MIN;
+                    const pct = Math.min(100, Math.max(0, ((bmi - MIN) / RANGE) * 100));
+                    return (
+                      <div style={{ marginTop: 8 }}>
+                        <div style={{ position: "relative" }}>
+                          <div style={{ display: "flex", height: 10, borderRadius: 99, overflow: "hidden" }}>
+                            {BMI_SEGMENTS.map((s) => (
+                              <div key={s.label} style={{ flex: s.flex, backgroundColor: s.color }} />
+                            ))}
+                          </div>
+                          {/* 위치 dot */}
+                          <div style={{
+                            position: "absolute",
+                            top: "50%",
+                            left: `${pct}%`,
+                            transform: "translate(-50%, -50%)",
+                            width: 14,
+                            height: 14,
+                            backgroundColor: "#ffffff",
+                            border: "2px solid #334155",
+                            borderRadius: "50%",
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+                          }} />
+                        </div>
+                        <div style={{ display: "flex", marginTop: 4, fontSize: 8, color: "#94a3b8" }}>
+                          {BMI_SEGMENTS.map((s) => (
+                            <div key={s.label} style={{ flex: s.flex }}>{s.label}</div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
                   <p style={{ fontSize: 10, color: "#64748b", marginTop: 6 }}>{getBmiAdvice(bmiLv)}</p>
                 </div>
               )}

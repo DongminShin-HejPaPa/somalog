@@ -108,11 +108,11 @@ export function InputModal({
     } else if (field === "water") {
       setWaterValue(log.water ?? waterGoal);
     } else if (field === "breakfast") {
-      setTextValue(log.breakfast ?? "");
+      setTextValue(log.breakfast === "SKIP" ? "" : (log.breakfast ?? ""));
     } else if (field === "lunch") {
-      setTextValue(log.lunch ?? "");
+      setTextValue(log.lunch === "SKIP" ? "" : (log.lunch ?? ""));
     } else if (field === "dinner") {
-      setTextValue(log.dinner ?? "");
+      setTextValue(log.dinner === "SKIP" ? "" : (log.dinner ?? ""));
     } else if (field === "customFieldValue") {
       setTextValue(log.customFieldValue ?? "");
     }
@@ -298,15 +298,37 @@ export function InputModal({
                 </span>
                 <span className="text-xs text-muted-foreground">4L</span>
               </div>
-              <input
-                type="range"
-                min={0}
-                max={4}
-                step={0.1}
-                value={waterValue ?? 0}
-                onChange={(e) => setWaterValue(Math.round(Number(e.target.value) * 10) / 10)}
-                className="w-full h-2 rounded-full appearance-none cursor-pointer accent-navy bg-secondary"
-              />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = Math.round(((waterValue ?? 0) - 0.1) * 10) / 10;
+                    if (next >= 0) setWaterValue(next);
+                  }}
+                  className="w-9 h-9 flex items-center justify-center rounded-lg bg-secondary border border-border text-foreground text-lg font-semibold shrink-0 hover:bg-border transition-colors"
+                >
+                  −
+                </button>
+                <input
+                  type="range"
+                  min={0}
+                  max={4}
+                  step={0.1}
+                  value={waterValue ?? 0}
+                  onChange={(e) => setWaterValue(Math.round(Number(e.target.value) * 10) / 10)}
+                  className="flex-1 h-2 rounded-full appearance-none cursor-pointer accent-navy bg-secondary"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = Math.round(((waterValue ?? 0) + 0.1) * 10) / 10;
+                    if (next <= 4) setWaterValue(next);
+                  }}
+                  className="w-9 h-9 flex items-center justify-center rounded-lg bg-secondary border border-border text-foreground text-lg font-semibold shrink-0 hover:bg-border transition-colors"
+                >
+                  +
+                </button>
+              </div>
               <div className="flex justify-between text-xs text-muted-foreground mt-1">
                 <span>목표 {waterGoal}L</span>
                 {waterValue != null && waterValue > 0 && waterValue < waterGoal && (
@@ -397,6 +419,20 @@ export function InputModal({
               className="w-full px-4 py-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[52px]"
             />
             <SaveButton onClick={handleTextSave} isSaving={isSaving} />
+            <button
+              type="button"
+              onClick={() => onSave({ [field]: "SKIP" } as DailyLogUpdate)}
+              disabled={isSaving}
+              data-testid="modal-meal-skip"
+              className={cn(
+                "w-full py-3 rounded-xl text-sm font-semibold min-h-[48px] transition-colors",
+                log[field] === "SKIP"
+                  ? "bg-coral text-white"
+                  : "bg-secondary text-foreground border border-border hover:border-coral/40 hover:text-coral"
+              )}
+            >
+              안 먹음
+            </button>
             {hasCurrentValue && (
               <DeleteButton
                 onClick={() => onDelete(field as ClearableField)}

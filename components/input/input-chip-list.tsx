@@ -34,6 +34,10 @@ function formatValue(key: ItemKey, value: unknown, waterGoal: number): string {
       return value === "Y" ? "했음" : "안 했음";
     case "lateSnack":
       return value === "Y" ? "먹음" : "안 먹음";
+    case "breakfast":
+    case "lunch":
+    case "dinner":
+      return value === "SKIP" ? "안 먹음" : value as string;
     default:
       return value as string;
   }

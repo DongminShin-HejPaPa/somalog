@@ -30,6 +30,7 @@ pnpm-debug.log*
 # personal data — never commit
 lib/my-mig-data.csv
 lib/my-mig-data.txt
+debug.md
 
 # vercel
 .vercel

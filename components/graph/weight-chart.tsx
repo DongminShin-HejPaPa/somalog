@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Expand, X, GripHorizontal, Info } from "lucide-react";
+import { Expand, X, GripHorizontal, Info, Share2 } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -60,19 +60,20 @@ function calcBMI(weight: number, heightCm: number): number {
 
 type BmiLevel = "낮음" | "건강" | "높음" | "비만";
 
+// 아시아·태평양 기준 (WHO 아시아 기준): 18.5 / 23 / 25
 function getBmiLevel(bmi: number): BmiLevel {
   if (bmi < 18.5) return "낮음";
-  if (bmi < 24) return "건강";
-  if (bmi < 30) return "높음";
+  if (bmi < 23)   return "건강";
+  if (bmi < 25)   return "높음";
   return "비만";
 }
 
 function getBmiAdvice(level: BmiLevel): string {
   switch (level) {
     case "낮음": return "체중이 다소 적습니다. 균형 잡힌 식단으로 건강을 챙기세요.";
-    case "건강": return "건강 체중 범위예요. 지금처럼 꾸준히 유지하세요!";
-    case "높음": return "체중이 다소 높습니다. 꾸준한 운동과 식단 관리를 권장해요.";
-    case "비만": return "비만 범위입니다. 전문가 상담과 함께 체중 감량을 시작하세요.";
+    case "건강": return "건강 체중 범위예요 (아시아 기준). 지금처럼 꾸준히 유지하세요!";
+    case "높음": return "과체중 범위입니다 (아시아 기준). 꾸준한 운동과 식단 관리를 권장해요.";
+    case "비만": return "비만 범위입니다 (아시아 기준). 전문가 상담과 함께 체중 감량을 시작하세요.";
   }
 }
 
@@ -88,21 +89,26 @@ function calcBodyFatPct(bmi: number, age: number, gender: "남성" | "여성"): 
   return (1.20 * bmi) + (0.23 * age) - (10.8 * sex) - 5.4;
 }
 
+// BMI → 해당 키의 몸무게 경계 (kg)
+function bmiToWeight(bmi: number, heightCm: number): number {
+  return Math.round(bmi * Math.pow(heightCm / 100, 2) * 10) / 10;
+}
+
 // ── 미니 BMI 게이지 바 ───────────────────────────────────────────────────────
-// 표시 범위: 14 ~ 40 / 구분: 낮음(~18.5), 건강(~24), 높음(~30), 비만(30~)
+// 표시 범위: 14 ~ 40 / 아시아 기준: 낮음(~18.5), 건강(~23), 높음(~25), 비만(25~)
+// 세그먼트: 낮음 4.5, 건강 4.5, 높음 2, 비만 15 → 합 26
 
 function BmiGaugeBar({ bmi }: { bmi: number }) {
   const MIN = 14, MAX = 40, RANGE = MAX - MIN;
   const pct = Math.min(100, Math.max(0, ((bmi - MIN) / RANGE) * 100));
-  // 세그먼트 비율: 낮음 4.5, 건강 5.5, 높음 6, 비만 10 → 합 26
   return (
     <div className="mt-2.5">
       <div className="relative">
         <div className="flex h-2.5 rounded-full overflow-hidden">
           <div style={{ flex: 4.5 }} className="bg-amber-400" />
-          <div style={{ flex: 5.5 }} className="bg-teal-400" />
-          <div style={{ flex: 6 }} className="bg-orange-400" />
-          <div style={{ flex: 10 }} className="bg-red-500" />
+          <div style={{ flex: 4.5 }} className="bg-teal-400" />
+          <div style={{ flex: 2 }} className="bg-orange-400" />
+          <div style={{ flex: 15 }} className="bg-red-500" />
         </div>
         <div
           className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-white border-2 border-slate-700 rounded-full shadow"
@@ -111,27 +117,27 @@ function BmiGaugeBar({ bmi }: { bmi: number }) {
       </div>
       <div className="flex mt-1.5 text-[9px] text-muted-foreground">
         <div style={{ flex: 4.5 }}>낮음</div>
-        <div style={{ flex: 5.5 }}>건강</div>
-        <div style={{ flex: 6 }}>높음</div>
-        <div style={{ flex: 10 }}>비만</div>
+        <div style={{ flex: 4.5 }}>건강</div>
+        <div style={{ flex: 2 }}>높음</div>
+        <div style={{ flex: 15 }}>비만</div>
       </div>
     </div>
   );
 }
 
-// 상세 BMI 게이지 (정보 시트용)
+// 상세 BMI 게이지 (정보 시트용) — 아시아 기준 컷포인트: 18.5, 23, 25
 function BmiGaugeDetail({ bmi }: { bmi: number }) {
   const MIN = 14, MAX = 40, RANGE = MAX - MIN;
   const pct = Math.min(100, Math.max(0, ((bmi - MIN) / RANGE) * 100));
-  const cutpoints = [{ v: 18.5 }, { v: 24 }, { v: 30 }];
+  const cutpoints = [{ v: 18.5 }, { v: 23 }, { v: 25 }];
   return (
     <div className="my-4">
       <div className="relative">
         <div className="flex h-4 rounded-full overflow-hidden">
           <div style={{ flex: 4.5 }} className="bg-amber-400" />
-          <div style={{ flex: 5.5 }} className="bg-teal-400" />
-          <div style={{ flex: 6 }} className="bg-orange-400" />
-          <div style={{ flex: 10 }} className="bg-red-500" />
+          <div style={{ flex: 4.5 }} className="bg-teal-400" />
+          <div style={{ flex: 2 }} className="bg-orange-400" />
+          <div style={{ flex: 15 }} className="bg-red-500" />
         </div>
         {cutpoints.map(({ v }) => (
           <div
@@ -149,9 +155,9 @@ function BmiGaugeDetail({ bmi }: { bmi: number }) {
       </div>
       <div className="relative flex mt-1 text-[10px] text-muted-foreground">
         <div style={{ flex: 4.5 }}>낮음</div>
-        <div style={{ flex: 5.5 }}>건강</div>
-        <div style={{ flex: 6 }}>높음</div>
-        <div style={{ flex: 10 }}>비만</div>
+        <div style={{ flex: 4.5 }}>건강</div>
+        <div style={{ flex: 2 }}>높음</div>
+        <div style={{ flex: 15 }}>비만</div>
       </div>
       <div className="relative flex mt-0.5 text-[10px] font-medium text-foreground/50">
         {cutpoints.map(({ v }) => (
@@ -336,13 +342,11 @@ function computeLoess(
   const windowSize = Math.max(3, Math.round(span * n));
 
   return evalXs.map((xi) => {
-    // 거리 기준 가장 가까운 windowSize개 선택
     const dists = xs.map((x, i) => ({ i, d: Math.abs(x - xi) }));
     dists.sort((a, b) => a.d - b.d);
     const win = dists.slice(0, windowSize);
     const h = win[win.length - 1].d || 1;
 
-    // tricube 가중치 + 중심/스케일 정규화
     const pts = win.map(({ i, d }) => ({
       x: xs[i],
       y: ys[i],
@@ -355,7 +359,6 @@ function computeLoess(
     const xBar = pts.reduce((s, p) => s + p.w * p.x, 0) / sumW;
     const xScale = Math.max(...pts.map(p => Math.abs(p.x - xBar))) || 1;
 
-    // 가중 이차 회귀 행렬 구성
     const A = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
     const bv = [0, 0, 0];
     for (const { x, y, w } of pts) {
@@ -397,6 +400,9 @@ export function WeightChart({
   const [isPortrait, setIsPortrait] = useState(false);
   const [legendPos, setLegendPos] = useState({ x: 0, y: 0 });
   const [infoSheet, setInfoSheet] = useState<"bmi" | "metabolism" | "body" | null>(null);
+  const [isSharePreview, setIsSharePreview] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const shareContentRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
 
@@ -475,6 +481,36 @@ export function WeightChart({
         console.warn("Exit Fullscreen API failed", err);
       }
       setIsFullscreen(false);
+    }
+  };
+
+  const handleShareCapture = async () => {
+    if (!shareContentRef.current) return;
+    setIsCapturing(true);
+    try {
+      const { toPng } = await import("html-to-image");
+      const dataUrl = await toPng(shareContentRef.current, {
+        quality: 1,
+        pixelRatio: 2,
+        backgroundColor: "#ffffff",
+      });
+
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const file = new File([blob], "somalog-progress.png", { type: "image/png" });
+
+      if (typeof navigator !== "undefined" && navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: "SomaLog 다이어트 기록" });
+      } else {
+        const a = document.createElement("a");
+        a.href = dataUrl;
+        a.download = "somalog-progress.png";
+        a.click();
+      }
+    } catch (err) {
+      console.error("Share failed", err);
+    } finally {
+      setIsCapturing(false);
     }
   };
 
@@ -589,6 +625,20 @@ export function WeightChart({
     goalWeight: goalLineData[i],
   }));
 
+  // ── 공유 모드 계산 ──────────────────────────────────────────────────────────
+  const shareYTickFormatter = (v: number) => {
+    const delta = Math.round(v - startWeight);
+    return delta === 0 ? "0" : String(delta);
+  };
+  const shareTooltipFormatter = (value: number, name: string) => {
+    const labels: Record<string, string> = { weight: "체중", loessTrend: "추세", goalWeight: "목표선" };
+    const delta = +(value - startWeight).toFixed(1);
+    const deltaStr = delta === 0 ? "0" : delta > 0 ? `+${delta}` : String(delta);
+    return [`${deltaStr} kg`, labels[name] ?? name];
+  };
+  const targetDelta = +(targetWeight - startWeight).toFixed(1);
+  const lowestDelta = +(lowestWeight - startWeight).toFixed(1);
+
   return (
     <div
       data-testid="graph-weight-chart"
@@ -616,24 +666,38 @@ export function WeightChart({
         </div>
       )}
 
+      {/* 기간 필터 + 자랑 버튼 */}
       <div className={cn(
-        "flex gap-1.5 flex-shrink-0 z-20 transition-opacity",
-        isFullscreen ? "absolute bottom-6 left-6 bg-background/80 p-2.5 rounded-2xl backdrop-blur-md shadow-sm" : "px-4 mb-3"
+        "flex-shrink-0 z-20 transition-opacity",
+        isFullscreen
+          ? "absolute bottom-6 left-6 bg-background/80 p-2.5 rounded-2xl backdrop-blur-md shadow-sm flex gap-1.5"
+          : "px-4 mb-3 flex items-center gap-2"
       )}>
-        {(Object.keys(periodLabels) as Period[]).map((p) => (
+        <div className={cn("flex gap-1.5", !isFullscreen && "flex-1")}>
+          {(Object.keys(periodLabels) as Period[]).map((p) => (
+            <button
+              key={p}
+              onClick={() => setPeriod(p)}
+              className={cn(
+                "px-3 py-1.5 rounded-full text-xs font-medium transition-colors min-h-[36px]",
+                period === p
+                  ? "bg-navy text-white"
+                  : "bg-secondary text-muted-foreground"
+              )}
+            >
+              {periodLabels[p]}
+            </button>
+          ))}
+        </div>
+        {!isFullscreen && (
           <button
-            key={p}
-            onClick={() => setPeriod(p)}
-            className={cn(
-              "px-3 py-1.5 rounded-full text-xs font-medium transition-colors min-h-[36px]",
-              period === p
-                ? "bg-navy text-white"
-                : "bg-secondary text-muted-foreground"
-            )}
+            onClick={() => setIsSharePreview(true)}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-pink-500 to-purple-500 text-white shadow-sm whitespace-nowrap min-h-[36px]"
           >
-            {periodLabels[p]}
+            <Share2 size={11} />
+            친구에게 자랑
           </button>
-        ))}
+        )}
       </div>
 
       {/* 범례 */}
@@ -780,14 +844,14 @@ export function WeightChart({
           {/* ── BMI (full width) ── */}
           {bmi !== null && bmiLv !== null ? (
             <div className="p-3 bg-secondary rounded-xl">
-              <CardTitle onInfo={() => setInfoSheet("bmi")}>BMI</CardTitle>
+              <CardTitle onInfo={() => setInfoSheet("bmi")}>BMI (아시아 기준)</CardTitle>
               <p className="text-lg font-bold">{bmi.toFixed(1)} <span className="text-sm font-medium text-muted-foreground">({bmiLv})</span></p>
               <BmiGaugeBar bmi={bmi} />
               <p className="text-xs text-muted-foreground mt-2">{getBmiAdvice(bmiLv)}</p>
             </div>
           ) : (
             <div className="p-3 bg-secondary rounded-xl">
-              <p className="text-xs text-muted-foreground">BMI</p>
+              <p className="text-xs text-muted-foreground">BMI (아시아 기준)</p>
               <p className="text-xs text-muted-foreground/60 mt-1">키·체중 정보를 입력하시면 확인할 수 있어요.</p>
             </div>
           )}
@@ -839,9 +903,9 @@ export function WeightChart({
         </div>
       )}
 
-      {/* ── 정보 바텀시트 (z-[100]로 하단 탭바 위에 표시) ── */}
+      {/* ── 정보 바텀시트 ── */}
       <InfoSheet open={infoSheet === "bmi"} onClose={() => setInfoSheet(null)} title="BMI (체질량지수)">
-        <p>BMI(Body Mass Index)는 체중(kg)을 신장(m)의 제곱으로 나눈 값으로, 비만 여부를 판단하는 표준 지표입니다.</p>
+        <p>BMI(Body Mass Index)는 체중(kg)을 신장(m)의 제곱으로 나눈 값으로, 비만 여부를 판단하는 지표입니다. 이 앱은 <strong className="text-foreground">WHO 아시아·태평양 기준</strong>을 적용합니다 (국제 기준보다 낮은 컷포인트).</p>
         <div className="p-3 bg-secondary rounded-xl text-sm">
           <p className="font-semibold text-foreground mb-1">계산 공식</p>
           <p>BMI = 체중(kg) ÷ 신장(m)²</p>
@@ -854,10 +918,26 @@ export function WeightChart({
         {bmi !== null && <BmiGaugeDetail bmi={bmi} />}
         <div className="space-y-2">
           {[
-            { color: "bg-amber-400", label: "낮음 (18.5 미만)", desc: "저체중. 영양 불균형에 주의하세요." },
-            { color: "bg-teal-400", label: "건강 (18.5–24)", desc: "정상 체중. 현재 상태를 유지하세요." },
-            { color: "bg-orange-400", label: "높음 (24–30)", desc: "과체중. 생활 습관 개선을 권장해요." },
-            { color: "bg-red-500", label: "비만 (30 이상)", desc: "건강 위험 증가. 전문가 상담을 권장합니다." },
+            {
+              color: "bg-amber-400",
+              label: `낮음 (18.5 미만${height > 0 ? `, ${bmiToWeight(18.5, height)}kg 미만` : ""})`,
+              desc: "저체중. 영양 불균형에 주의하세요.",
+            },
+            {
+              color: "bg-teal-400",
+              label: `건강 (18.5–23${height > 0 ? `, ${bmiToWeight(18.5, height)}–${bmiToWeight(23, height)}kg` : ""})`,
+              desc: "정상 체중 (아시아 기준). 현재 상태를 유지하세요.",
+            },
+            {
+              color: "bg-orange-400",
+              label: `높음 (23–25${height > 0 ? `, ${bmiToWeight(23, height)}–${bmiToWeight(25, height)}kg` : ""})`,
+              desc: "과체중 (아시아 기준). 생활 습관 개선을 권장해요.",
+            },
+            {
+              color: "bg-red-500",
+              label: `비만 (25 이상${height > 0 ? `, ${bmiToWeight(25, height)}kg 이상` : ""})`,
+              desc: "비만 (아시아 기준). 전문가 상담을 권장합니다.",
+            },
           ].map(({ color, label, desc }) => (
             <div key={label} className="flex items-start gap-2">
               <span className={`mt-0.5 w-2 h-2 rounded-sm ${color} flex-shrink-0`} />
@@ -938,6 +1018,152 @@ export function WeightChart({
           ⚠ 이 수치는 통계적 추정이며 근육량·수분 상태에 따라 오차가 발생할 수 있습니다.
         </p>
       </InfoSheet>
+
+      {/* ── 친구에게 자랑 오버레이 ── */}
+      {isSharePreview && (
+        <div className="fixed inset-0 z-[110] flex flex-col bg-background">
+          {/* 헤더 */}
+          <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-border flex-shrink-0">
+            <h3 className="font-bold text-base">친구에게 자랑하기</h3>
+            <button
+              onClick={() => setIsSharePreview(false)}
+              className="p-1.5 text-muted-foreground hover:bg-secondary rounded-lg transition-colors"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* 캡처 영역 (스크롤 가능) */}
+          <div className="flex-1 overflow-y-auto">
+            <div
+              ref={shareContentRef}
+              className="bg-white p-4 min-h-full"
+              style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}
+            >
+              {/* 앱 브랜딩 */}
+              <div className="text-center mb-4">
+                <p className="text-xl font-black text-[#1e3a5f] tracking-tight">SomaLog</p>
+                <p className="text-xs text-gray-400 mt-0.5">다이어트 기록</p>
+              </div>
+
+              {/* 차트 — y축: 시작 대비 감량량 표시 */}
+              <div style={{ height: 240 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    margin={{ top: 10, right: 20, left: 0, bottom: 5 }}
+                    data={finalChartData}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                    <XAxis dataKey="date" tick={{ fontSize: 9 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+                    <YAxis
+                      domain={[minW, maxW]}
+                      tick={{ fontSize: 9 }}
+                      tickLine={false}
+                      axisLine={false}
+                      width={38}
+                      tickFormatter={shareYTickFormatter}
+                      unit=" kg"
+                    />
+                    <Tooltip
+                      contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid #e2e8f0" }}
+                      formatter={shareTooltipFormatter}
+                    />
+                    <ReferenceLine y={targetWeight} stroke="#16a34a" strokeWidth={1.5} />
+                    <Line type="linear" dataKey="goalWeight" stroke="#86efac" strokeWidth={1.5} strokeDasharray="8 4" dot={false} connectNulls />
+                    <Line type="monotone" dataKey="loessTrend" stroke="#f97316" strokeWidth={2} strokeDasharray="6 3" dot={false} connectNulls />
+                    <Line type="monotone" dataKey="weight" stroke="#1e3a5f" strokeWidth={2} dot={<CustomDot />} activeDot={{ r: 6 }} connectNulls />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* 범례 */}
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-[9px] text-gray-400 mb-4 mt-1 px-1">
+                <span className="flex items-center gap-1"><span style={{ width: 16, height: 2, backgroundColor: "#1e3a5f", display: "inline-block" }} /> 일별 체중</span>
+                <span className="flex items-center gap-1">
+                  <svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" stroke="#f97316" strokeWidth="2" strokeDasharray="5 3" /></svg>
+                  추세
+                </span>
+                <span className="flex items-center gap-1">
+                  <svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" stroke="#86efac" strokeWidth="2" strokeDasharray="5 3" /></svg>
+                  목표 감량선
+                </span>
+              </div>
+
+              {/* 4개 카드 — 시작 기준 상대값 (4번째만 실제값) */}
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <div className="p-3 rounded-xl" style={{ backgroundColor: "#f1f5f9" }}>
+                  <p style={{ fontSize: 10, color: "#64748b" }}>시작</p>
+                  <p style={{ fontSize: 18, fontWeight: 700, color: "#1e293b" }}>0 kg</p>
+                  <p style={{ fontSize: 10, color: "#94a3b8" }}>{fmtCardDate(new Date(startDate + "T00:00:00"))}</p>
+                </div>
+                <div className="p-3 rounded-xl" style={{ backgroundColor: "#f1f5f9" }}>
+                  <p style={{ fontSize: 10, color: "#64748b" }}>목표 감량</p>
+                  <p style={{ fontSize: 18, fontWeight: 700, color: "#1e293b" }}>{targetDelta > 0 ? `+${targetDelta}` : targetDelta} kg</p>
+                  <p style={{ fontSize: 10, color: "#94a3b8" }}>{fmtCardDate(targetEndDate)}</p>
+                </div>
+                <div className="p-3 rounded-xl" style={{ backgroundColor: "#f1f5f9" }}>
+                  <p style={{ fontSize: 10, color: "#64748b" }}>최저 감량</p>
+                  <p style={{ fontSize: 18, fontWeight: 700, color: lowestDelta < 0 ? "#16a34a" : "#1e293b" }}>{lowestDelta > 0 ? `+${lowestDelta}` : lowestDelta} kg</p>
+                  <p style={{ fontSize: 10, color: "#94a3b8" }}>{fmtCardDate(new Date(lowestWeightDate + "T00:00:00"))}</p>
+                </div>
+                <div className="p-3 rounded-xl" style={{ backgroundColor: "#f1f5f9" }}>
+                  <p style={{ fontSize: 10, color: "#64748b" }}>목표까지</p>
+                  <p style={{ fontSize: 18, fontWeight: 700, color: "#1e293b" }}>{remaining.toFixed(1)} kg</p>
+                  {estimatedDate && (
+                    <p style={{ fontSize: 10, color: "#94a3b8" }}>예상 {fmtCardDate(estimatedDate)}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* BMI 카드 */}
+              {bmi !== null && bmiLv !== null && (
+                <div className="p-3 rounded-xl" style={{ backgroundColor: "#f1f5f9" }}>
+                  <p style={{ fontSize: 10, color: "#64748b", marginBottom: 2 }}>BMI (아시아 기준)</p>
+                  <p style={{ fontSize: 18, fontWeight: 700, color: "#1e293b" }}>
+                    {bmi.toFixed(1)}{" "}
+                    <span style={{ fontSize: 13, fontWeight: 500, color: "#64748b" }}>({bmiLv})</span>
+                  </p>
+                  {/* 인라인 게이지 (html-to-image 호환) */}
+                  <div style={{ marginTop: 8 }}>
+                    <div style={{ display: "flex", height: 10, borderRadius: 99, overflow: "hidden", position: "relative" }}>
+                      <div style={{ flex: 4.5, backgroundColor: "#fbbf24" }} />
+                      <div style={{ flex: 4.5, backgroundColor: "#2dd4bf" }} />
+                      <div style={{ flex: 2, backgroundColor: "#fb923c" }} />
+                      <div style={{ flex: 15, backgroundColor: "#ef4444" }} />
+                    </div>
+                    <div style={{ display: "flex", marginTop: 4, fontSize: 8, color: "#94a3b8" }}>
+                      <div style={{ flex: 4.5 }}>낮음</div>
+                      <div style={{ flex: 4.5 }}>건강</div>
+                      <div style={{ flex: 2 }}>높음</div>
+                      <div style={{ flex: 15 }}>비만</div>
+                    </div>
+                  </div>
+                  <p style={{ fontSize: 10, color: "#64748b", marginTop: 6 }}>{getBmiAdvice(bmiLv)}</p>
+                </div>
+              )}
+
+              {/* 푸터 */}
+              <p style={{ textAlign: "center", fontSize: 9, color: "#cbd5e1", marginTop: 12 }}>
+                somalog.vercel.app
+              </p>
+            </div>
+          </div>
+
+          {/* 하단 액션 */}
+          <div className="px-4 py-4 border-t border-border flex-shrink-0">
+            <button
+              onClick={handleShareCapture}
+              disabled={isCapturing}
+              className="w-full py-3 rounded-2xl font-semibold text-sm text-white bg-gradient-to-r from-pink-500 to-purple-500 shadow-sm disabled:opacity-60 transition-opacity"
+            >
+              {isCapturing ? "처리 중…" : "저장 / 공유하기"}
+            </button>
+            <p className="text-center text-xs text-muted-foreground mt-2">
+              이미지로 저장하거나 SNS에 바로 공유할 수 있어요
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

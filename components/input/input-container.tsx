@@ -36,7 +36,7 @@ function addDays(dateStr: string, n: number): string {
   return formatDate(d);
 }
 
-export function InputContainer({ userId }: { userId: string | null }) {
+export function InputContainer() {
   const { settings } = useSettings();
   const searchParams = useSearchParams();
   const [currentDate, setCurrentDate] = useState<string>(formatDate(new Date()));
@@ -101,7 +101,7 @@ export function InputContainer({ userId }: { userId: string | null }) {
   }, []);
 
   useEffect(() => {
-    logStore.invalidateIfUserChanged(userId);
+    // user transition은 SettingsProvider의 useUserCacheLifecycle에서 중앙 처리
     const today = formatDate(new Date());
 
     const applyLogs = (logs: DailyLog[]) => {

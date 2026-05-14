@@ -10,7 +10,7 @@ import { WeightChart } from "./weight-chart";
 import type { DailyLog } from "@/lib/types";
 import { logStore } from "@/lib/stores/log-store";
 
-export function GraphContainer({ userId, userName }: { userId: string | null; userName: string }) {
+export function GraphContainer({ userName }: { userName: string }) {
   const { settings, updateSettings } = useSettings();
   const [logs, setLogs] = useState<DailyLog[] | undefined>(undefined);
   const [lowest, setLowest] = useState<{ weight: number; date: string } | undefined>(undefined);
@@ -21,8 +21,7 @@ export function GraphContainer({ userId, userName }: { userId: string | null; us
   );
 
   useEffect(() => {
-    logStore.invalidateIfUserChanged(userId);
-
+    // user transition은 SettingsProvider의 useUserCacheLifecycle에서 중앙 처리
     const applyFresh = (freshLogs: DailyLog[], freshLowest: { weight: number; date: string }) => {
       logStore.setAllLogs(freshLogs);
       logStore.setLowestWeight(freshLowest);

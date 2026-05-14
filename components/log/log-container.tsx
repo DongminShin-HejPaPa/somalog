@@ -13,15 +13,14 @@ import { logStore } from "@/lib/stores/log-store";
 
 const PAGE_SIZE = 30;
 
-export function LogContainer({ userId }: { userId: string | null }) {
+export function LogContainer() {
   const [logs, setLogs] = useState<DailyLog[] | undefined>(undefined);
   const [weeklyLogs, setWeeklyLogs] = useState<WeeklyLog[] | undefined>(undefined);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   useEffect(() => {
-    logStore.invalidateIfUserChanged(userId);
-
+    // user transition은 SettingsProvider의 useUserCacheLifecycle에서 중앙 처리
     const cachedLogs = logStore.getRecentLogs();
     const cachedWeekly = logStore.getWeeklyLogs();
     const cachedCount = logStore.getTotalCount();
@@ -56,7 +55,7 @@ export function LogContainer({ userId }: { userId: string | null }) {
       // No cache yet: fetch (skeleton shows until complete)
       fetchAll().catch(() => {});
     }
-  }, [userId]);
+  }, []);
 
   const handleLoadMore = async () => {
     if (!logs || isLoadingMore) return;

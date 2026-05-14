@@ -9,6 +9,7 @@ import { getGreetingMessage } from "@/lib/utils/greeting-messages";
 import { useSettings } from "@/lib/contexts/settings-context";
 import type { DailyLog } from "@/lib/types";
 import { logStore } from "@/lib/stores/log-store";
+import { perfLog, perfDumpResources } from "@/lib/utils/perf-log";
 
 interface HomeContainerProps {
   userId: string | null;
@@ -24,16 +25,19 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
   const { settings } = useSettings();
 
   useEffect(() => {
-    logStore.invalidateIfUserChanged(userId);
+    perfLog("home-container:mount");
     const today = formatDate(new Date());
 
     const populate = (logs: DailyLog[], firstUnclosed: DailyLog | null, todayLog: DailyLog | null) => {
       setRecentLogs(logs);
       setActiveLog(firstUnclosed ?? todayLog);
+      perfLog("home-container:first-content-paint");
     };
 
     const fetchFresh = async () => {
+      perfLog("home-container:fetchFresh-start");
       const initialData = await actionGetHomeInitialData();
+      perfLog("home-container:fetchFresh-end");
       logStore.setRecentLogs(initialData.recentLogs);
       if (initialData.todayLog) logStore.setLog(initialData.todayLog);
       return initialData;
@@ -44,6 +48,7 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
 
       if (cachedLogs) {
         // 1. 메모리 캐시 적중 (탭 이동 시): 즉각 표시
+        perfLog("home-container:cache hit=memory");
         const firstUnclosed = logStore.getFirstUnclosedLog();
         const cachedToday = logStore.getLog(today) ?? cachedLogs.find((l) => l.date === today) ?? null;
         populate(cachedLogs, firstUnclosed, cachedToday);
@@ -62,6 +67,7 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
            // 즉각 표시
            setRecentLogs(localCache.recentLogs);
            setActiveLog(localCache.activeLog);
+           perfLog("home-container:first-content-paint (from localStorage)");
            logStore.setRecentLogs(localCache.recentLogs);
            if (localCache.activeLog) logStore.setLog(localCache.activeLog);
 
@@ -72,6 +78,7 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
            }).catch(() => {});
         } else {
            // 3. 아무 캐시도 없음 (최초 로그인): 화면을 가리고(스켈레톤) Fetch 대기
+           perfLog("home-container:cache hit=miss (no localStorage)");
            const data = await fetchFresh();
            populate(data.recentLogs, data.firstUnclosed, data.todayLog);
            if (userId) logStore.saveHomeCache(userId, data.recentLogs, data.firstUnclosed ?? data.todayLog);
@@ -112,6 +119,7 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
     };
 
     init();
+    perfDumpResources();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 인사말: 필요한 데이터가 준비될 때마다 갱신

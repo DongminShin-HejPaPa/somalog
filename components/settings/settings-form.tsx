@@ -14,6 +14,7 @@ import { DIET_PRESETS, computePresetMonths } from "@/lib/utils/diet-presets";
 import { logout, deleteAccount } from "@/app/actions/auth-actions";
 import { AccountInfoDialog } from "./account-info-dialog";
 import { actionGetRecentDailyLogs } from "@/app/actions/log-actions";
+import { logStore } from "@/lib/stores/log-store";
 import { computeRecommendedWater } from "@/lib/utils/compute-daily";
 
 type DialogState = "idle" | "confirm-reset" | "confirm-onboarding" | "confirm-demo" | "confirm-delete-custom-field" | "confirm-delete-account" | "confirm-delete-account-final";
@@ -1223,6 +1224,9 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
             <div className="flex gap-2">
               <button
                 onClick={() => startTransition(async () => {
+                  // 계정 삭제 전 클라이언트 영구 캐시 모두 정리 (server는 localStorage 접근 불가)
+                  logStore.clearAllHomeCaches();
+                  logStore.resetInMemory();
                   const result = await deleteAccount();
                   if (result?.error) alert(result.error);
                 })}

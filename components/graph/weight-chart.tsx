@@ -120,13 +120,30 @@ function BmiGaugeBar({ bmi, startBmi }: { bmi: number; startBmi?: number }) {
     : null;
   return (
     <div className="mt-2.5">
+      {/* 마커 레이블 행 */}
+      <div className="relative h-3.5 mb-0.5">
+        {startPct !== null && (
+          <span
+            className="absolute text-[9px] text-slate-400 -translate-x-1/2 leading-none"
+            style={{ left: `${startPct}%` }}
+          >
+            시작
+          </span>
+        )}
+        <span
+          className="absolute text-[9px] text-slate-600 font-medium -translate-x-1/2 leading-none"
+          style={{ left: `${pct}%` }}
+        >
+          현재
+        </span>
+      </div>
+      {/* 게이지 바 */}
       <div className="relative">
         <div className="flex h-2.5 rounded-full overflow-hidden">
           {BMI_SEGMENTS.map((s) => (
             <div key={s.label} style={{ flex: s.flex, backgroundColor: s.color }} />
           ))}
         </div>
-        {/* 시작 BMI — 눈에 덜 띄는 세로 눈금 */}
         {startPct !== null && (
           <div
             className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 opacity-50"
@@ -135,7 +152,6 @@ function BmiGaugeBar({ bmi, startBmi }: { bmi: number; startBmi?: number }) {
             <div className="w-0.5 h-4 bg-slate-500 rounded-full" />
           </div>
         )}
-        {/* 현재 BMI — 흰 동그라미 */}
         <div
           className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-white border-2 border-slate-700 rounded-full shadow"
           style={{ left: `${pct}%` }}
@@ -160,6 +176,23 @@ function BmiGaugeDetail({ bmi, startBmi }: { bmi: number; startBmi?: number }) {
   const cutpoints = [18.5, 23, 25, 30, 35];
   return (
     <div className="my-4">
+      {/* 마커 레이블 행 */}
+      <div className="relative h-4 mb-0.5">
+        {startPct !== null && (
+          <span
+            className="absolute text-[9px] text-slate-400 -translate-x-1/2 leading-none"
+            style={{ left: `${startPct}%` }}
+          >
+            시작
+          </span>
+        )}
+        <span
+          className="absolute text-[9px] text-slate-600 font-medium -translate-x-1/2 leading-none"
+          style={{ left: `${pct}%` }}
+        >
+          현재
+        </span>
+      </div>
       <div className="relative">
         <div className="flex h-4 rounded-full overflow-hidden">
           {BMI_SEGMENTS.map((s) => (
@@ -173,7 +206,6 @@ function BmiGaugeDetail({ bmi, startBmi }: { bmi: number; startBmi?: number }) {
             style={{ left: `${((v - MIN) / RANGE) * 100}%` }}
           />
         ))}
-        {/* 시작 BMI — 반투명 세로 눈금 */}
         {startPct !== null && (
           <div
             className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 opacity-40"
@@ -182,7 +214,6 @@ function BmiGaugeDetail({ bmi, startBmi }: { bmi: number; startBmi?: number }) {
             <div className="w-0.5 h-6 bg-slate-700 rounded-full" />
           </div>
         )}
-        {/* 현재 BMI — 흰 동그라미 */}
         <div
           className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-5 bg-white border-2 border-slate-700 rounded-full shadow flex items-center justify-center"
           style={{ left: `${pct}%` }}
@@ -1101,9 +1132,12 @@ export function WeightChart({
                 </p>
                 <p className="text-xs text-gray-400 mt-0.5">
                   SomaLog와 함께{" "}
-                  {(startWeight - currentWeight) > 0
-                    ? `${(startWeight - currentWeight).toFixed(1)} kg 줄여가는중`
-                    : `${Math.abs(startWeight - currentWeight).toFixed(1)} kg 함께하는중`}
+                  <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#0d9488" }}>
+                    {(startWeight - currentWeight) > 0
+                      ? `${(startWeight - currentWeight).toFixed(1)} kg`
+                      : `${Math.abs(startWeight - currentWeight).toFixed(1)} kg`}
+                  </span>
+                  {" "}{(startWeight - currentWeight) > 0 ? "줄여가는중" : "함께하는중"}
                 </p>
               </div>
 
@@ -1184,7 +1218,7 @@ export function WeightChart({
                     {bmi.toFixed(1)}{" "}
                     <span style={{ fontSize: 13, fontWeight: 500, color: "#64748b" }}>({bmiLv})</span>
                   </p>
-                  {/* 인라인 게이지 — dot + 시작 마커 포함, 6단계, html-to-image 호환 */}
+                  {/* 인라인 게이지 — 마커 레이블 + dot + 시작 마커, 6단계, html-to-image 호환 */}
                   {(() => {
                     const MIN = 14, MAX = 40, RANGE = MAX - MIN;
                     const pct = Math.min(100, Math.max(0, ((bmi - MIN) / RANGE) * 100));
@@ -1193,13 +1227,39 @@ export function WeightChart({
                       : null;
                     return (
                       <div style={{ marginTop: 8 }}>
+                        {/* 마커 레이블 행 */}
+                        <div style={{ position: "relative", height: 12, marginBottom: 2 }}>
+                          {sPct !== null && (
+                            <span style={{
+                              position: "absolute",
+                              left: `${sPct}%`,
+                              transform: "translateX(-50%)",
+                              fontSize: 8,
+                              color: "#94a3b8",
+                              lineHeight: 1,
+                            }}>
+                              시작
+                            </span>
+                          )}
+                          <span style={{
+                            position: "absolute",
+                            left: `${pct}%`,
+                            transform: "translateX(-50%)",
+                            fontSize: 8,
+                            fontWeight: 600,
+                            color: "#475569",
+                            lineHeight: 1,
+                          }}>
+                            현재
+                          </span>
+                        </div>
+                        {/* 바 + 마커 */}
                         <div style={{ position: "relative" }}>
                           <div style={{ display: "flex", height: 10, borderRadius: 99, overflow: "hidden" }}>
                             {BMI_SEGMENTS.map((s) => (
                               <div key={s.label} style={{ flex: s.flex, backgroundColor: s.color }} />
                             ))}
                           </div>
-                          {/* 시작 BMI — 반투명 세로 눈금 */}
                           {sPct !== null && (
                             <div style={{
                               position: "absolute",
@@ -1213,7 +1273,6 @@ export function WeightChart({
                               opacity: 0.4,
                             }} />
                           )}
-                          {/* 현재 BMI — 흰 동그라미 */}
                           <div style={{
                             position: "absolute",
                             top: "50%",

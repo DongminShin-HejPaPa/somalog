@@ -1,4 +1,7 @@
-const CACHE_NAME = "somalog-v1";
+const CACHE_NAME = "somalog-v2";
+// _next/static/ 청크는 content-hash 파일명이라 불변(immutable).
+// 파일명이 곧 버전이므로 캐시를 비울 필요가 없고 activate cleanup에서 보존한다.
+const STATIC_CACHE = "somalog-static-v1";
 
 // 앱 셸: 오프라인에서도 보여줄 핵심 정적 파일들
 const PRECACHE_URLS = [
@@ -22,7 +25,9 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
-        keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))
+        keys
+          .filter((k) => k !== CACHE_NAME && k !== STATIC_CACHE)
+          .map((k) => caches.delete(k))
       )
     )
   );
@@ -35,7 +40,26 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   // chrome-extension 등 외부 스킴 bypass
   if (!event.request.url.startsWith(self.location.origin)) return;
-  // Next.js API / Server Actions bypass (항상 네트워크)
+
+  // _next/static/ 청크: content-hash 파일명 → 불변. Cache First.
+  // (디스크에서 즉시 로드 → cold start 흰 화면 제거. 파일명이 바뀌면 자연히 새로 받음)
+  if (event.request.url.includes("/_next/static/")) {
+    event.respondWith(
+      caches.match(event.request).then((cached) => {
+        if (cached) return cached;
+        return fetch(event.request).then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(STATIC_CACHE).then((cache) => cache.put(event.request, clone));
+          }
+          return response;
+        });
+      })
+    );
+    return;
+  }
+
+  // RSC payload / server actions / next-image / API: 항상 네트워크
   if (event.request.url.includes("/_next/") || event.request.url.includes("/api/")) return;
 
   event.respondWith(

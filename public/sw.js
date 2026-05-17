@@ -1,4 +1,4 @@
-const CACHE_NAME = "somalog-v2";
+const CACHE_NAME = "somalog-v3";
 // _next/static/ 청크는 content-hash 파일명이라 불변(immutable).
 // 파일명이 곧 버전이므로 캐시를 비울 필요가 없고 activate cleanup에서 보존한다.
 const STATIC_CACHE = "somalog-static-v1";
@@ -62,6 +62,16 @@ self.addEventListener("fetch", (event) => {
   // RSC payload / server actions / next-image / API: 항상 네트워크
   if (event.request.url.includes("/_next/") || event.request.url.includes("/api/")) return;
 
+  // 페이지(HTML) 네비게이션 → Stale-While-Revalidate.
+  // 캐시된 셸을 즉시 반환해 cold start 흰 화면(서버 Supabase 체인 대기)을 제거하고,
+  // 백그라운드로 최신 HTML 을 받아 캐시만 갱신한다. 최신 데이터는 클라이언트
+  // (localStorage 캐시 + HomeContainer 패치)가 채운다.
+  // 강제 reload / postMessage 없음 — 활성 세션을 절대 끊지 않는다.
+  if (event.request.mode === "navigate") {
+    event.respondWith(staleWhileRevalidateHTML(event.request));
+    return;
+  }
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
@@ -78,3 +88,36 @@ self.addEventListener("fetch", (event) => {
       })
   );
 });
+
+async function staleWhileRevalidateHTML(request) {
+  const cache = await caches.open(CACHE_NAME);
+  // 쿼리스트링으로 인한 캐시 미스/비대를 막기 위해 pathname 으로 정규화
+  const url = new URL(request.url);
+  const cacheKey = url.origin + url.pathname;
+  const cached =
+    (await cache.match(cacheKey)) ||
+    (await cache.match(request, { ignoreSearch: true }));
+
+  const networkFetch = fetch(request)
+    .then((response) => {
+      if (response && response.status === 200) {
+        cache.put(cacheKey, response.clone()).catch(() => {});
+      }
+      return response;
+    })
+    .catch(() => null);
+
+  // 캐시가 있으면 즉시 반환 + 백그라운드 갱신 (다음 cold start 가 빨라짐)
+  if (cached) {
+    networkFetch.catch(() => {});
+    return cached;
+  }
+
+  // 첫 방문(캐시 없음): 네트워크 대기
+  const fresh = await networkFetch;
+  if (fresh) return fresh;
+  return new Response("오프라인 상태입니다.", {
+    status: 503,
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}

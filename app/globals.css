@@ -36,7 +36,3 @@ body {
   color: var(--color-foreground);
   background: #f8fafc;
 }
-
-.safe-bottom {
-  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
-}

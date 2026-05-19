@@ -17,8 +17,9 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] bg-white border-t border-border z-50 flex safe-bottom">
-      {tabs.map((tab) => {
+    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] bg-white border-t border-border z-50">
+      <div className="flex items-center justify-around h-20">
+        {tabs.map((tab) => {
           const isActive = pathname === tab.href;
           const Icon = tab.icon;
           return (
@@ -28,17 +29,18 @@ export function BottomNav() {
               prefetch={true}
               data-testid={`nav-${tab.href.slice(1)}`}
               className={cn(
-                "flex-1 flex flex-col items-center justify-center py-2.5 gap-1 text-[11px] transition-colors",
+                "flex flex-col items-center justify-center gap-0.5 w-full h-full min-h-[44px] min-w-[44px] text-xs transition-colors",
                 isActive
                   ? "text-navy font-semibold"
                   : "text-muted-foreground"
               )}
             >
-              <Icon className={cn("w-[22px] h-[22px]", isActive ? "stroke-[2.5]" : "stroke-[1.8]")} />
+              <Icon className={cn("w-5 h-5", isActive && "stroke-[2.5]")} />
               <span>{tab.label}</span>
             </Link>
           );
         })}
+      </div>
     </nav>
   );
 }

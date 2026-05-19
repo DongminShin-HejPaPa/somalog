@@ -15,9 +15,9 @@ export function FreeTextInput({ onSubmit, isSaving, isClosed }: FreeTextInputPro
   const inputRef = useRef<HTMLInputElement>(null);
   const keyboardOffset = useKeyboardOffset();
 
-  // 키보드가 닫혀 있으면 bottom-14(56px, 내비게이션 바 위)
+  // 키보드가 닫혀 있으면 bottom-20(80px, 내비게이션 바 위)
   // 키보드가 열리면 키보드 높이 + 8px 여백으로 올림
-  const bottomOffset = keyboardOffset > 0 ? keyboardOffset + 8 : 56;
+  const bottomOffset = keyboardOffset > 0 ? keyboardOffset + 8 : 80;
 
   const handleSubmit = () => {
     const trimmed = text.trim();

@@ -37,7 +37,7 @@ export default async function TabsLayout({
 
   return (
     <TabsProviders initialSettings={initialSettings} userId={userId}>
-      <div className="pb-14">
+      <div className="pb-20">
         {children}
         <BottomNav />
       </div>

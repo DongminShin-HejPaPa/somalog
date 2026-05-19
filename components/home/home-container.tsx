@@ -34,6 +34,13 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
   const [recentLogs, setRecentLogs] = useState<DailyLog[]>(bootCache?.recentLogs ?? []);
   const [greeting, setGreeting] = useState<string | null>(null);
   const [isClosingDay, setIsClosingDay] = useState(false);
+  // 진단: 첫 페인트 시점 캐시 상태 + 네트워크 완료 시점을 화면에 표시
+  const [diag, setDiag] = useState<string>(() => {
+    if (typeof window === "undefined") return "ssr";
+    if (!userId) return "noUser";
+    return bootCache ? `boot=hit:${bootCache.recentLogs.length}` : "boot=miss";
+  });
+  const [mountAt] = useState<number>(() => (typeof performance !== "undefined" ? performance.now() : 0));
   const { settings } = useSettings();
 
   useEffect(() => {
@@ -44,16 +51,27 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
     // 메모리/로컬/네트워크 3-tier 분기 없음 — 분기는 첫 페인트를 안 늦추기 위한 것이었지만
     // useState 초기화에서 동기로 캐시를 읽으면 이미 첫 페인트는 보장된다.
     const fetchFresh = async () => {
+      const t0 = performance.now();
+      setDiag((d) => `${d} | fetchStart`);
       try {
         const data = await actionGetHomeInitialData();
+        const elapsed = Math.round(performance.now() - t0);
+        const sinceMount = Math.round(performance.now() - mountAt);
         const newActive = data.firstUnclosed ?? data.todayLog ?? null;
         setRecentLogs(data.recentLogs);
         setActiveLog(newActive);
         logStore.setRecentLogs(data.recentLogs);
         if (data.todayLog) logStore.setLog(data.todayLog);
-        if (userId) logStore.saveHomeCache(userId, data.recentLogs, newActive);
-      } catch {
-        // 네트워크 실패 시 캐시 그대로 유지
+        if (userId) {
+          logStore.saveHomeCache(userId, data.recentLogs, newActive);
+          // 저장 검증: 즉시 다시 읽어 확인
+          const verify = logStore.loadHomeCache(userId);
+          setDiag((d) => `${d} | fetched ${elapsed}ms (mount+${sinceMount}ms) save=${verify ? "ok" : "FAIL"}`);
+        } else {
+          setDiag((d) => `${d} | fetched ${elapsed}ms (mount+${sinceMount}ms) noUid`);
+        }
+      } catch (err) {
+        setDiag((d) => `${d} | fetchError`);
       }
     };
     fetchFresh();
@@ -151,6 +169,8 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
         {!greeting && initialDisplayName && (
           <p className="text-xs text-muted-foreground mt-1">{initialDisplayName} 님</p>
         )}
+        {/* 진단 라인: 첫 페인트 시점 캐시 상태 + fetch 소요시간 (5초 wait 디버깅용) */}
+        <p className="text-[10px] text-rose-500/70 font-mono mt-1 break-all">{diag}</p>
       </header>
 
       <HomeContent

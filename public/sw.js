@@ -1,12 +1,21 @@
-const CACHE_NAME = "somalog-v3";
+// 캐시 이름에는 절대 버전을 붙이지 않는다 — 영구 고정 (familyTime 검증 구조 이식).
+// HTML SWR 캐시를 별도의 영구 캐시(HTML_CACHE)로 분리하는 것이 핵심:
+// 과거엔 HTML 을 버전 박힌 CACHE_NAME 에 저장해, 배포로 버전이 바뀌면
+// activate 가 0.1초 즉시표시의 원천인 warm HTML 캐시를 통째로 삭제 →
+// 다음 진입이 콜드 네트워크 HTML 을 끝까지 기다리는 2초 흰화면이 됐다.
+// 코드/HTML 변경은 SWR(stale 즉시 + 백그라운드 갱신)로 다음 부팅에
+// 자연 전파되므로 버전 bump 는 불필요하며 오히려 해롭다.
+const CACHE_NAME = "somalog-shell";
 // _next/static/ 청크는 content-hash 파일명이라 불변(immutable).
-// 파일명이 곧 버전이므로 캐시를 비울 필요가 없고 activate cleanup에서 보존한다.
-const STATIC_CACHE = "somalog-static-v1";
+const STATIC_CACHE = "somalog-static";
+// HTML 네비게이션 SWR 전용 영구 캐시. 절대 rename 하지 않는다.
+const HTML_CACHE = "somalog-html";
 
-// 앱 셸: 오프라인에서도 보여줄 핵심 정적 파일들
+// 앱 셸: 오프라인에서도 보여줄 핵심 정적 파일들.
+// 인증이 필요한 HTML 라우트(/, /home)는 프리캐시하지 않는다 —
+// install 시 addAll 은 원자적이라 인증 리다이렉트/실패가 전체 프리캐시를
+// 깨뜨리고, 로그인 HTML 이 잘못 캐시될 수 있다. HTML 은 SWR 가 채운다.
 const PRECACHE_URLS = [
-  "/",
-  "/home",
   "/manifest.json",
   "/icon-192.png",
   "/icon-512.png",
@@ -26,7 +35,7 @@ self.addEventListener("activate", (event) => {
     caches.keys().then((keys) =>
       Promise.all(
         keys
-          .filter((k) => k !== CACHE_NAME && k !== STATIC_CACHE)
+          .filter((k) => k !== CACHE_NAME && k !== STATIC_CACHE && k !== HTML_CACHE)
           .map((k) => caches.delete(k))
       )
     )
@@ -90,7 +99,7 @@ self.addEventListener("fetch", (event) => {
 });
 
 async function staleWhileRevalidateHTML(request) {
-  const cache = await caches.open(CACHE_NAME);
+  const cache = await caches.open(HTML_CACHE);
   // 쿼리스트링으로 인한 캐시 미스/비대를 막기 위해 pathname 으로 정규화
   const url = new URL(request.url);
   const cacheKey = url.origin + url.pathname;

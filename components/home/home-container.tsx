@@ -18,8 +18,25 @@ interface HomeContainerProps {
 }
 
 export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps) {
-  const [activeLog, setActiveLog] = useState<DailyLog | null | undefined>(undefined);
-  const [recentLogs, setRecentLogs] = useState<DailyLog[] | undefined>(undefined);
+  // familyTime ChatRoom 패턴 이식: localStorage 캐시를 useState 초기화에서
+  // "동기로" 읽어 첫 페인트부터 실제 콘텐츠를 그린다. 기존엔 캐시 읽기가
+  // useEffect(페인트 이후)에 있어 복귀 사용자도 항상 스켈레톤이 먼저
+  // 떴다(캐시 적중 시 번쩍, 미스 시 네트워크까지 5초). 캐시가 없는
+  // 최초 로그인만 스켈레톤 — familyTime 의 "빈 채팅" 과 동일한 개념.
+  const [bootCache] = useState<{ recentLogs: DailyLog[]; activeLog: DailyLog | null } | null>(() => {
+    if (typeof window === "undefined" || !userId) return null;
+    try {
+      return logStore.loadHomeCache(userId);
+    } catch {
+      return null;
+    }
+  });
+  const [activeLog, setActiveLog] = useState<DailyLog | null | undefined>(
+    bootCache ? bootCache.activeLog : undefined,
+  );
+  const [recentLogs, setRecentLogs] = useState<DailyLog[] | undefined>(
+    bootCache ? bootCache.recentLogs : undefined,
+  );
   const [greeting, setGreeting] = useState<string | null>(null);
   const [isClosingDay, setIsClosingDay] = useState(false);
   const { settings } = useSettings();

@@ -9,7 +9,6 @@ import { getGreetingMessage } from "@/lib/utils/greeting-messages";
 import { useSettings } from "@/lib/contexts/settings-context";
 import type { DailyLog } from "@/lib/types";
 import { logStore } from "@/lib/stores/log-store";
-import { perfLog, perfDumpResources } from "@/lib/utils/perf-log";
 
 interface HomeContainerProps {
   userId: string | null;
@@ -18,11 +17,11 @@ interface HomeContainerProps {
 }
 
 export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps) {
-  // familyTime ChatRoom 패턴 이식: localStorage 캐시를 useState 초기화에서
-  // "동기로" 읽어 첫 페인트부터 실제 콘텐츠를 그린다. 기존엔 캐시 읽기가
-  // useEffect(페인트 이후)에 있어 복귀 사용자도 항상 스켈레톤이 먼저
-  // 떴다(캐시 적중 시 번쩍, 미스 시 네트워크까지 5초). 캐시가 없는
-  // 최초 로그인만 스켈레톤 — familyTime 의 "빈 채팅" 과 동일한 개념.
+  // familyTime ChatRoom 과 동일 패턴:
+  // useState 초기화에서 localStorage 를 동기로 읽어 첫 페인트부터 실 콘텐츠.
+  // 캐시 미스/SSR/비로그인 시 빈 상태(null / [])로 시작 — **스켈레톤 없음**.
+  // HomeContent 는 빈 상태를 "오늘의 기록을 시작하세요" 안내로 처리하므로
+  // 잠깐 깡통이 보이는 게 자연스럽다(familyTime 의 "빈 채팅"과 동치).
   const [bootCache] = useState<{ recentLogs: DailyLog[]; activeLog: DailyLog | null } | null>(() => {
     if (typeof window === "undefined" || !userId) return null;
     try {
@@ -31,118 +30,72 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
       return null;
     }
   });
-  const [activeLog, setActiveLog] = useState<DailyLog | null | undefined>(
-    bootCache ? bootCache.activeLog : undefined,
-  );
-  const [recentLogs, setRecentLogs] = useState<DailyLog[] | undefined>(
-    bootCache ? bootCache.recentLogs : undefined,
-  );
+  const [activeLog, setActiveLog] = useState<DailyLog | null>(bootCache?.activeLog ?? null);
+  const [recentLogs, setRecentLogs] = useState<DailyLog[]>(bootCache?.recentLogs ?? []);
   const [greeting, setGreeting] = useState<string | null>(null);
   const [isClosingDay, setIsClosingDay] = useState(false);
   const { settings } = useSettings();
 
   useEffect(() => {
-    perfLog("home-container:mount");
     const today = formatDate(new Date());
 
-    const populate = (logs: DailyLog[], firstUnclosed: DailyLog | null, todayLog: DailyLog | null) => {
-      setRecentLogs(logs);
-      setActiveLog(firstUnclosed ?? todayLog);
-      perfLog("home-container:first-content-paint");
-    };
-
+    // 마운트 시 무조건 최신 데이터 1회 fetch.
+    // familyTime ChatRoom 과 동일: 캐시는 "즉시 표시", 네트워크는 "백그라운드 동기화".
+    // 메모리/로컬/네트워크 3-tier 분기 없음 — 분기는 첫 페인트를 안 늦추기 위한 것이었지만
+    // useState 초기화에서 동기로 캐시를 읽으면 이미 첫 페인트는 보장된다.
     const fetchFresh = async () => {
-      perfLog("home-container:fetchFresh-start");
-      const initialData = await actionGetHomeInitialData();
-      perfLog("home-container:fetchFresh-end");
-      logStore.setRecentLogs(initialData.recentLogs);
-      if (initialData.todayLog) logStore.setLog(initialData.todayLog);
-      return initialData;
-    };
-
-    const init = async () => {
-      const cachedLogs = logStore.getRecentLogs();
-
-      if (cachedLogs) {
-        // 1. 메모리 캐시 적중 (탭 이동 시): 즉각 표시
-        perfLog("home-container:cache hit=memory");
-        const firstUnclosed = logStore.getFirstUnclosedLog();
-        const cachedToday = logStore.getLog(today) ?? cachedLogs.find((l) => l.date === today) ?? null;
-        populate(cachedLogs, firstUnclosed, cachedToday);
-
-        // 메모리 캐시가 오래되었다면 백그라운드 갱신
-        if (logStore.isStale()) {
-          fetchFresh().then((data) => {
-             populate(data.recentLogs, data.firstUnclosed, data.todayLog);
-             if (userId) logStore.saveHomeCache(userId, data.recentLogs, data.firstUnclosed ?? data.todayLog);
-          }).catch(() => {});
-        }
-      } else {
-        // 2. 로컬 스토리지 확인 (PWA 재시작 시)
-        const localCache = userId ? logStore.loadHomeCache(userId) : null;
-        if (localCache) {
-           // 즉각 표시
-           setRecentLogs(localCache.recentLogs);
-           setActiveLog(localCache.activeLog);
-           perfLog("home-container:first-content-paint (from localStorage)");
-           logStore.setRecentLogs(localCache.recentLogs);
-           if (localCache.activeLog) logStore.setLog(localCache.activeLog);
-
-           // PWA 재시작 시점엔 무조건 백그라운드로 최신화 (조용한 단일 통신)
-           fetchFresh().then((data) => {
-             populate(data.recentLogs, data.firstUnclosed, data.todayLog);
-             if (userId) logStore.saveHomeCache(userId, data.recentLogs, data.firstUnclosed ?? data.todayLog);
-           }).catch(() => {});
-        } else {
-           // 3. 아무 캐시도 없음 (최초 로그인): 화면을 가리고(스켈레톤) Fetch 대기
-           perfLog("home-container:cache hit=miss (no localStorage)");
-           const data = await fetchFresh();
-           populate(data.recentLogs, data.firstUnclosed, data.todayLog);
-           if (userId) logStore.saveHomeCache(userId, data.recentLogs, data.firstUnclosed ?? data.todayLog);
-        }
+      try {
+        const data = await actionGetHomeInitialData();
+        const newActive = data.firstUnclosed ?? data.todayLog ?? null;
+        setRecentLogs(data.recentLogs);
+        setActiveLog(newActive);
+        logStore.setRecentLogs(data.recentLogs);
+        if (data.todayLog) logStore.setLog(data.todayLog);
+        if (userId) logStore.saveHomeCache(userId, data.recentLogs, newActive);
+      } catch {
+        // 네트워크 실패 시 캐시 그대로 유지
       }
-
-      // 4. 프리페치: 2초 딜레이 후 1번의 요청으로 필요한 데이터 단일 다운로드
-      setTimeout(() => {
-        const fetchRecords = !logStore.getWeeklyLogs() || logStore.getTotalCount() === null;
-        const fetchGraph = !logStore.getAllLogs() || !logStore.hasLowestWeight();
-
-        if (fetchRecords || fetchGraph) {
-          actionGetPrefetchData(fetchRecords, fetchGraph)
-            .then((res) => {
-              if (res.w) logStore.setWeeklyLogs(res.w);
-              if (res.c !== undefined) logStore.setTotalCount(res.c);
-              if (res.all) logStore.setAllLogs(res.all);
-              if (res.low) logStore.setLowestWeight(res.low);
-            })
-            .catch(() => {});
-        }
-      }, 2000);
-
-      // 5. 백그라운드 밀린 로그 일괄 마감
-      logStore.runAutoCloseOnce(() => actionAutoCloseOldLogs())
-        ?.then(async (result) => {
-          if (result.filledCount + result.closedCount > 0) {
-            const updatedLogs = await actionGetRecentDailyLogs(30);
-            logStore.setRecentLogs(updatedLogs);
-            setRecentLogs(updatedLogs);
-            const newFirstUnclosed = logStore.getFirstUnclosedLog();
-            const newActiveLog = newFirstUnclosed ?? logStore.getLog(today) ?? null;
-            setActiveLog(newActiveLog);
-            if (userId) logStore.saveHomeCache(userId, updatedLogs, newActiveLog);
-          }
-        })
-        .catch(() => {});
     };
+    fetchFresh();
 
-    init();
-    perfDumpResources();
+    // 프리페치: 2초 후 다른 탭(기록/그래프)용 데이터 미리 다운로드
+    const prefetchTimer = setTimeout(() => {
+      const fetchRecords = !logStore.getWeeklyLogs() || logStore.getTotalCount() === null;
+      const fetchGraph = !logStore.getAllLogs() || !logStore.hasLowestWeight();
+      if (fetchRecords || fetchGraph) {
+        actionGetPrefetchData(fetchRecords, fetchGraph)
+          .then((res) => {
+            if (res.w) logStore.setWeeklyLogs(res.w);
+            if (res.c !== undefined) logStore.setTotalCount(res.c);
+            if (res.all) logStore.setAllLogs(res.all);
+            if (res.low) logStore.setLowestWeight(res.low);
+          })
+          .catch(() => {});
+      }
+    }, 2000);
+
+    // 백그라운드 밀린 로그 일괄 마감
+    logStore.runAutoCloseOnce(() => actionAutoCloseOldLogs())
+      ?.then(async (result) => {
+        if (result.filledCount + result.closedCount > 0) {
+          const updatedLogs = await actionGetRecentDailyLogs(30);
+          logStore.setRecentLogs(updatedLogs);
+          setRecentLogs(updatedLogs);
+          const newFirstUnclosed = logStore.getFirstUnclosedLog();
+          const newActiveLog = newFirstUnclosed ?? logStore.getLog(today) ?? null;
+          setActiveLog(newActiveLog);
+          if (userId) logStore.saveHomeCache(userId, updatedLogs, newActiveLog);
+        }
+      })
+      .catch(() => {});
+
+    return () => clearTimeout(prefetchTimer);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 인사말: 필요한 데이터가 준비될 때마다 갱신
   useEffect(() => {
-    if (initialDisplayName && activeLog !== undefined && recentLogs !== undefined && settings.onboardingComplete) {
-      setGreeting(getGreetingMessage(initialDisplayName, activeLog ?? null, recentLogs, settings));
+    if (initialDisplayName && settings.onboardingComplete) {
+      setGreeting(getGreetingMessage(initialDisplayName, activeLog, recentLogs, settings));
     }
   }, [initialDisplayName, activeLog, recentLogs, settings]);
 
@@ -172,8 +125,6 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
     }
   };
 
-  const isLoading = activeLog === undefined || recentLogs === undefined;
-
   return (
     <div className="pb-6">
       <header className="px-4 pt-4 pb-2">
@@ -202,31 +153,12 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
         )}
       </header>
 
-      {isLoading ? (
-        <HomeSkeleton />
-      ) : (
-        <HomeContent
-          todayLog={activeLog ?? null}
-          recentLogs={(recentLogs ?? []).slice(0, 14)}
-          onCloseToday={handleCloseDay}
-          isClosingToday={isClosingDay}
-        />
-      )}
-    </div>
-  );
-}
-
-function HomeSkeleton() {
-  return (
-    <div className="px-4 space-y-3 mt-2 animate-pulse">
-      <div className="h-20 bg-secondary rounded-xl" />
-      <div className="grid grid-cols-4 gap-2">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="h-16 bg-secondary rounded-xl" />
-        ))}
-      </div>
-      <div className="h-20 bg-secondary rounded-xl" />
-      <div className="h-44 bg-secondary rounded-xl" />
+      <HomeContent
+        todayLog={activeLog}
+        recentLogs={recentLogs.slice(0, 14)}
+        onCloseToday={handleCloseDay}
+        isClosingToday={isClosingDay}
+      />
     </div>
   );
 }

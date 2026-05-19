@@ -2,6 +2,8 @@ import { HomeContainer } from "@/components/home/home-container";
 import { getAuthUser } from "@/lib/supabase/server";
 import { getHomeInitialData } from "@/lib/services/home-service";
 
+export const dynamic = 'force-dynamic';
+
 export default async function HomePage() {
   const user = await getAuthUser();
   const displayName =

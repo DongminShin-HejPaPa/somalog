@@ -8,20 +8,27 @@ import { formatDate } from "@/lib/utils/date-utils";
 import { getGreetingMessage } from "@/lib/utils/greeting-messages";
 import { useSettings } from "@/lib/contexts/settings-context";
 import type { DailyLog } from "@/lib/types";
+import type { HomeInitialData } from "@/lib/services/home-service";
 import { logStore } from "@/lib/stores/log-store";
 
 interface HomeContainerProps {
   userId: string | null;
   /** 서버에서 계산된 표시 이름 — getSession() 브라우저 호출 없이 즉시 사용 */
   initialDisplayName: string | null;
+  /**
+   * 서버에서 fetch 한 초기 데이터. SSR HTML 에 실 콘텐츠를 박아
+   * iOS PWA 의 청크 evict 로 인한 3.5초 mount-갭을 사용자 가시 시간에서 제거한다.
+   */
+  initialData: HomeInitialData | null;
 }
 
-export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps) {
-  // familyTime ChatRoom 과 동일 패턴:
-  // useState 초기화에서 localStorage 를 동기로 읽어 첫 페인트부터 실 콘텐츠.
-  // 캐시 미스/SSR/비로그인 시 빈 상태(null / [])로 시작 — **스켈레톤 없음**.
-  // HomeContent 는 빈 상태를 "오늘의 기록을 시작하세요" 안내로 처리하므로
-  // 잠깐 깡통이 보이는 게 자연스럽다(familyTime 의 "빈 채팅"과 동치).
+export function HomeContainer({ userId, initialDisplayName, initialData }: HomeContainerProps) {
+  // 우선순위:
+  //   1. 클라이언트 localStorage 캐시 (가장 최신 — 사용자가 직전에 한 변경)
+  //   2. 서버 initialData (SSR HTML 에 박힌 데이터)
+  //   3. 빈 상태
+  // SSR: typeof window === undefined → bootCache=null → initialData 사용 → HTML에 실 콘텐츠.
+  // 클라이언트 first render: localStorage 적중 시 그것을 우선 (familyTime ChatRoom 동일 패턴).
   const [bootCache] = useState<{ recentLogs: DailyLog[]; activeLog: DailyLog | null } | null>(() => {
     if (typeof window === "undefined" || !userId) return null;
     try {
@@ -30,24 +37,26 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
       return null;
     }
   });
-  const [activeLog, setActiveLog] = useState<DailyLog | null>(bootCache?.activeLog ?? null);
-  const [recentLogs, setRecentLogs] = useState<DailyLog[]>(bootCache?.recentLogs ?? []);
+  const initialActive = initialData?.firstUnclosed ?? initialData?.todayLog ?? null;
+  const initialRecent = initialData?.recentLogs ?? [];
+  const [activeLog, setActiveLog] = useState<DailyLog | null>(bootCache?.activeLog ?? initialActive);
+  const [recentLogs, setRecentLogs] = useState<DailyLog[]>(bootCache?.recentLogs ?? initialRecent);
   const [greeting, setGreeting] = useState<string | null>(null);
   const [isClosingDay, setIsClosingDay] = useState(false);
   // 진단: 페이지 시작(navigation/timeOrigin)부터 mount 까지 시간을 측정해
   // mount 이전 구간(흰화면 + JS 다운로드/파싱/하이드레이션)을 가시화한다.
-  // 두 로그가 동일한데도 1초/6초 차이 나는 건 mount 이전이 변동된다는 뜻.
+  // SSR 데이터 적용 후엔 사용자가 mount 이전에 콘텐츠를 보므로 이 값과 체감이 분리된다.
   const [mountAt] = useState<number>(() => (typeof performance !== "undefined" ? performance.now() : 0));
   const [diag, setDiag] = useState<string>(() => {
     if (typeof window === "undefined") return "ssr";
     if (!userId) return "noUser";
-    // performance.now() 는 timeOrigin 기준이므로 mountAt 그대로가 nav→mount 소요 시간
     const preMount = Math.round(mountAt);
     const navEntry = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
     const respEnd = navEntry ? Math.round(navEntry.responseEnd) : -1;
     const dcl = navEntry ? Math.round(navEntry.domContentLoadedEventEnd) : -1;
+    const initFlag = initialData ? `ssr=${initialData.recentLogs.length}` : "ssr=none";
     const cacheState = bootCache ? `boot=hit:${bootCache.recentLogs.length}` : "boot=miss";
-    return `${cacheState} | nav→mount=${preMount}ms respEnd=${respEnd}ms dcl=${dcl}ms`;
+    return `${initFlag} ${cacheState} | nav→mount=${preMount}ms respEnd=${respEnd}ms dcl=${dcl}ms`;
   });
   const { settings } = useSettings();
 

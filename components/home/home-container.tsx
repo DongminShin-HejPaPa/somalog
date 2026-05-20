@@ -57,9 +57,12 @@ export function HomeContainer({ userId, initialDisplayName, initialData }: HomeC
     const paintEntries = performance.getEntriesByType("paint") as PerformanceEntry[];
     const fcpEntry = paintEntries.find((e) => e.name === "first-contentful-paint");
     const fcp = fcpEntry ? Math.round(fcpEntry.startTime) : -1;
+    // mountAt 이 10초를 넘으면 iOS WebView 가 살아있는 채로 백그라운드 → 재진입한 케이스.
+    // performance.timeOrigin 이 옛 진입 시점이라 측정값을 못 믿음. diag 에 표식.
+    const resumeFlag = mountAt > 10000 ? " [RESUMED-session: timings unreliable]" : "";
     const initFlag = initialData ? `ssr=${initialData.recentLogs.length}` : "ssr=none";
     const cacheState = bootCache ? `boot=hit:${bootCache.recentLogs.length}` : "boot=miss";
-    return `${initFlag} ${cacheState} | nav→mount=${preMount}ms FCP=${fcp}ms respEnd=${respEnd}ms dcl=${dcl}ms`;
+    return `${initFlag} ${cacheState} | nav→mount=${preMount}ms FCP=${fcp}ms respEnd=${respEnd}ms dcl=${dcl}ms${resumeFlag}`;
   });
   const { settings } = useSettings();
 

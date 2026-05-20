@@ -9,7 +9,7 @@ export default async function GraphPage() {
       <header className="px-4 pt-4 pb-2">
         <h1 className="text-lg font-bold">체중 그래프</h1>
       </header>
-      <GraphContainer userName={userName} />
+      <GraphContainer userName={userName} userId={user?.id ?? null} />
     </div>
   );
 }

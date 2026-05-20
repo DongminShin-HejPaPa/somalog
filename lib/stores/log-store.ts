@@ -9,6 +9,15 @@ const LEGACY_HOME_CACHE_KEY = "somalog_home_v1"; // pre-userId-split 키 (마이
 const HOME_CACHE_SCHEMA_VERSION = 1;
 const HOME_CACHE_LRU_LIMIT = 3;
 
+// 로그 탭 / 그래프 탭 데이터 영속 캐시.
+// 이전엔 메모리만 있어서 PWA 콜드 스타트마다 비어 있었고, 홈 진입 직후 다른 탭으로
+// 가면 캐시 미스 → fetch → 2초 스켈레톤이 발생. familyTime ChatRoom 의
+// localStorage 동기 읽기 패턴과 동일 구조로 추가.
+const LOG_CACHE_KEY_PREFIX = "somalog_log_v1:";
+const GRAPH_CACHE_KEY_PREFIX = "somalog_graph_v1:";
+const LOG_CACHE_SCHEMA_VERSION = 1;
+const GRAPH_CACHE_SCHEMA_VERSION = 1;
+
 interface HomeCacheRecord {
   userId: string;
   recentLogs: DailyLog[];
@@ -17,8 +26,32 @@ interface HomeCacheRecord {
   schemaVersion: number;
 }
 
+interface LogCacheRecord {
+  userId: string;
+  weeklyLogs: WeeklyLog[];
+  totalCount: number;
+  cachedAt: number;
+  schemaVersion: number;
+}
+
+interface GraphCacheRecord {
+  userId: string;
+  allLogs: DailyLog[];
+  lowestWeight: { weight: number; date: string } | null;
+  cachedAt: number;
+  schemaVersion: number;
+}
+
 function homeCacheKey(userId: string): string {
   return HOME_CACHE_KEY_PREFIX + userId;
+}
+
+function logCacheKey(userId: string): string {
+  return LOG_CACHE_KEY_PREFIX + userId;
+}
+
+function graphCacheKey(userId: string): string {
+  return GRAPH_CACHE_KEY_PREFIX + userId;
 }
 
 class LogStore {
@@ -66,6 +99,10 @@ class LogStore {
         this.lowestWeight = { weight: log.weight, date: log.date };
       }
     }
+
+    // 입력 탭에서 저장 / 홈 마감 등으로 setLog 가 불릴 때 그래프 캐시 즉시 갱신.
+    // (다음 그래프 탭 진입 시 stale 표시 없이 바로 최신 데이터)
+    this.persistGraphCacheIfReady();
   }
 
   setLogs(logs: DailyLog[]) {
@@ -95,6 +132,7 @@ class LogStore {
 
   setWeeklyLogs(logs: WeeklyLog[]) {
     this.weeklyLogs = logs;
+    this.persistLogCacheIfReady();
   }
 
   getWeeklyLogs() {
@@ -103,6 +141,7 @@ class LogStore {
 
   setTotalCount(c: number) {
     this.totalCount = c;
+    this.persistLogCacheIfReady();
   }
 
   getTotalCount() {
@@ -111,6 +150,7 @@ class LogStore {
 
   setAllLogs(logs: DailyLog[]) {
     this.allLogs = logs;
+    this.persistGraphCacheIfReady();
   }
 
   getAllLogs() {
@@ -120,6 +160,7 @@ class LogStore {
   setLowestWeight(lowest: { weight: number; date: string } | null) {
     this.lowestWeight = lowest;
     this.lowestWeightFetched = true;
+    this.persistGraphCacheIfReady();
   }
 
   getLowestWeight() {
@@ -273,13 +314,133 @@ class LogStore {
       const keys: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        if (k && k.startsWith(HOME_CACHE_KEY_PREFIX)) keys.push(k);
+        if (
+          k &&
+          (k.startsWith(HOME_CACHE_KEY_PREFIX) ||
+            k.startsWith(LOG_CACHE_KEY_PREFIX) ||
+            k.startsWith(GRAPH_CACHE_KEY_PREFIX))
+        ) {
+          keys.push(k);
+        }
       }
       keys.forEach((k) => localStorage.removeItem(k));
       localStorage.removeItem(LEGACY_HOME_CACHE_KEY);
     } catch {
       // 무시
     }
+  }
+
+  // ── 로그 탭 영속 캐시 ──────────────────────────────────────────
+  saveLogCache(userId: string, weeklyLogs: WeeklyLog[], totalCount: number): void {
+    if (typeof window === "undefined") return;
+    try {
+      const record: LogCacheRecord = {
+        userId,
+        weeklyLogs,
+        totalCount,
+        cachedAt: Date.now(),
+        schemaVersion: LOG_CACHE_SCHEMA_VERSION,
+      };
+      localStorage.setItem(logCacheKey(userId), JSON.stringify(record));
+    } catch {
+      // 용량 초과 등 무시
+    }
+  }
+
+  loadLogCache(userId: string): { weeklyLogs: WeeklyLog[]; totalCount: number } | null {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = localStorage.getItem(logCacheKey(userId));
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as Partial<LogCacheRecord>;
+      if (parsed.userId !== userId) return null;
+      if (parsed.schemaVersion !== LOG_CACHE_SCHEMA_VERSION) {
+        localStorage.removeItem(logCacheKey(userId));
+        return null;
+      }
+      if (!Array.isArray(parsed.weeklyLogs) || typeof parsed.totalCount !== "number") {
+        return null;
+      }
+      return { weeklyLogs: parsed.weeklyLogs, totalCount: parsed.totalCount };
+    } catch {
+      return null;
+    }
+  }
+
+  clearLogCacheForUser(userId: string): void {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.removeItem(logCacheKey(userId));
+    } catch {
+      // 무시
+    }
+  }
+
+  // ── 그래프 탭 영속 캐시 ────────────────────────────────────────
+  saveGraphCache(
+    userId: string,
+    allLogs: DailyLog[],
+    lowestWeight: { weight: number; date: string } | null
+  ): void {
+    if (typeof window === "undefined") return;
+    try {
+      const record: GraphCacheRecord = {
+        userId,
+        allLogs,
+        lowestWeight,
+        cachedAt: Date.now(),
+        schemaVersion: GRAPH_CACHE_SCHEMA_VERSION,
+      };
+      localStorage.setItem(graphCacheKey(userId), JSON.stringify(record));
+    } catch {
+      // 용량 초과 등 무시
+    }
+  }
+
+  loadGraphCache(
+    userId: string
+  ): { allLogs: DailyLog[]; lowestWeight: { weight: number; date: string } | null } | null {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = localStorage.getItem(graphCacheKey(userId));
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as Partial<GraphCacheRecord>;
+      if (parsed.userId !== userId) return null;
+      if (parsed.schemaVersion !== GRAPH_CACHE_SCHEMA_VERSION) {
+        localStorage.removeItem(graphCacheKey(userId));
+        return null;
+      }
+      if (!Array.isArray(parsed.allLogs)) return null;
+      return {
+        allLogs: parsed.allLogs,
+        lowestWeight: parsed.lowestWeight ?? null,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  clearGraphCacheForUser(userId: string): void {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.removeItem(graphCacheKey(userId));
+    } catch {
+      // 무시
+    }
+  }
+
+  // ── 자동 영속화: setter 가 호출될 때 currentUserId 기준으로 자동 저장 ──────
+  // 사용자가 입력 탭에서 저장 → 홈/그래프 캐시도 즉시 갱신 (다음 탭 진입 즉시 최신).
+  private persistLogCacheIfReady(): void {
+    if (!this.currentUserId) return;
+    if (this.weeklyLogs === null || this.totalCount === null) return;
+    this.saveLogCache(this.currentUserId, this.weeklyLogs, this.totalCount);
+  }
+
+  private persistGraphCacheIfReady(): void {
+    if (!this.currentUserId) return;
+    if (!this.allLogs || !this.lowestWeightFetched) return;
+    this.saveGraphCache(this.currentUserId, this.allLogs, this.lowestWeight);
   }
 
   /**

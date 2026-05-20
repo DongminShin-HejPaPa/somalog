@@ -10,10 +10,42 @@ import { WeightChart } from "./weight-chart";
 import type { DailyLog } from "@/lib/types";
 import { logStore } from "@/lib/stores/log-store";
 
-export function GraphContainer({ userName }: { userName: string }) {
+interface GraphContainerProps {
+  userName: string;
+  userId: string | null;
+}
+
+export function GraphContainer({ userName, userId }: GraphContainerProps) {
   const { settings, updateSettings } = useSettings();
-  const [logs, setLogs] = useState<DailyLog[] | undefined>(undefined);
-  const [lowest, setLowest] = useState<{ weight: number; date: string } | undefined>(undefined);
+  // familyTime ChatRoom 패턴: useState 초기화에서 캐시 동기 읽기.
+  // 메모리 → localStorage → 빈 상태 순.
+  const [bootCache] = useState<{ allLogs: DailyLog[]; lowest: { weight: number; date: string } } | null>(() => {
+    if (typeof window === "undefined") return null;
+    const memAll = logStore.getAllLogs();
+    if (memAll && logStore.hasLowestWeight()) {
+      return {
+        allLogs: memAll,
+        lowest: logStore.getLowestWeight() ?? { weight: Infinity, date: "" },
+      };
+    }
+    if (!userId) return null;
+    try {
+      const fromLs = logStore.loadGraphCache(userId);
+      if (fromLs) {
+        return {
+          allLogs: fromLs.allLogs,
+          lowest: fromLs.lowestWeight ?? { weight: Infinity, date: "" },
+        };
+      }
+    } catch {
+      // 무시
+    }
+    return null;
+  });
+  const [logs, setLogs] = useState<DailyLog[]>(bootCache?.allLogs ?? []);
+  const [lowest, setLowest] = useState<{ weight: number; date: string }>(
+    bootCache?.lowest ?? { weight: Infinity, date: "" }
+  );
 
   const handleActivityLevelChange = useCallback(
     (level: number) => updateSettings({ activityLevel: level }),
@@ -21,44 +53,28 @@ export function GraphContainer({ userName }: { userName: string }) {
   );
 
   useEffect(() => {
-    // user transition은 SettingsProvider의 useUserCacheLifecycle에서 중앙 처리
-    const applyFresh = (freshLogs: DailyLog[], freshLowest: { weight: number; date: string }) => {
-      logStore.setAllLogs(freshLogs);
-      logStore.setLowestWeight(freshLowest);
-      setLogs(freshLogs);
-      setLowest(freshLowest);
-    };
-
-    const fetchAll = () =>
-      Promise.all([actionGetAllDailyLogs(), actionGetLowestWeight()])
-        .then(([fetchedLogs, fetchedLowest]) => applyFresh(fetchedLogs, fetchedLowest));
-
-    // Use hasLowestWeight() (not getLowestWeight()) so a null value (no data)
-    // still counts as a valid cache hit and avoids an unnecessary re-fetch.
-    if (logStore.getAllLogs() && logStore.hasLowestWeight()) {
-      // Instant display from cache — no skeleton shown
-      setLogs(logStore.getAllLogs()!);
-      setLowest(logStore.getLowestWeight() ?? { weight: Infinity, date: "" });
-
-      // Stale: background refresh without blocking UI
-      if (logStore.isStale()) {
-        fetchAll().catch(() => {});
+    // bootCache 를 메모리 logStore 에도 즉시 주입
+    if (bootCache) {
+      logStore.setAllLogs(bootCache.allLogs);
+      if (bootCache.lowest.weight !== Infinity) {
+        logStore.setLowestWeight(bootCache.lowest);
       }
-    } else {
-      // No cache yet: fetch (skeleton shows until complete)
-      fetchAll().catch(() => {});
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (logs === undefined || lowest === undefined) {
-    return (
-      <div className="px-4 space-y-3 mt-2 animate-pulse">
-        <div className="h-64 bg-secondary rounded-xl" />
-        <div className="h-10 bg-secondary rounded-xl" />
-        <div className="h-10 bg-secondary rounded-xl" />
-      </div>
-    );
-  }
+    // 백그라운드 최신화. memory fresh 면 생략.
+    const hasFreshMemory =
+      logStore.getAllLogs() && logStore.hasLowestWeight() && !logStore.isStale();
+    if (hasFreshMemory) return;
+
+    Promise.all([actionGetAllDailyLogs(), actionGetLowestWeight()])
+      .then(([freshLogs, freshLowest]) => {
+        logStore.setAllLogs(freshLogs);
+        logStore.setLowestWeight(freshLowest);
+        setLogs(freshLogs);
+        setLowest(freshLowest);
+      })
+      .catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <WeightChart

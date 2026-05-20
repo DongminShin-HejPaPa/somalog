@@ -171,14 +171,22 @@ export function SettingsProvider({
   const resetAllSettings = useCallback(() => {
     clearCachedSettings(uid);
     logStore.resetInMemory();
-    if (uid) logStore.clearHomeCacheForUser(uid);
+    if (uid) {
+      logStore.clearHomeCacheForUser(uid);
+      logStore.clearLogCacheForUser(uid);
+      logStore.clearGraphCacheForUser(uid);
+    }
     setSettings(DEFAULT_SETTINGS);
   }, [uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** 데모 데이터로 설정 state 교체 (실제 데이터 로드는 settings-form에서 serverLoadDemoData 호출 후 이 함수로 상태 동기화) */
   const loadDemoSettings = useCallback(() => {
     logStore.resetInMemory();
-    if (uid) logStore.clearHomeCacheForUser(uid);
+    if (uid) {
+      logStore.clearHomeCacheForUser(uid);
+      logStore.clearLogCacheForUser(uid);
+      logStore.clearGraphCacheForUser(uid);
+    }
     setSettings({ ...mockSettings });
   }, [uid]); // eslint-disable-line react-hooks/exhaustive-deps
 

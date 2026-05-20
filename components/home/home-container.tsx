@@ -8,27 +8,18 @@ import { formatDate } from "@/lib/utils/date-utils";
 import { getGreetingMessage } from "@/lib/utils/greeting-messages";
 import { useSettings } from "@/lib/contexts/settings-context";
 import type { DailyLog } from "@/lib/types";
-import type { HomeInitialData } from "@/lib/services/home-service";
 import { logStore } from "@/lib/stores/log-store";
 
 interface HomeContainerProps {
   userId: string | null;
   /** 서버에서 계산된 표시 이름 — getSession() 브라우저 호출 없이 즉시 사용 */
   initialDisplayName: string | null;
-  /**
-   * 서버에서 fetch 한 초기 데이터. SSR HTML 에 실 콘텐츠를 박아
-   * iOS PWA 의 청크 evict 로 인한 3.5초 mount-갭을 사용자 가시 시간에서 제거한다.
-   */
-  initialData: HomeInitialData | null;
 }
 
-export function HomeContainer({ userId, initialDisplayName, initialData }: HomeContainerProps) {
-  // 우선순위:
-  //   1. 클라이언트 localStorage 캐시 (가장 최신 — 사용자가 직전에 한 변경)
-  //   2. 서버 initialData (SSR HTML 에 박힌 데이터)
-  //   3. 빈 상태
-  // SSR: typeof window === undefined → bootCache=null → initialData 사용 → HTML에 실 콘텐츠.
-  // 클라이언트 first render: localStorage 적중 시 그것을 우선 (familyTime ChatRoom 동일 패턴).
+export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps) {
+  // familyTime ChatRoom 패턴: useState 초기화에서 localStorage 동기 읽기.
+  // SSR/캐시 미스/비로그인 시 빈 상태(null / [])로 시작 — 스켈레톤 없음.
+  // HomeContent 는 빈 상태를 "오늘의 기록을 시작하세요" 안내로 처리.
   const [bootCache] = useState<{ recentLogs: DailyLog[]; activeLog: DailyLog | null } | null>(() => {
     if (typeof window === "undefined" || !userId) return null;
     try {
@@ -37,10 +28,8 @@ export function HomeContainer({ userId, initialDisplayName, initialData }: HomeC
       return null;
     }
   });
-  const initialActive = initialData?.firstUnclosed ?? initialData?.todayLog ?? null;
-  const initialRecent = initialData?.recentLogs ?? [];
-  const [activeLog, setActiveLog] = useState<DailyLog | null>(bootCache?.activeLog ?? initialActive);
-  const [recentLogs, setRecentLogs] = useState<DailyLog[]>(bootCache?.recentLogs ?? initialRecent);
+  const [activeLog, setActiveLog] = useState<DailyLog | null>(bootCache?.activeLog ?? null);
+  const [recentLogs, setRecentLogs] = useState<DailyLog[]>(bootCache?.recentLogs ?? []);
   const [greeting, setGreeting] = useState<string | null>(null);
   const [isClosingDay, setIsClosingDay] = useState(false);
   // 진단: 페이지 시작(navigation/timeOrigin)부터 mount 까지 시간을 측정해
@@ -60,9 +49,8 @@ export function HomeContainer({ userId, initialDisplayName, initialData }: HomeC
     // mountAt 이 10초를 넘으면 iOS WebView 가 살아있는 채로 백그라운드 → 재진입한 케이스.
     // performance.timeOrigin 이 옛 진입 시점이라 측정값을 못 믿음. diag 에 표식.
     const resumeFlag = mountAt > 10000 ? " [RESUMED-session: timings unreliable]" : "";
-    const initFlag = initialData ? `ssr=${initialData.recentLogs.length}` : "ssr=none";
     const cacheState = bootCache ? `boot=hit:${bootCache.recentLogs.length}` : "boot=miss";
-    return `${initFlag} ${cacheState} | nav→mount=${preMount}ms FCP=${fcp}ms respEnd=${respEnd}ms dcl=${dcl}ms${resumeFlag}`;
+    return `${cacheState} | nav→mount=${preMount}ms FCP=${fcp}ms respEnd=${respEnd}ms dcl=${dcl}ms${resumeFlag}`;
   });
   const { settings } = useSettings();
 

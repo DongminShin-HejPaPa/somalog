@@ -108,13 +108,9 @@ async function staleWhileRevalidateHTML(request) {
     (await cache.match(request, { ignoreSearch: true }));
 
   const networkFetch = fetch(request)
-    .then(async (response) => {
+    .then((response) => {
       if (response && response.status === 200) {
         cache.put(cacheKey, response.clone()).catch(() => {});
-        // 참조 청크(CSS/JS) 들을 함께 STATIC_CACHE 로 재예열한다.
-        // iOS PWA 가 시간 지나면 /_next/static/ 청크를 부분 evict 하는 문제를
-        // "매 방문이 다음 방문용 캐시를 따뜻하게" 유지해 완화한다.
-        prewarmStaticChunks(response.clone()).catch(() => {});
       }
       return response;
     })
@@ -133,34 +129,4 @@ async function staleWhileRevalidateHTML(request) {
     status: 503,
     headers: { "Content-Type": "text/html; charset=utf-8" },
   });
-}
-
-// HTML 본문에서 /_next/static/ 참조를 뽑아 STATIC_CACHE 에 강제 재예열.
-// HTML body 를 1회만 읽으므로 caller 가 response.clone() 을 넘긴다고 가정.
-async function prewarmStaticChunks(htmlResponse) {
-  try {
-    const html = await htmlResponse.text();
-    const urls = new Set();
-    const re = /\/_next\/static\/[^"'\s)>]+/g;
-    let m;
-    while ((m = re.exec(html)) !== null) urls.add(m[0]);
-    if (urls.size === 0) return;
-    const staticCache = await caches.open(STATIC_CACHE);
-    // 병렬 재예열. 이미 캐시에 있으면 fetch 자체를 생략한다.
-    await Promise.all(
-      Array.from(urls).map(async (path) => {
-        const url = self.location.origin + path;
-        const existing = await staticCache.match(url);
-        if (existing) return;
-        try {
-          const res = await fetch(url, { credentials: "same-origin" });
-          if (res.ok) await staticCache.put(url, res);
-        } catch {
-          // 무시
-        }
-      })
-    );
-  } catch {
-    // 무시
-  }
 }

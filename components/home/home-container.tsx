@@ -54,9 +54,12 @@ export function HomeContainer({ userId, initialDisplayName, initialData }: HomeC
     const navEntry = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
     const respEnd = navEntry ? Math.round(navEntry.responseEnd) : -1;
     const dcl = navEntry ? Math.round(navEntry.domContentLoadedEventEnd) : -1;
+    const paintEntries = performance.getEntriesByType("paint") as PerformanceEntry[];
+    const fcpEntry = paintEntries.find((e) => e.name === "first-contentful-paint");
+    const fcp = fcpEntry ? Math.round(fcpEntry.startTime) : -1;
     const initFlag = initialData ? `ssr=${initialData.recentLogs.length}` : "ssr=none";
     const cacheState = bootCache ? `boot=hit:${bootCache.recentLogs.length}` : "boot=miss";
-    return `${initFlag} ${cacheState} | nav→mount=${preMount}ms respEnd=${respEnd}ms dcl=${dcl}ms`;
+    return `${initFlag} ${cacheState} | nav→mount=${preMount}ms FCP=${fcp}ms respEnd=${respEnd}ms dcl=${dcl}ms`;
   });
   const { settings } = useSettings();
 

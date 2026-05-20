@@ -34,13 +34,21 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
   const [recentLogs, setRecentLogs] = useState<DailyLog[]>(bootCache?.recentLogs ?? []);
   const [greeting, setGreeting] = useState<string | null>(null);
   const [isClosingDay, setIsClosingDay] = useState(false);
-  // 진단: 첫 페인트 시점 캐시 상태 + 네트워크 완료 시점을 화면에 표시
+  // 진단: 페이지 시작(navigation/timeOrigin)부터 mount 까지 시간을 측정해
+  // mount 이전 구간(흰화면 + JS 다운로드/파싱/하이드레이션)을 가시화한다.
+  // 두 로그가 동일한데도 1초/6초 차이 나는 건 mount 이전이 변동된다는 뜻.
+  const [mountAt] = useState<number>(() => (typeof performance !== "undefined" ? performance.now() : 0));
   const [diag, setDiag] = useState<string>(() => {
     if (typeof window === "undefined") return "ssr";
     if (!userId) return "noUser";
-    return bootCache ? `boot=hit:${bootCache.recentLogs.length}` : "boot=miss";
+    // performance.now() 는 timeOrigin 기준이므로 mountAt 그대로가 nav→mount 소요 시간
+    const preMount = Math.round(mountAt);
+    const navEntry = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+    const respEnd = navEntry ? Math.round(navEntry.responseEnd) : -1;
+    const dcl = navEntry ? Math.round(navEntry.domContentLoadedEventEnd) : -1;
+    const cacheState = bootCache ? `boot=hit:${bootCache.recentLogs.length}` : "boot=miss";
+    return `${cacheState} | nav→mount=${preMount}ms respEnd=${respEnd}ms dcl=${dcl}ms`;
   });
-  const [mountAt] = useState<number>(() => (typeof performance !== "undefined" ? performance.now() : 0));
   const { settings } = useSettings();
 
   useEffect(() => {

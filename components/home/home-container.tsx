@@ -57,6 +57,15 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
   useEffect(() => {
     const today = formatDate(new Date());
 
+    // 회귀 수정: bootCache 적중 시 logStore (메모리 싱글톤) 도 즉시 채운다.
+    // 이게 없으면 사용자가 홈 마운트 직후 다른 탭으로 가면 logStore 캐시 미스 →
+    // 각 탭이 자체 fetch → 2초 스켈레톤. 5741de9 에서 3-tier init 제거 시
+    // 빠뜨린 행동을 복구.
+    if (bootCache) {
+      logStore.setRecentLogs(bootCache.recentLogs);
+      if (bootCache.activeLog) logStore.setLog(bootCache.activeLog);
+    }
+
     // 마운트 시 무조건 최신 데이터 1회 fetch.
     // familyTime ChatRoom 과 동일: 캐시는 "즉시 표시", 네트워크는 "백그라운드 동기화".
     // 메모리/로컬/네트워크 3-tier 분기 없음 — 분기는 첫 페인트를 안 늦추기 위한 것이었지만
@@ -87,21 +96,21 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
     };
     fetchFresh();
 
-    // 프리페치: 2초 후 다른 탭(기록/그래프)용 데이터 미리 다운로드
-    const prefetchTimer = setTimeout(() => {
-      const fetchRecords = !logStore.getWeeklyLogs() || logStore.getTotalCount() === null;
-      const fetchGraph = !logStore.getAllLogs() || !logStore.hasLowestWeight();
-      if (fetchRecords || fetchGraph) {
-        actionGetPrefetchData(fetchRecords, fetchGraph)
-          .then((res) => {
-            if (res.w) logStore.setWeeklyLogs(res.w);
-            if (res.c !== undefined) logStore.setTotalCount(res.c);
-            if (res.all) logStore.setAllLogs(res.all);
-            if (res.low) logStore.setLowestWeight(res.low);
-          })
-          .catch(() => {});
-      }
-    }, 2000);
+    // 프리페치: 이전엔 2초 지연이 있었으나 — 사용자가 홈 진입 직후 바로 다른 탭으로
+    // 이동하면 (그 2초 안에) 캐시 미스로 떨어져서 결과적으로 탭 이동 시 스켈레톤이
+    // 보였다. fetchFresh 와 별도 엔드포인트이므로 즉시 병렬 발사해도 무방.
+    const fetchRecords = !logStore.getWeeklyLogs() || logStore.getTotalCount() === null;
+    const fetchGraph = !logStore.getAllLogs() || !logStore.hasLowestWeight();
+    if (fetchRecords || fetchGraph) {
+      actionGetPrefetchData(fetchRecords, fetchGraph)
+        .then((res) => {
+          if (res.w) logStore.setWeeklyLogs(res.w);
+          if (res.c !== undefined) logStore.setTotalCount(res.c);
+          if (res.all) logStore.setAllLogs(res.all);
+          if (res.low) logStore.setLowestWeight(res.low);
+        })
+        .catch(() => {});
+    }
 
     // 백그라운드 밀린 로그 일괄 마감
     logStore.runAutoCloseOnce(() => actionAutoCloseOldLogs())
@@ -117,8 +126,6 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
         }
       })
       .catch(() => {});
-
-    return () => clearTimeout(prefetchTimer);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 인사말: 필요한 데이터가 준비될 때마다 갱신

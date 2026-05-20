@@ -462,15 +462,6 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
       ? computeRecommendedWater(currentBasisWeight, form.gender)
       : null;
 
-  // 최근 입력된 체중 / 성별이 바뀌면 수분 목표를 자동 재계산.
-  // 사용자가 saved 후 직접 다른 값으로 덮어쓰지 않는 한, 항상 현재 체중 기반 값으로 표시된다.
-  useEffect(() => {
-    if (recommendedWater === null) return;
-    if (form.waterGoal === recommendedWater) return;
-    setForm((prev) => ({ ...prev, waterGoal: recommendedWater }));
-    setSaved(false);
-  }, [recommendedWater]); // eslint-disable-line react-hooks/exhaustive-deps
-
   return (
     <div>
       {/* 관리자 페이지 메뉴 (관리자 전용) */}

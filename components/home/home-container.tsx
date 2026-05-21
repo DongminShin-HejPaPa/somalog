@@ -110,7 +110,7 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
       } else {
         parts.push(`sw=${sw.version ?? "?"}(rtt${sw._rttMs}ms)`);
         // HTML cache entries
-        const html = sw.htmlCache as Array<{ url: string; status: number | string; bodyLen?: number; ct?: string }> | undefined;
+        const html = sw.htmlCache as Array<{ url: string; status: number | string; bodyLen?: number; ct?: string; vary?: string; cc?: string; hasSetCookie?: boolean; date?: string }> | undefined;
         if (Array.isArray(html)) {
           if (html.length === 0) {
             parts.push("HTML[empty]");
@@ -124,6 +124,16 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
               return `${path}:${e.status}:${ct}:${len}`;
             }).join(",");
             parts.push(`HTML[${summary}]`);
+            // /home entry 의 헤더 detail (vary 등) — 가설 검증용
+            const home = html.find((e) => {
+              try { return new URL(e.url).pathname === "/home"; } catch { return false; }
+            });
+            if (home) {
+              const v = home.vary ? `vary="${home.vary}"` : "vary=∅";
+              const c = home.cc ? `cc="${home.cc}"` : "cc=∅";
+              const sc = home.hasSetCookie ? "set-cookie=Y" : "set-cookie=N";
+              parts.push(`/home-hdr[${v} ${c} ${sc}]`);
+            }
           }
         } else if (sw.htmlCacheErr) {
           parts.push(`HTMLerr=${sw.htmlCacheErr}`);

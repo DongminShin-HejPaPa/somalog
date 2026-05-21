@@ -14,7 +14,7 @@ const HTML_CACHE = "somalog-html";
 // SW 버전 식별자. sw.js 본문이 의미 있게 바뀔 때마다 손으로 bump.
 // 클라이언트가 PING 메시지를 보내면 PONG 으로 이 값 반환 → 진단 라인에 표시.
 // "옛 SW 가 active 인 채로 느린 건지" vs "새 SW 인데도 캐시 미스인 건지" 분리 진단용.
-const SW_VERSION = "2026-01-21-d-deep-diag";
+const SW_VERSION = "2026-01-21-e-ignore-vary";
 
 // 앱 셸: 오프라인에서도 보여줄 핵심 정적 파일들.
 // 인증이 필요한 HTML 라우트(/, /home)는 프리캐시하지 않는다 —
@@ -123,6 +123,7 @@ self.addEventListener("message", (event) => {
       out.scope = self.registration && self.registration.scope;
     } catch {}
     // HTML_CACHE 내용: 각 entry 의 URL, status, 본문 크기, content-type
+    // 추가: vary / cache-control / set-cookie 유무 / date — vary 매칭 거부 가설 검증용
     try {
       const htmlCache = await caches.open(HTML_CACHE);
       const keys = await htmlCache.keys();
@@ -131,12 +132,20 @@ self.addEventListener("message", (event) => {
         if (!resp) return { url: req.url, status: "no-resp" };
         let bodyLen = -1;
         let ct = "?";
+        let vary = "";
+        let cc = "";
+        let hasSetCookie = false;
+        let date = "";
         try {
           ct = resp.headers.get("content-type") || "?";
+          vary = resp.headers.get("vary") || "";
+          cc = resp.headers.get("cache-control") || "";
+          hasSetCookie = !!resp.headers.get("set-cookie");
+          date = resp.headers.get("date") || "";
           const text = await resp.clone().text();
           bodyLen = text.length;
         } catch {}
-        return { url: req.url, status: resp.status, bodyLen, ct };
+        return { url: req.url, status: resp.status, bodyLen, ct, vary, cc, hasSetCookie, date };
       }));
       out.htmlCache = items;
     } catch (e) {
@@ -172,9 +181,13 @@ async function staleWhileRevalidateHTML(request) {
   // 쿼리스트링으로 인한 캐시 미스/비대를 막기 위해 pathname 으로 정규화
   const url = new URL(request.url);
   const cacheKey = url.origin + url.pathname;
+  // ignoreVary: Next.js force-dynamic 응답에 vary: cookie 등이 자동으로 박혀,
+  // Supabase auth cookie 가 rotation 될 때마다 vary 매칭이 거부되어 캐시가
+  // 있는데도 매번 미스가 났다. 진단으로 확정 (HTML[/home:200:18KB] 존재함에도
+  // respEnd=1.7s 의 네트워크 fetch 가 발생). URL 만으로 매치되도록 강제.
   const cached =
-    (await cache.match(cacheKey)) ||
-    (await cache.match(request, { ignoreSearch: true }));
+    (await cache.match(cacheKey, { ignoreVary: true })) ||
+    (await cache.match(request, { ignoreSearch: true, ignoreVary: true }));
 
   const networkFetch = fetch(request)
     .then((response) => {

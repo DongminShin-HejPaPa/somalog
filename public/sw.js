@@ -14,7 +14,7 @@ const HTML_CACHE = "somalog-html";
 // SW 버전 식별자. sw.js 본문이 의미 있게 바뀔 때마다 손으로 bump.
 // 클라이언트가 PING 메시지를 보내면 PONG 으로 이 값 반환 → 진단 라인에 표시.
 // "옛 SW 가 active 인 채로 느린 건지" vs "새 SW 인데도 캐시 미스인 건지" 분리 진단용.
-const SW_VERSION = "2026-01-21-e-ignore-vary";
+const SW_VERSION = "2026-01-21-f-clean-headers";
 
 // 앱 셸: 오프라인에서도 보여줄 핵심 정적 파일들.
 // 인증이 필요한 HTML 라우트(/, /home)는 프리캐시하지 않는다 —
@@ -172,41 +172,88 @@ self.addEventListener("message", (event) => {
     } catch (e) {
       out.allCachesErr = String(e);
     }
+    // SERVE_LOG: SW 가 HTML 요청을 어떻게 처리했는지 시간순.
+    // "SW 가 정말 캐시 서빙했는지 vs iOS 가 SW 우회했는지" 결정적 판별.
+    out.serveLog = SERVE_LOG.slice(-5).map((e) => ({
+      type: e.type,
+      url: (() => { try { return new URL(e.url).pathname; } catch { return e.url; } })(),
+      detail: e.detail,
+      agoMs: Date.now() - e.ts,
+    }));
     port.postMessage(out);
   })());
 });
+
+// SW 가 HTML 요청을 어떻게 처리했는지 기록. PING 응답으로 끌어와 진단.
+// "SW 가 캐시 서빙했는지 vs iOS 가 SW 우회했는지" 확정용.
+const SERVE_LOG = []; // { ts, url, type, detail } 가 시간순으로 append. 마지막 N개만 유지.
+const SERVE_LOG_MAX = 20;
+function logServe(url, type, detail) {
+  try {
+    SERVE_LOG.push({ ts: Date.now(), url, type, detail: detail || "" });
+    if (SERVE_LOG.length > SERVE_LOG_MAX) SERVE_LOG.shift();
+  } catch {}
+}
+
+// Vercel/Next.js force-dynamic 응답에 박힌 vary / cache-control / set-cookie 가
+// iOS Safari 의 Cache API match 또는 후속 응답 사용에 영향을 줄 가능성. 헤더를
+// strip 한 클린 응답으로 저장해 그 변수 제거.
+async function makeCleanResponseForCache(response) {
+  try {
+    const body = await response.clone().blob();
+    const ct = response.headers.get("content-type") || "text/html; charset=utf-8";
+    return new Response(body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: { "content-type": ct },
+    });
+  } catch {
+    return response.clone();
+  }
+}
 
 async function staleWhileRevalidateHTML(request) {
   const cache = await caches.open(HTML_CACHE);
   // 쿼리스트링으로 인한 캐시 미스/비대를 막기 위해 pathname 으로 정규화
   const url = new URL(request.url);
   const cacheKey = url.origin + url.pathname;
-  // ignoreVary: Next.js force-dynamic 응답에 vary: cookie 등이 자동으로 박혀,
-  // Supabase auth cookie 가 rotation 될 때마다 vary 매칭이 거부되어 캐시가
-  // 있는데도 매번 미스가 났다. 진단으로 확정 (HTML[/home:200:18KB] 존재함에도
-  // respEnd=1.7s 의 네트워크 fetch 가 발생). URL 만으로 매치되도록 강제.
+  // ignoreVary + ignoreMethod: 응답 헤더의 vary 와 method 모두 무시하고 URL 로만 매치.
+  // 캐시 저장 시 헤더 strip 까지 같이 적용하므로 사실상 vary 없어야 하나 방어적으로 둠.
   const cached =
-    (await cache.match(cacheKey, { ignoreVary: true })) ||
-    (await cache.match(request, { ignoreSearch: true, ignoreVary: true }));
+    (await cache.match(cacheKey, { ignoreVary: true, ignoreMethod: true })) ||
+    (await cache.match(request, { ignoreSearch: true, ignoreVary: true, ignoreMethod: true }));
 
   const networkFetch = fetch(request)
-    .then((response) => {
+    .then(async (response) => {
       if (response && response.status === 200) {
-        cache.put(cacheKey, response.clone()).catch(() => {});
+        // 헤더 strip 한 클린 응답을 저장 (vary, cache-control, set-cookie 제거)
+        try {
+          const clean = await makeCleanResponseForCache(response);
+          await cache.put(cacheKey, clean);
+          logServe(cacheKey, "cached", `status=${response.status}`);
+        } catch (e) {
+          logServe(cacheKey, "cache-put-err", String(e));
+        }
       }
       return response;
     })
-    .catch(() => null);
+    .catch((e) => {
+      logServe(cacheKey, "network-err", String(e));
+      return null;
+    });
 
   // 캐시가 있으면 즉시 반환 + 백그라운드 갱신 (다음 cold start 가 빨라짐)
   if (cached) {
+    logServe(cacheKey, "served-from-cache", `bodyType=${cached.headers.get("content-type")}`);
     networkFetch.catch(() => {});
     return cached;
   }
 
   // 첫 방문(캐시 없음): 네트워크 대기
+  logServe(cacheKey, "served-from-network", "cache-miss");
   const fresh = await networkFetch;
   if (fresh) return fresh;
+  logServe(cacheKey, "served-offline-fallback", "no-network");
   return new Response("오프라인 상태입니다.", {
     status: 503,
     headers: { "Content-Type": "text/html; charset=utf-8" },

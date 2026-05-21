@@ -143,6 +143,19 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
           parts.push(`allCaches=[${(sw.allCaches as string[]).join(",")}]`);
         }
         if (sw.scope) parts.push(`scope=${sw.scope}`);
+        // SERVE_LOG: SW 가 HTML 요청을 어떻게 처리했는지 시간순.
+        // "served-from-cache" 가 보이면 SW 가 캐시 서빙한 것.
+        // 마지막 항목이 "served-from-network" 인데 그 시점에 캐시가 있었다면 vary/keys 매칭 실패.
+        // 아무것도 없으면 SW 가 이 라운드의 HTML 요청을 처리 안 한 것 = iOS 우회.
+        const log = sw.serveLog as Array<{ type: string; url: string; detail: string; agoMs: number }> | undefined;
+        if (Array.isArray(log)) {
+          if (log.length === 0) {
+            parts.push("serveLog[empty=iOS-bypassed-SW?]");
+          } else {
+            const summary = log.map((e) => `${e.url}:${e.type}(${e.agoMs}ms전)`).join(" → ");
+            parts.push(`serveLog[${summary}]`);
+          }
+        }
       }
 
       // Storage

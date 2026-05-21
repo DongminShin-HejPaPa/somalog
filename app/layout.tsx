@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import "./globals.css";
-import { ServiceWorkerRegistrar } from "@/components/service-worker-registrar";
 
 export const metadata: Metadata = {
   title: "Soma Log",
@@ -41,7 +41,35 @@ export default function RootLayout({
         <div className="mx-auto max-w-[480px] min-h-dvh bg-white relative shadow-sm">
           {children}
         </div>
-        <ServiceWorkerRegistrar />
+        {/*
+          SW 등록 + 영속 스토리지 요청을 inline script 로 처리 (familyTime sw-register 동일 패턴).
+          이전엔 React useEffect 안에서 등록했는데, 그 경우 하이드레이션 끝나야 SW 가
+          업데이트 감지·활성화돼 새 SW 로의 전환이 늦었음. inline + window.load 로 옮겨
+          페이지 로드 직후 즉시 동작.
+          storage.persist() 는 familyTime 이 push/IDB 로 암묵적으로 받는 iOS persistence
+          를 우리는 표준 API 로 명시 요청. PWA-installed 사이트는 iOS Safari 16+ 에서
+          프롬프트 없이 승인되는 것이 일반적.
+        */}
+        <Script
+          id="sw-register"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js')
+                    .then(function(reg) { console.log('[SW] 등록 완료:', reg.scope); })
+                    .catch(function(err) { console.warn('[SW] 등록 실패:', err); });
+                });
+              }
+              if (navigator.storage && typeof navigator.storage.persist === 'function') {
+                navigator.storage.persist().then(function(granted) {
+                  console.log('[storage] persist:', granted);
+                }).catch(function() {});
+              }
+            `,
+          }}
+        />
       </body>
     </html>
   );

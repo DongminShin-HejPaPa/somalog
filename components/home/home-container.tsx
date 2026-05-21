@@ -54,6 +54,46 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
   });
   const { settings } = useSettings();
 
+  // SW 버전 진단: 마운트 후 1회 SW 에 PING → PONG 의 version 을 diag 에 덧붙임.
+  // "옛 SW 가 active 인 채로 느린 건지" vs "새 SW 인데도 캐시 미스인 건지" 분리.
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.serviceWorker) return;
+    let cancelled = false;
+    navigator.serviceWorker.ready
+      .then((reg) => {
+        if (cancelled) return;
+        const controller = reg.active || navigator.serviceWorker.controller;
+        if (!controller) {
+          setDiag((d) => d.includes("sw=") ? d : `${d} sw=noctrl`);
+          return;
+        }
+        const channel = new MessageChannel();
+        channel.port1.onmessage = (event) => {
+          if (cancelled) return;
+          const v = event.data && event.data.version;
+          if (v) {
+            setDiag((d) => d.includes("sw=") ? d : `${d} sw=${v}`);
+          }
+        };
+        try {
+          controller.postMessage({ type: "PING" }, [channel.port2]);
+        } catch {
+          setDiag((d) => d.includes("sw=") ? d : `${d} sw=pingFail`);
+        }
+        // 1초 안에 응답 없으면 timeout 표시 (옛 SW 는 message handler 없어 응답 안 옴)
+        setTimeout(() => {
+          if (cancelled) return;
+          setDiag((d) => d.includes("sw=") ? d : `${d} sw=timeout(oldSW?)`);
+        }, 1000);
+      })
+      .catch(() => {
+        if (!cancelled) setDiag((d) => d.includes("sw=") ? d : `${d} sw=noReg`);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const today = formatDate(new Date());
 

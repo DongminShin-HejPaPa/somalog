@@ -11,6 +11,11 @@ const STATIC_CACHE = "somalog-static";
 // HTML 네비게이션 SWR 전용 영구 캐시. 절대 rename 하지 않는다.
 const HTML_CACHE = "somalog-html";
 
+// SW 버전 식별자. sw.js 본문이 의미 있게 바뀔 때마다 손으로 bump.
+// 클라이언트가 PING 메시지를 보내면 PONG 으로 이 값 반환 → 진단 라인에 표시.
+// "옛 SW 가 active 인 채로 느린 건지" vs "새 SW 인데도 캐시 미스인 건지" 분리 진단용.
+const SW_VERSION = "2026-01-21-c-destination-check";
+
 // 앱 셸: 오프라인에서도 보여줄 핵심 정적 파일들.
 // 인증이 필요한 HTML 라우트(/, /home)는 프리캐시하지 않는다 —
 // install 시 addAll 은 원자적이라 인증 리다이렉트/실패가 전체 프리캐시를
@@ -102,6 +107,18 @@ self.addEventListener("fetch", (event) => {
         );
       })
   );
+});
+
+// ── PING/PONG: 클라이언트 진단용 SW 버전 응답 ──────────────────
+// 클라이언트가 어떤 버전의 SW 가 활성 중인지 확인할 수 있게 함.
+// "옛 SW 가 active 인 채로 느린 건지" vs "새 SW 인데도 캐시 미스인 건지" 분리 진단.
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "PING") {
+    const port = event.ports && event.ports[0];
+    if (port) {
+      port.postMessage({ type: "PONG", version: SW_VERSION });
+    }
+  }
 });
 
 async function staleWhileRevalidateHTML(request) {

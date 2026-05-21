@@ -54,44 +54,110 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
   });
   const { settings } = useSettings();
 
-  // SW 버전 진단: 마운트 후 1회 SW 에 PING → PONG 의 version 을 diag 에 덧붙임.
-  // "옛 SW 가 active 인 채로 느린 건지" vs "새 SW 인데도 캐시 미스인 건지" 분리.
+  // 추가 진단 라인: SW 캐시 상태 + 스토리지 영속 grant + 환경 정보.
+  // 단일 PING 으로 HTML_CACHE 내부 키/응답 상태/본문 크기까지 가져와 표시 → 한 번에 판별.
+  const [diag2, setDiag2] = useState<string>("");
   useEffect(() => {
-    if (typeof navigator === "undefined" || !navigator.serviceWorker) return;
+    if (typeof navigator === "undefined") return;
     let cancelled = false;
-    navigator.serviceWorker.ready
-      .then((reg) => {
-        if (cancelled) return;
+
+    // 1) storage.persisted() 확인
+    const persistedPromise = navigator.storage?.persisted
+      ? navigator.storage.persisted().catch(() => null)
+      : Promise.resolve(null);
+
+    // 2) storage.estimate()
+    const estimatePromise = navigator.storage?.estimate
+      ? navigator.storage.estimate().catch(() => null)
+      : Promise.resolve(null);
+
+    // 3) SW PING
+    const swInfoPromise: Promise<Record<string, unknown> | null> = (async () => {
+      if (!navigator.serviceWorker) return null;
+      try {
+        const reg = await navigator.serviceWorker.ready;
         const controller = reg.active || navigator.serviceWorker.controller;
-        if (!controller) {
-          setDiag((d) => d.includes("sw=") ? d : `${d} sw=noctrl`);
-          return;
-        }
-        const channel = new MessageChannel();
-        channel.port1.onmessage = (event) => {
-          if (cancelled) return;
-          const v = event.data && event.data.version;
-          if (v) {
-            setDiag((d) => d.includes("sw=") ? d : `${d} sw=${v}`);
+        if (!controller) return { _err: "noctrl" };
+        return await new Promise<Record<string, unknown>>((resolve) => {
+          const channel = new MessageChannel();
+          const t0 = performance.now();
+          channel.port1.onmessage = (event) => {
+            const data = (event.data ?? {}) as Record<string, unknown>;
+            data._rttMs = Math.round(performance.now() - t0);
+            resolve(data);
+          };
+          try {
+            controller.postMessage({ type: "PING" }, [channel.port2]);
+          } catch {
+            resolve({ _err: "pingFail" });
           }
-        };
-        try {
-          controller.postMessage({ type: "PING" }, [channel.port2]);
-        } catch {
-          setDiag((d) => d.includes("sw=") ? d : `${d} sw=pingFail`);
+          setTimeout(() => resolve({ _err: "timeout(oldSW?)" }), 1500);
+        });
+      } catch (e) {
+        return { _err: `noReg:${String(e)}` };
+      }
+    })();
+
+    Promise.all([persistedPromise, estimatePromise, swInfoPromise]).then(([persisted, estimate, sw]) => {
+      if (cancelled) return;
+      const parts: string[] = [];
+
+      // SW info
+      if (!sw) {
+        parts.push("sw=N/A");
+      } else if (sw._err) {
+        parts.push(`sw=${sw._err}`);
+      } else {
+        parts.push(`sw=${sw.version ?? "?"}(rtt${sw._rttMs}ms)`);
+        // HTML cache entries
+        const html = sw.htmlCache as Array<{ url: string; status: number | string; bodyLen?: number; ct?: string }> | undefined;
+        if (Array.isArray(html)) {
+          if (html.length === 0) {
+            parts.push("HTML[empty]");
+          } else {
+            const summary = html.map((e) => {
+              const path = (() => {
+                try { return new URL(e.url).pathname; } catch { return e.url; }
+              })();
+              const ct = e.ct?.includes("html") ? "html" : (e.ct ?? "?");
+              const len = e.bodyLen !== undefined && e.bodyLen >= 0 ? `${Math.round(e.bodyLen / 1024)}KB` : "?";
+              return `${path}:${e.status}:${ct}:${len}`;
+            }).join(",");
+            parts.push(`HTML[${summary}]`);
+          }
+        } else if (sw.htmlCacheErr) {
+          parts.push(`HTMLerr=${sw.htmlCacheErr}`);
         }
-        // 1초 안에 응답 없으면 timeout 표시 (옛 SW 는 message handler 없어 응답 안 옴)
-        setTimeout(() => {
-          if (cancelled) return;
-          setDiag((d) => d.includes("sw=") ? d : `${d} sw=timeout(oldSW?)`);
-        }, 1000);
-      })
-      .catch(() => {
-        if (!cancelled) setDiag((d) => d.includes("sw=") ? d : `${d} sw=noReg`);
-      });
-    return () => {
-      cancelled = true;
-    };
+        parts.push(`static=${sw.staticCount ?? "?"} shell=${sw.shellCount ?? "?"}`);
+        if (Array.isArray(sw.allCaches)) {
+          parts.push(`allCaches=[${(sw.allCaches as string[]).join(",")}]`);
+        }
+        if (sw.scope) parts.push(`scope=${sw.scope}`);
+      }
+
+      // Storage
+      if (persisted === null) parts.push("persisted=?");
+      else parts.push(`persisted=${persisted}`);
+      if (estimate) {
+        const usage = (estimate as { usage?: number }).usage;
+        const quota = (estimate as { quota?: number }).quota;
+        if (usage !== undefined && quota !== undefined) {
+          parts.push(`storage=${Math.round(usage / 1024)}KB/${Math.round(quota / 1024 / 1024)}MB`);
+        }
+      }
+
+      // Environment
+      const conn = (navigator as Navigator & { connection?: { effectiveType?: string } }).connection;
+      if (conn?.effectiveType) parts.push(`net=${conn.effectiveType}`);
+      const ua = navigator.userAgent;
+      const m = ua.match(/iPhone OS ([0-9_]+)/);
+      if (m) parts.push(`iOS=${m[1].replace(/_/g, ".")}`);
+      parts.push(`ctrl=${navigator.serviceWorker?.controller ? "yes" : "no"}`);
+
+      setDiag2(parts.join(" | "));
+    });
+
+    return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -227,8 +293,12 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
         {!greeting && initialDisplayName && (
           <p className="text-xs text-muted-foreground mt-1">{initialDisplayName} 님</p>
         )}
-        {/* 진단 라인: 첫 페인트 시점 캐시 상태 + fetch 소요시간 (5초 wait 디버깅용) */}
+        {/* 진단 라인 1: 첫 페인트 시점 캐시 상태 + fetch 소요시간 (5초 wait 디버깅용) */}
         <p className="text-[10px] text-rose-500/70 font-mono mt-1 break-all">{diag}</p>
+        {/* 진단 라인 2: SW 캐시 내부 상태 + 스토리지 영속 grant + 환경 (한 방에 다 확인) */}
+        {diag2 && (
+          <p className="text-[10px] text-amber-700/70 font-mono mt-0.5 break-all">{diag2}</p>
+        )}
       </header>
 
       <HomeContent

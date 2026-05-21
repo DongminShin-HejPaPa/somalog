@@ -14,7 +14,7 @@ const HTML_CACHE = "somalog-html";
 // SW 버전 식별자. sw.js 본문이 의미 있게 바뀔 때마다 손으로 bump.
 // 클라이언트가 PING 메시지를 보내면 PONG 으로 이 값 반환 → 진단 라인에 표시.
 // "옛 SW 가 active 인 채로 느린 건지" vs "새 SW 인데도 캐시 미스인 건지" 분리 진단용.
-const SW_VERSION = "2026-01-21-c-destination-check";
+const SW_VERSION = "2026-01-21-d-deep-diag";
 
 // 앱 셸: 오프라인에서도 보여줄 핵심 정적 파일들.
 // 인증이 필요한 HTML 라우트(/, /home)는 프리캐시하지 않는다 —
@@ -109,16 +109,62 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
-// ── PING/PONG: 클라이언트 진단용 SW 버전 응답 ──────────────────
-// 클라이언트가 어떤 버전의 SW 가 활성 중인지 확인할 수 있게 함.
-// "옛 SW 가 active 인 채로 느린 건지" vs "새 SW 인데도 캐시 미스인 건지" 분리 진단.
+// ── PING/PONG: 클라이언트 진단용 SW 상태 응답 ──────────────────
+// "캐시가 비어있는지", "잘못된 내용이 들어있는지", "키 매칭이 안 되는지" 등을
+// 한 번의 응답으로 판별할 수 있게 cache 내용을 함께 반환.
 self.addEventListener("message", (event) => {
-  if (event.data && event.data.type === "PING") {
-    const port = event.ports && event.ports[0];
-    if (port) {
-      port.postMessage({ type: "PONG", version: SW_VERSION });
+  if (!event.data || event.data.type !== "PING") return;
+  const port = event.ports && event.ports[0];
+  if (!port) return;
+
+  event.waitUntil((async () => {
+    const out = { type: "PONG", version: SW_VERSION };
+    try {
+      out.scope = self.registration && self.registration.scope;
+    } catch {}
+    // HTML_CACHE 내용: 각 entry 의 URL, status, 본문 크기, content-type
+    try {
+      const htmlCache = await caches.open(HTML_CACHE);
+      const keys = await htmlCache.keys();
+      const items = await Promise.all(keys.map(async (req) => {
+        const resp = await htmlCache.match(req);
+        if (!resp) return { url: req.url, status: "no-resp" };
+        let bodyLen = -1;
+        let ct = "?";
+        try {
+          ct = resp.headers.get("content-type") || "?";
+          const text = await resp.clone().text();
+          bodyLen = text.length;
+        } catch {}
+        return { url: req.url, status: resp.status, bodyLen, ct };
+      }));
+      out.htmlCache = items;
+    } catch (e) {
+      out.htmlCacheErr = String(e);
     }
-  }
+    // STATIC_CACHE / CACHE_NAME: 키 개수만 (개수 자체가 진단)
+    try {
+      const sc = await caches.open(STATIC_CACHE);
+      const skeys = await sc.keys();
+      out.staticCount = skeys.length;
+    } catch (e) {
+      out.staticErr = String(e);
+    }
+    try {
+      const cc = await caches.open(CACHE_NAME);
+      const ckeys = await cc.keys();
+      out.shellCount = ckeys.length;
+    } catch (e) {
+      out.shellErr = String(e);
+    }
+    // 전체 cache 이름 목록 (혹시 우리가 모르는 orphan 캐시가 있는지)
+    try {
+      out.allCaches = await caches.keys();
+    } catch (e) {
+      out.allCachesErr = String(e);
+    }
+    port.postMessage(out);
+  })());
 });
 
 async function staleWhileRevalidateHTML(request) {

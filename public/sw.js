@@ -14,7 +14,7 @@ const HTML_CACHE = "somalog-html";
 // SW 버전 식별자. sw.js 본문이 의미 있게 바뀔 때마다 손으로 bump.
 // 클라이언트가 PING 메시지를 보내면 PONG 으로 이 값 반환 → 진단 라인에 표시.
 // "옛 SW 가 active 인 채로 느린 건지" vs "새 SW 인데도 캐시 미스인 건지" 분리 진단용.
-const SW_VERSION = "2026-01-21-f-clean-headers";
+const SW_VERSION = "2026-01-21-g-wait-until";
 
 // 앱 셸: 오프라인에서도 보여줄 핵심 정적 파일들.
 // 인증이 필요한 HTML 라우트(/, /home)는 프리캐시하지 않는다 —
@@ -48,6 +48,22 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
+// static chunk cache 적중/미스 카운터. iOS 가 청크를 실제로 캐시에서 서빙하는지
+// vs 매번 네트워크로 가는지 진단. PING 응답에 포함.
+let staticHitCount = 0;
+let staticMissCount = 0;
+const STATIC_RECENT = []; // 마지막 N개 청크 처리 기록
+const STATIC_RECENT_MAX = 10;
+function logStaticServe(url, type) {
+  if (type === "hit") staticHitCount++;
+  else if (type === "miss") staticMissCount++;
+  try {
+    const path = new URL(url).pathname.split("/").slice(-2).join("/");
+    STATIC_RECENT.push({ path, type, ts: Date.now() });
+    if (STATIC_RECENT.length > STATIC_RECENT_MAX) STATIC_RECENT.shift();
+  } catch {}
+}
+
 // ── Fetch: Network First (네트워크 실패 시 캐시 fallback) ─
 self.addEventListener("fetch", (event) => {
   // POST / non-GET 요청은 bypass
@@ -56,20 +72,13 @@ self.addEventListener("fetch", (event) => {
   if (!event.request.url.startsWith(self.location.origin)) return;
 
   // _next/static/ 청크: content-hash 파일명 → 불변. Cache First.
-  // (디스크에서 즉시 로드 → cold start 흰 화면 제거. 파일명이 바뀌면 자연히 새로 받음)
+  // async/await + event.waitUntil(cache.put(...)) 패턴으로 변경. 이유:
+  // 이전엔 cache.put 이 fire-and-forget 이라 iOS 가 respondWith resolve 직후
+  // SW 를 죽이면 put 이 완료되지 않아 청크가 캐시에 들어가지 않았음. 그래서
+  // 매 진입마다 같은 청크를 네트워크로 다시 받는 회귀 가능. waitUntil 로
+  // iOS 에 "put 끝날 때까지 살려둬" 신호.
   if (event.request.url.includes("/_next/static/")) {
-    event.respondWith(
-      caches.match(event.request).then((cached) => {
-        if (cached) return cached;
-        return fetch(event.request).then((response) => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(STATIC_CACHE).then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        });
-      })
-    );
+    event.respondWith(staticCacheFirst(event));
     return;
   }
 
@@ -88,7 +97,7 @@ self.addEventListener("fetch", (event) => {
   // familyTime 의 sw.js 와 동일하게 `destination === "document"` 도 함께 확인해
   // PWA 콜드 진입에서도 HTML 이 SWR 경로로 들어가도록 보강.
   if (event.request.mode === "navigate" || event.request.destination === "document") {
-    event.respondWith(staleWhileRevalidateHTML(event.request));
+    event.respondWith(staleWhileRevalidateHTML(event));
     return;
   }
 
@@ -108,6 +117,31 @@ self.addEventListener("fetch", (event) => {
       })
   );
 });
+
+async function staticCacheFirst(event) {
+  const request = event.request;
+  try {
+    // ignoreVary/ignoreMethod 추가: Vercel/CDN 이 청크에 vary 박을 가능성 방어.
+    const cached = await caches.match(request, { ignoreVary: true, ignoreMethod: true });
+    if (cached) {
+      logStaticServe(request.url, "hit");
+      return cached;
+    }
+    logStaticServe(request.url, "miss");
+    const response = await fetch(request);
+    if (response && response.ok) {
+      // waitUntil 로 cache.put 이 끝날 때까지 SW 살려둠. 이전엔 fire-and-forget
+      // 이라 put 미완료 상태로 SW 가 죽으면 청크가 캐시 안 들어감.
+      event.waitUntil(
+        caches.open(STATIC_CACHE).then((cache) => cache.put(request, response.clone()))
+      );
+    }
+    return response;
+  } catch (e) {
+    // 네트워크 실패 또는 기타 에러 시 빈 응답으로 fallback (브라우저가 알아서 에러 처리)
+    return new Response("Static fetch error", { status: 502 });
+  }
+}
 
 // ── PING/PONG: 클라이언트 진단용 SW 상태 응답 ──────────────────
 // "캐시가 비어있는지", "잘못된 내용이 들어있는지", "키 매칭이 안 되는지" 등을
@@ -180,6 +214,11 @@ self.addEventListener("message", (event) => {
       detail: e.detail,
       agoMs: Date.now() - e.ts,
     }));
+    // 정적 청크 hit/miss 카운터 — JS 청크가 캐시에서 서빙됐는지 vs 네트워크 가는지.
+    // 느린 케이스에 staticMiss 가 크면 청크 캐시가 진짜로 적중 안 함을 확정.
+    out.staticHit = staticHitCount;
+    out.staticMiss = staticMissCount;
+    out.staticRecent = STATIC_RECENT.slice();
     port.postMessage(out);
   })());
 });
@@ -212,7 +251,8 @@ async function makeCleanResponseForCache(response) {
   }
 }
 
-async function staleWhileRevalidateHTML(request) {
+async function staleWhileRevalidateHTML(event) {
+  const request = event.request;
   const cache = await caches.open(HTML_CACHE);
   // 쿼리스트링으로 인한 캐시 미스/비대를 막기 위해 pathname 으로 정규화
   const url = new URL(request.url);
@@ -242,10 +282,13 @@ async function staleWhileRevalidateHTML(request) {
       return null;
     });
 
-  // 캐시가 있으면 즉시 반환 + 백그라운드 갱신 (다음 cold start 가 빨라짐)
+  // 캐시가 있으면 즉시 반환 + 백그라운드 갱신 (다음 cold start 가 빨라짐).
+  // event.waitUntil 로 백그라운드 fetch + cache.put 이 완료될 때까지 iOS 가 SW 살려둠.
+  // 이전엔 networkFetch 가 fire-and-forget 이라 iOS 가 SW 죽여서 cache.put 미완료 →
+  // 다음 진입에 stale 한 채로 머무는 가능성. waitUntil 로 차단.
   if (cached) {
     logServe(cacheKey, "served-from-cache", `bodyType=${cached.headers.get("content-type")}`);
-    networkFetch.catch(() => {});
+    event.waitUntil(networkFetch.catch(() => {}));
     return cached;
   }
 

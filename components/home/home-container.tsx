@@ -139,6 +139,12 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
           parts.push(`HTMLerr=${sw.htmlCacheErr}`);
         }
         parts.push(`static=${sw.staticCount ?? "?"} shell=${sw.shellCount ?? "?"}`);
+        // staticHit / staticMiss 카운터: 이번 SW 세션 동안 static chunk 가
+        // 캐시에서 서빙된 횟수 vs 네트워크로 fetch 한 횟수. miss 가 크면 청크가
+        // 캐시 안 들어간 거 = waitUntil 효과 없음 또는 iOS 가 더 적극적으로 evict.
+        if (sw.staticHit !== undefined || sw.staticMiss !== undefined) {
+          parts.push(`chunkServe[hit=${sw.staticHit ?? 0},miss=${sw.staticMiss ?? 0}]`);
+        }
         if (Array.isArray(sw.allCaches)) {
           parts.push(`allCaches=[${(sw.allCaches as string[]).join(",")}]`);
         }

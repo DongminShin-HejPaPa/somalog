@@ -18,8 +18,6 @@ export default function HomeLoading() {
         <div className="h-2 bg-secondary rounded-full" />
         <div className="h-11 bg-secondary rounded-lg" />
       </div>
-      {/* WeightMiniGraph */}
-      <div className="mx-4 mt-4 h-44 bg-secondary rounded-xl" />
     </div>
   );
 }

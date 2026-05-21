@@ -1,31 +1,11 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { useSettings } from "@/lib/contexts/settings-context";
 import { DietProgressBanner } from "./diet-progress-banner";
 import { InputStatusChips } from "./input-status-chips";
 import { CoachOneLiner } from "./coach-one-liner";
 import type { DailyLog } from "@/lib/types";
 import { formatDate } from "@/lib/utils/date-utils";
-
-// recharts(무거움)를 home 임계 번들에서 분리 — cold start JS 다운로드 비용 절감.
-// 외곽 치수를 실제 컴포넌트와 동일하게 맞춰 청크 로딩 중 CLS(레이아웃 이동) 없음.
-// Graph 탭(weight-chart.tsx)의 recharts 는 빠른 경로 보호를 위해 정적 유지.
-const WeightMiniGraph = dynamic(
-  () => import("./weight-mini-graph").then((m) => m.WeightMiniGraph),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="mx-4 mt-4">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="font-semibold text-sm">최근 14일 체중</h3>
-          <span className="text-xs text-navy font-medium">전체 보기</span>
-        </div>
-        <div className="h-[160px] bg-secondary/30 rounded-xl animate-pulse" />
-      </div>
-    ),
-  }
-);
 
 interface HomeContentProps {
   todayLog: DailyLog | null;
@@ -39,21 +19,11 @@ export function HomeContent({ todayLog, recentLogs, onCloseToday, isClosingToday
 
   if (!todayLog) {
     return (
-      <>
-        <div className="px-4 mt-8 text-center">
-          <p className="text-sm text-muted-foreground">
-            입력 탭에서 오늘의 기록을 시작하세요
-          </p>
-        </div>
-        {recentLogs.length > 0 && (
-          <WeightMiniGraph
-            data={recentLogs.slice(0, 14).map((d) => ({
-              date: d.date,
-              weight: d.weight,
-            }))}
-          />
-        )}
-      </>
+      <div className="px-4 mt-8 text-center">
+        <p className="text-sm text-muted-foreground">
+          입력 탭에서 오늘의 기록을 시작하세요
+        </p>
+      </div>
     );
   }
 
@@ -110,13 +80,6 @@ export function HomeContent({ todayLog, recentLogs, onCloseToday, isClosingToday
           badgeText={badgeText}
         />
       )}
-
-      <WeightMiniGraph
-        data={recentLogs.slice(0, 14).map((d) => ({
-          date: d.date,
-          weight: d.weight,
-        }))}
-      />
     </>
   );
 }

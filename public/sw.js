@@ -76,7 +76,13 @@ self.addEventListener("fetch", (event) => {
   // 백그라운드로 최신 HTML 을 받아 캐시만 갱신한다. 최신 데이터는 클라이언트
   // (localStorage 캐시 + HomeContainer 패치)가 채운다.
   // 강제 reload / postMessage 없음 — 활성 세션을 절대 끊지 않는다.
-  if (event.request.mode === "navigate") {
+  //
+  // iOS Safari PWA 콜드 진입에서 `request.mode === "navigate"` 가 항상 세팅되지
+  // 않는 WebKit 동작이 있다 (홈 화면 아이콘 탭 직후 첫 요청). 이로 인해 SW 가
+  // HTML 을 가로채지 못해 절대 캐시되지 않고 매번 네트워크로 가는 회귀가 있었음.
+  // familyTime 의 sw.js 와 동일하게 `destination === "document"` 도 함께 확인해
+  // PWA 콜드 진입에서도 HTML 이 SWR 경로로 들어가도록 보강.
+  if (event.request.mode === "navigate" || event.request.destination === "document") {
     event.respondWith(staleWhileRevalidateHTML(event.request));
     return;
   }

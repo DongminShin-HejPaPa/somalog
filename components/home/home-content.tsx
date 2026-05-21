@@ -21,7 +21,7 @@ export function HomeContent({ todayLog, recentLogs, onCloseToday, isClosingToday
     return (
       <div className="px-4 mt-8 text-center">
         <p className="text-sm text-muted-foreground">
-          입력 탭에서 오늘의 기록을 시작하세요
+          당신의 건강 상태를 이해 중입니다
         </p>
       </div>
     );

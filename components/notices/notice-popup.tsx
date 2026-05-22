@@ -4,27 +4,30 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, X, Megaphone } from "lucide-react";
 import { actionGetUnseenImportantNotices, actionMarkNoticesSeen } from "@/app/actions/notice-actions";
+import { useSettings } from "@/lib/contexts/settings-context";
 import type { Notice } from "@/lib/types";
-
-interface NoticePopupProps {
-  lastNoticeSeenAt: string | null;
-}
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function NoticePopup({ lastNoticeSeenAt }: NoticePopupProps) {
+// 이전엔 (tabs)/layout.tsx 가 서버에서 getSettings 를 await 해 initialSettings 를
+// prop 으로 받아야만 마운트됐다. 그 await 를 제거하면서 NoticePopup 이 useSettings
+// context 에서 직접 lastNoticeSeenAt 을 읽고, settings.onboardingComplete 가 true
+// 일 때만 공지 fetch 를 수행하도록 변경. 마운트는 항상 되며 내부에서 gate.
+export function NoticePopup() {
+  const { settings, isLoaded } = useSettings();
   const [notices, setNotices] = useState<Notice[]>([]);
   const [index, setIndex] = useState(0);
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
-    actionGetUnseenImportantNotices(lastNoticeSeenAt).then((data) => {
+    if (!isLoaded || !settings.onboardingComplete) return;
+    actionGetUnseenImportantNotices(settings.lastNoticeSeenAt).then((data) => {
       setNotices(data);
     });
-  }, [lastNoticeSeenAt]);
+  }, [isLoaded, settings.onboardingComplete, settings.lastNoticeSeenAt]);
 
   const handleClose = async () => {
     setDismissed(true);

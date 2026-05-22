@@ -14,10 +14,11 @@ export function TabsProviders({ children, initialSettings, userId }: TabsProvide
   return (
     <SettingsProvider initialSettings={initialSettings} userId={userId}>
       {children}
-      {/* 중요 공지 팝업 — 로그인 사용자에게만 (settings가 null이면 미인증) */}
-      {initialSettings && (
-        <NoticePopup lastNoticeSeenAt={initialSettings.lastNoticeSeenAt} />
-      )}
+      {/* NoticePopup 은 항상 마운트. 내부에서 useSettings 로 isLoaded +
+          onboardingComplete + lastNoticeSeenAt 을 읽어 자체 gating.
+          (tabs)/layout 의 getSettings await 를 제거해도 (initialSettings=null)
+          공지 기능이 살아있도록 prop 의존 제거. */}
+      <NoticePopup />
     </SettingsProvider>
   );
 }

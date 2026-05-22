@@ -67,6 +67,27 @@ export default function RootLayout({
                   console.log('[storage] persist:', granted);
                 }).catch(function() {});
               }
+              /* IDB keep-alive 시그널 — 가설: iOS 가 IDB 사용 origin 을 stateful
+                 한 앱으로 분류해 SW/Cache evict 우선순위에서 후순위로 둘 가능성.
+                 familyTime 은 push state/messages 로 IDB 를 무겁게 쓰지만 우리는
+                 push 가 없어 같은 시그널 없음. 최소 IDB 쓰기 한 번이라도 우대
+                 받는지 시험. 효과 보장 안 됨. 실패 시 silent. */
+              try {
+                var req = indexedDB.open('somalog_keepalive', 1);
+                req.onupgradeneeded = function(e) {
+                  var db = e.target.result;
+                  if (!db.objectStoreNames.contains('signals')) {
+                    db.createObjectStore('signals');
+                  }
+                };
+                req.onsuccess = function(e) {
+                  try {
+                    var db = e.target.result;
+                    var tx = db.transaction('signals', 'readwrite');
+                    tx.objectStore('signals').put(Date.now(), 'lastOpen');
+                  } catch (_) {}
+                };
+              } catch (_) {}
             `,
           }}
         />

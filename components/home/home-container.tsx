@@ -54,140 +54,9 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
   });
   const { settings } = useSettings();
 
-  // 추가 진단 라인: SW 캐시 상태 + 스토리지 영속 grant + 환경 정보.
-  // 단일 PING 으로 HTML_CACHE 내부 키/응답 상태/본문 크기까지 가져와 표시 → 한 번에 판별.
-  const [diag2, setDiag2] = useState<string>("");
-  useEffect(() => {
-    if (typeof navigator === "undefined") return;
-    let cancelled = false;
+  // 추가 진단 라인 (diag2) 제거됨 — SW PING/PONG 코드를 sw.js 에서 제거해서
+  // 클라이언트 호출도 더는 의미 없음. 기본 diag 라인만 유지.
 
-    // 1) storage.persisted() 확인
-    const persistedPromise = navigator.storage?.persisted
-      ? navigator.storage.persisted().catch(() => null)
-      : Promise.resolve(null);
-
-    // 2) storage.estimate()
-    const estimatePromise = navigator.storage?.estimate
-      ? navigator.storage.estimate().catch(() => null)
-      : Promise.resolve(null);
-
-    // 3) SW PING
-    const swInfoPromise: Promise<Record<string, unknown> | null> = (async () => {
-      if (!navigator.serviceWorker) return null;
-      try {
-        const reg = await navigator.serviceWorker.ready;
-        const controller = reg.active || navigator.serviceWorker.controller;
-        if (!controller) return { _err: "noctrl" };
-        return await new Promise<Record<string, unknown>>((resolve) => {
-          const channel = new MessageChannel();
-          const t0 = performance.now();
-          channel.port1.onmessage = (event) => {
-            const data = (event.data ?? {}) as Record<string, unknown>;
-            data._rttMs = Math.round(performance.now() - t0);
-            resolve(data);
-          };
-          try {
-            controller.postMessage({ type: "PING" }, [channel.port2]);
-          } catch {
-            resolve({ _err: "pingFail" });
-          }
-          setTimeout(() => resolve({ _err: "timeout(oldSW?)" }), 1500);
-        });
-      } catch (e) {
-        return { _err: `noReg:${String(e)}` };
-      }
-    })();
-
-    Promise.all([persistedPromise, estimatePromise, swInfoPromise]).then(([persisted, estimate, sw]) => {
-      if (cancelled) return;
-      const parts: string[] = [];
-
-      // SW info
-      if (!sw) {
-        parts.push("sw=N/A");
-      } else if (sw._err) {
-        parts.push(`sw=${sw._err}`);
-      } else {
-        parts.push(`sw=${sw.version ?? "?"}(rtt${sw._rttMs}ms)`);
-        // HTML cache entries
-        const html = sw.htmlCache as Array<{ url: string; status: number | string; bodyLen?: number; ct?: string; vary?: string; cc?: string; hasSetCookie?: boolean; date?: string }> | undefined;
-        if (Array.isArray(html)) {
-          if (html.length === 0) {
-            parts.push("HTML[empty]");
-          } else {
-            const summary = html.map((e) => {
-              const path = (() => {
-                try { return new URL(e.url).pathname; } catch { return e.url; }
-              })();
-              const ct = e.ct?.includes("html") ? "html" : (e.ct ?? "?");
-              const len = e.bodyLen !== undefined && e.bodyLen >= 0 ? `${Math.round(e.bodyLen / 1024)}KB` : "?";
-              return `${path}:${e.status}:${ct}:${len}`;
-            }).join(",");
-            parts.push(`HTML[${summary}]`);
-            // /home entry 의 헤더 detail (vary 등) — 가설 검증용
-            const home = html.find((e) => {
-              try { return new URL(e.url).pathname === "/home"; } catch { return false; }
-            });
-            if (home) {
-              const v = home.vary ? `vary="${home.vary}"` : "vary=∅";
-              const c = home.cc ? `cc="${home.cc}"` : "cc=∅";
-              const sc = home.hasSetCookie ? "set-cookie=Y" : "set-cookie=N";
-              parts.push(`/home-hdr[${v} ${c} ${sc}]`);
-            }
-          }
-        } else if (sw.htmlCacheErr) {
-          parts.push(`HTMLerr=${sw.htmlCacheErr}`);
-        }
-        parts.push(`static=${sw.staticCount ?? "?"} shell=${sw.shellCount ?? "?"}`);
-        // staticHit / staticMiss 카운터: 이번 SW 세션 동안 static chunk 가
-        // 캐시에서 서빙된 횟수 vs 네트워크로 fetch 한 횟수. miss 가 크면 청크가
-        // 캐시 안 들어간 거 = waitUntil 효과 없음 또는 iOS 가 더 적극적으로 evict.
-        if (sw.staticHit !== undefined || sw.staticMiss !== undefined) {
-          parts.push(`chunkServe[hit=${sw.staticHit ?? 0},miss=${sw.staticMiss ?? 0}]`);
-        }
-        if (Array.isArray(sw.allCaches)) {
-          parts.push(`allCaches=[${(sw.allCaches as string[]).join(",")}]`);
-        }
-        if (sw.scope) parts.push(`scope=${sw.scope}`);
-        // SERVE_LOG: SW 가 HTML 요청을 어떻게 처리했는지 시간순.
-        // "served-from-cache" 가 보이면 SW 가 캐시 서빙한 것.
-        // 마지막 항목이 "served-from-network" 인데 그 시점에 캐시가 있었다면 vary/keys 매칭 실패.
-        // 아무것도 없으면 SW 가 이 라운드의 HTML 요청을 처리 안 한 것 = iOS 우회.
-        const log = sw.serveLog as Array<{ type: string; url: string; detail: string; agoMs: number }> | undefined;
-        if (Array.isArray(log)) {
-          if (log.length === 0) {
-            parts.push("serveLog[empty=iOS-bypassed-SW?]");
-          } else {
-            const summary = log.map((e) => `${e.url}:${e.type}(${e.agoMs}ms전)`).join(" → ");
-            parts.push(`serveLog[${summary}]`);
-          }
-        }
-      }
-
-      // Storage
-      if (persisted === null) parts.push("persisted=?");
-      else parts.push(`persisted=${persisted}`);
-      if (estimate) {
-        const usage = (estimate as { usage?: number }).usage;
-        const quota = (estimate as { quota?: number }).quota;
-        if (usage !== undefined && quota !== undefined) {
-          parts.push(`storage=${Math.round(usage / 1024)}KB/${Math.round(quota / 1024 / 1024)}MB`);
-        }
-      }
-
-      // Environment
-      const conn = (navigator as Navigator & { connection?: { effectiveType?: string } }).connection;
-      if (conn?.effectiveType) parts.push(`net=${conn.effectiveType}`);
-      const ua = navigator.userAgent;
-      const m = ua.match(/iPhone OS ([0-9_]+)/);
-      if (m) parts.push(`iOS=${m[1].replace(/_/g, ".")}`);
-      parts.push(`ctrl=${navigator.serviceWorker?.controller ? "yes" : "no"}`);
-
-      setDiag2(parts.join(" | "));
-    });
-
-    return () => { cancelled = true; };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const today = formatDate(new Date());
@@ -322,12 +191,8 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
         {!greeting && initialDisplayName && (
           <p className="text-xs text-muted-foreground mt-1">{initialDisplayName} 님</p>
         )}
-        {/* 진단 라인 1: 첫 페인트 시점 캐시 상태 + fetch 소요시간 (5초 wait 디버깅용) */}
+        {/* 진단 라인: 첫 페인트 시점 캐시 상태 + fetch 소요시간 */}
         <p className="text-[10px] text-rose-500/70 font-mono mt-1 break-all">{diag}</p>
-        {/* 진단 라인 2: SW 캐시 내부 상태 + 스토리지 영속 grant + 환경 (한 방에 다 확인) */}
-        {diag2 && (
-          <p className="text-[10px] text-amber-700/70 font-mono mt-0.5 break-all">{diag2}</p>
-        )}
       </header>
 
       <HomeContent

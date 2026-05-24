@@ -32,31 +32,7 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
   const [recentLogs, setRecentLogs] = useState<DailyLog[]>(bootCache?.recentLogs ?? []);
   const [greeting, setGreeting] = useState<string | null>(null);
   const [isClosingDay, setIsClosingDay] = useState(false);
-  // 진단: 페이지 시작(navigation/timeOrigin)부터 mount 까지 시간을 측정해
-  // mount 이전 구간(흰화면 + JS 다운로드/파싱/하이드레이션)을 가시화한다.
-  // SSR 데이터 적용 후엔 사용자가 mount 이전에 콘텐츠를 보므로 이 값과 체감이 분리된다.
-  const [mountAt] = useState<number>(() => (typeof performance !== "undefined" ? performance.now() : 0));
-  const [diag, setDiag] = useState<string>(() => {
-    if (typeof window === "undefined") return "ssr";
-    if (!userId) return "noUser";
-    const preMount = Math.round(mountAt);
-    const navEntry = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
-    const respEnd = navEntry ? Math.round(navEntry.responseEnd) : -1;
-    const dcl = navEntry ? Math.round(navEntry.domContentLoadedEventEnd) : -1;
-    const paintEntries = performance.getEntriesByType("paint") as PerformanceEntry[];
-    const fcpEntry = paintEntries.find((e) => e.name === "first-contentful-paint");
-    const fcp = fcpEntry ? Math.round(fcpEntry.startTime) : -1;
-    // mountAt 이 10초를 넘으면 iOS WebView 가 살아있는 채로 백그라운드 → 재진입한 케이스.
-    // performance.timeOrigin 이 옛 진입 시점이라 측정값을 못 믿음. diag 에 표식.
-    const resumeFlag = mountAt > 10000 ? " [RESUMED-session: timings unreliable]" : "";
-    const cacheState = bootCache ? `boot=hit:${bootCache.recentLogs.length}` : "boot=miss";
-    return `${cacheState} | nav→mount=${preMount}ms FCP=${fcp}ms respEnd=${respEnd}ms dcl=${dcl}ms${resumeFlag}`;
-  });
   const { settings } = useSettings();
-
-  // 추가 진단 라인 (diag2) 제거됨 — SW PING/PONG 코드를 sw.js 에서 제거해서
-  // 클라이언트 호출도 더는 의미 없음. 기본 diag 라인만 유지.
-
 
   useEffect(() => {
     const today = formatDate(new Date());
@@ -75,12 +51,8 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
     // 메모리/로컬/네트워크 3-tier 분기 없음 — 분기는 첫 페인트를 안 늦추기 위한 것이었지만
     // useState 초기화에서 동기로 캐시를 읽으면 이미 첫 페인트는 보장된다.
     const fetchFresh = async () => {
-      const t0 = performance.now();
-      setDiag((d) => `${d} | fetchStart`);
       try {
         const data = await actionGetHomeInitialData();
-        const elapsed = Math.round(performance.now() - t0);
-        const sinceMount = Math.round(performance.now() - mountAt);
         const newActive = data.firstUnclosed ?? data.todayLog ?? null;
         setRecentLogs(data.recentLogs);
         setActiveLog(newActive);
@@ -88,14 +60,9 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
         if (data.todayLog) logStore.setLog(data.todayLog);
         if (userId) {
           logStore.saveHomeCache(userId, data.recentLogs, newActive);
-          // 저장 검증: 즉시 다시 읽어 확인
-          const verify = logStore.loadHomeCache(userId);
-          setDiag((d) => `${d} | fetched ${elapsed}ms (mount+${sinceMount}ms) save=${verify ? "ok" : "FAIL"}`);
-        } else {
-          setDiag((d) => `${d} | fetched ${elapsed}ms (mount+${sinceMount}ms) noUid`);
         }
-      } catch (err) {
-        setDiag((d) => `${d} | fetchError`);
+      } catch {
+        // 네트워크 실패 — 캐시 데이터 유지
       }
     };
     fetchFresh();
@@ -191,8 +158,6 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
         {!greeting && initialDisplayName && (
           <p className="text-xs text-muted-foreground mt-1">{initialDisplayName} 님</p>
         )}
-        {/* 진단 라인: 첫 페인트 시점 캐시 상태 + fetch 소요시간 */}
-        <p className="text-[10px] text-rose-500/70 font-mono mt-1 break-all">{diag}</p>
       </header>
 
       <HomeContent

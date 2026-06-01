@@ -293,14 +293,50 @@ function CardTitle({ children, onInfo }: { children: React.ReactNode; onInfo: ()
   );
 }
 
-type Period = "2w" | "1m" | "3m" | "all";
+type Period = "short" | "mid" | "long" | "all";
 
-const periodLabels: Record<Period, string> = {
-  "2w": "2주",
-  "1m": "1개월",
-  "3m": "3개월",
-  all: "전체",
-};
+const PERIOD_ORDER: Period[] = ["short", "mid", "long", "all"];
+
+// 총 다이어트 기간에 따라 단기/중기/장기 구간을 동적으로 결정한다.
+// 단기는 최근 추세를 보는 용도라 짧게 유지하고, 중기·장기는 기간이 길수록 넓힌다.
+interface PeriodConfig {
+  short: { days: number; label: string };
+  mid: { days: number; label: string };
+  long: { days: number; label: string };
+}
+
+function getPeriodConfig(totalDays: number): PeriodConfig {
+  if (totalDays < 180) {
+    // 6개월 미만 — 기존과 동일 (2주 / 1개월 / 3개월)
+    return {
+      short: { days: 14, label: "2주" },
+      mid: { days: 30, label: "1개월" },
+      long: { days: 90, label: "3개월" },
+    };
+  }
+  if (totalDays < 365) {
+    // 6개월 ~ 1년 — 단기는 그대로, 중기·장기 확대
+    return {
+      short: { days: 14, label: "2주" },
+      mid: { days: 60, label: "2개월" },
+      long: { days: 180, label: "6개월" },
+    };
+  }
+  if (totalDays < 730) {
+    // 1년 ~ 2년
+    return {
+      short: { days: 14, label: "2주" },
+      mid: { days: 90, label: "3개월" },
+      long: { days: 365, label: "1년" },
+    };
+  }
+  // 2년 이상
+  return {
+    short: { days: 30, label: "1개월" },
+    mid: { days: 180, label: "6개월" },
+    long: { days: 730, label: "2년" },
+  };
+}
 
 function fmtCardDate(d: Date): string {
   const yy = String(d.getFullYear()).slice(2);
@@ -599,10 +635,22 @@ export function WeightChart({
 
   const sortedLogs = [...logs].reverse();
 
+  // 다이어트 시작일부터 현재까지의 총 기간으로 구간 폭을 결정한다.
+  const totalDietDays = Math.max(
+    1,
+    Math.ceil((Date.now() - new Date(startDate).getTime()) / 86400000)
+  );
+  const periodConfig = getPeriodConfig(totalDietDays);
+  const periodLabels: Record<Period, string> = {
+    short: periodConfig.short.label,
+    mid: periodConfig.mid.label,
+    long: periodConfig.long.label,
+    all: "전체",
+  };
   const periodDays: Record<Period, number> = {
-    "2w": 14,
-    "1m": 30,
-    "3m": 90,
+    short: periodConfig.short.days,
+    mid: periodConfig.mid.days,
+    long: periodConfig.long.days,
     all: sortedLogs.length,
   };
   const displayLogs = sortedLogs.slice(-periodDays[period]);
@@ -658,6 +706,18 @@ export function WeightChart({
     .filter((w): w is number => w !== null);
   const minW = Number((Math.min(...allWeights) - 0.5).toFixed(1));
   const maxW = Number((Math.max(...allWeights) + 0.5).toFixed(1));
+
+  // y축 범위:
+  //  - 전체(all): 목표 감량선과 목표 체중선이 모두 보이도록 넓힌다.
+  //  - 그 외 구간: 체중 그래프 기준으로만 잡는다. 목표선은 잘려도(일부만 보여도) 무방.
+  //    (allowDataOverflow=true 로 목표선이 y축을 강제로 늘리지 못하게 한다.)
+  const isAllPeriod = period === "all";
+  const yDomainMin = isAllPeriod
+    ? Number((Math.min(...allWeights, targetWeight, ...goalLineData) - 0.5).toFixed(1))
+    : minW;
+  const yDomainMax = isAllPeriod
+    ? Number((Math.max(...allWeights, ...goalLineData) + 0.5).toFixed(1))
+    : maxW;
 
   const allSortedWeights = sortedLogs
     .map((l) => l.weight)
@@ -748,7 +808,7 @@ export function WeightChart({
           : "px-4 mb-3 flex items-center gap-2"
       )}>
         <div className={cn("flex gap-1.5", !isFullscreen && "flex-1")}>
-          {(Object.keys(periodLabels) as Period[]).map((p) => (
+          {PERIOD_ORDER.map((p) => (
             <button
               key={p}
               onClick={() => setPeriod(p)}
@@ -834,7 +894,7 @@ export function WeightChart({
           >
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
             <XAxis dataKey="date" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-            <YAxis domain={[minW, maxW]} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={35} unit=" kg" />
+            <YAxis domain={[yDomainMin, yDomainMax]} allowDataOverflow={!isAllPeriod} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={35} unit=" kg" />
             <Tooltip
               contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" }}
               formatter={(value: number, name: string) => {
@@ -1151,7 +1211,8 @@ export function WeightChart({
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                     <XAxis dataKey="date" tick={{ fontSize: 9 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
                     <YAxis
-                      domain={[minW, maxW]}
+                      domain={[yDomainMin, yDomainMax]}
+                      allowDataOverflow={!isAllPeriod}
                       tick={{ fontSize: 9 }}
                       tickLine={false}
                       axisLine={false}

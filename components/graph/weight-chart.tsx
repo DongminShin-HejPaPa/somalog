@@ -708,12 +708,12 @@ export function WeightChart({
   const maxW = Number((Math.max(...allWeights) + 0.5).toFixed(1));
 
   // y축 범위:
-  //  - 전체(all): 목표 감량선과 목표 체중선이 모두 보이도록 넓힌다.
+  //  - 전체(all): 목표 감량선이 모두 보이도록 넓힌다. (목표 체중선은 굳이 보일 필요 없음)
   //  - 그 외 구간: 체중 그래프 기준으로만 잡는다. 목표선은 잘려도(일부만 보여도) 무방.
   //    (allowDataOverflow=true 로 목표선이 y축을 강제로 늘리지 못하게 한다.)
   const isAllPeriod = period === "all";
   const yDomainMin = isAllPeriod
-    ? Number((Math.min(...allWeights, targetWeight, ...goalLineData) - 0.5).toFixed(1))
+    ? Number((Math.min(...allWeights, ...goalLineData) - 0.5).toFixed(1))
     : minW;
   const yDomainMax = isAllPeriod
     ? Number((Math.max(...allWeights, ...goalLineData) + 0.5).toFixed(1))

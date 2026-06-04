@@ -18,7 +18,7 @@ function toKoreanError(message: string): string {
     return "등록되지 않은 이메일입니다.";
   }
   if (message.includes("Password should be at least")) {
-    return "비밀번호는 6자 이상이어야 합니다.";
+    return "비밀번호는 8자 이상이어야 합니다.";
   }
   return "로그인 중 오류가 발생했습니다. 다시 시도해주세요.";
 }

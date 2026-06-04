@@ -129,7 +129,7 @@ export function AccountInfoDialog({ isOpen, onClose }: Props) {
                 name="password"
                 type="password"
                 label="새 비밀번호"
-                placeholder="6자 이상 입력하세요"
+                placeholder="8자 이상 입력하세요"
               />
               <FieldInput
                 name="passwordConfirm"

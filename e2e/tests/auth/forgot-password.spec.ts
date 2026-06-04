@@ -45,7 +45,7 @@ test.describe("Forgot Password", () => {
   // J2-04: /reset-password UI — 비밀번호 불일치
   test("/reset-password 비밀번호 불일치 → 에러 표시", async ({ page }) => {
     await page.goto("/reset-password");
-    await page.getByPlaceholder("6자 이상 입력하세요").fill("NewPass1234!");
+    await page.getByPlaceholder("8자 이상 입력하세요").fill("NewPass1234!");
     await page.getByPlaceholder("비밀번호를 다시 입력하세요").fill("Different!");
     await page.getByRole("button", { name: "비밀번호 변경" }).click();
 
@@ -55,7 +55,7 @@ test.describe("Forgot Password", () => {
   // J2-04: /reset-password UI — 세션 없이 제출 → 에러
   test("/reset-password 세션 없이 변경 시도 → 에러 표시", async ({ page }) => {
     await page.goto("/reset-password");
-    await page.getByPlaceholder("6자 이상 입력하세요").fill("NewPass1234!");
+    await page.getByPlaceholder("8자 이상 입력하세요").fill("NewPass1234!");
     await page.getByPlaceholder("비밀번호를 다시 입력하세요").fill("NewPass1234!");
     await page.getByRole("button", { name: "비밀번호 변경" }).click();
 

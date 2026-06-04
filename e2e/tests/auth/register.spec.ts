@@ -30,8 +30,8 @@ test.describe("Register", () => {
     await expect(register.emailInput).toHaveValue("e2e-test@example.com");
   });
 
-  // J1-03: 비밀번호 6자 미만 → 에러
-  test("비밀번호 6자 미만 → 에러 메시지 표시", async ({ page }) => {
+  // J1-03: 비밀번호 8자 미만 → 에러
+  test("비밀번호 8자 미만 → 에러 메시지 표시", async ({ page }) => {
     const register = new RegisterPage(page);
     await register.goto();
 
@@ -39,7 +39,7 @@ test.describe("Register", () => {
     await register.agreeRequired();
     await register.submitButton.click();
 
-    await expect(register.errorMessage).toContainText("6자 이상");
+    await expect(register.errorMessage).toContainText("8자 이상");
   });
 
   // J1-04: 이미 가입된 이메일 → 에러

@@ -15,8 +15,8 @@ export async function resetPassword(
   if (password !== passwordConfirm) {
     return { error: "비밀번호가 일치하지 않습니다." };
   }
-  if (password.length < 6) {
-    return { error: "비밀번호는 6자 이상이어야 합니다." };
+  if (password.length < 8) {
+    return { error: "비밀번호는 8자 이상이어야 합니다." };
   }
 
   const supabase = await createClient();

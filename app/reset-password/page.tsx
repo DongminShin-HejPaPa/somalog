@@ -35,7 +35,7 @@ export default function ResetPasswordPage() {
                 name="password"
                 type="password"
                 required
-                placeholder="6자 이상 입력하세요"
+                placeholder="8자 이상 입력하세요"
                 className="w-full h-11 px-3 rounded-lg border border-border bg-white text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-navy/30 focus:border-navy transition-colors"
               />
             </div>

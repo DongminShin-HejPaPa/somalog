@@ -19,8 +19,8 @@ export async function updateAccountInfo(
   if (!name) return { error: "이름을 입력해주세요." };
 
   if (password) {
-    if (password.length < 6)
-      return { error: "비밀번호는 6자 이상이어야 합니다." };
+    if (password.length < 8)
+      return { error: "비밀번호는 8자 이상이어야 합니다." };
     if (password !== passwordConfirm)
       return { error: "비밀번호가 일치하지 않습니다." };
   }

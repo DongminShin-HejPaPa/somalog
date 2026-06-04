@@ -100,7 +100,7 @@ cp e2e/.env.test.local.example .env.test.local
 |------|------|-----------|
 | `SUPABASE_SERVICE_ROLE_KEY` | Admin API 키 (RLS 우회) | Supabase 대시보드 → Project Settings → API → `service_role` |
 | `TEST_USER_EMAIL` | 테스트 전용 계정 이메일 | 임의 지정 (예: `e2e-test@somalog.local`) |
-| `TEST_USER_PASSWORD` | 테스트 계정 비밀번호 (6자 이상) | 임의 지정 |
+| `TEST_USER_PASSWORD` | 테스트 계정 비밀번호 (8자 이상) | 임의 지정 |
 
 > ⚠️ `.env.test.local`은 `.gitignore`에 등록되어 있어 커밋되지 않는다.
 

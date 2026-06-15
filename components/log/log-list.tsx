@@ -86,8 +86,8 @@ export function LogList({
     { key: "unclosed", label: "마감안한날" },
     ...(settings.intensiveDayOn ? [{ key: "intensive", label: "Hard Reset Mode" }] : []),
     { key: "exercise", label: "운동한 날" },
-    { key: "lateSnack", label: "야식 있는 날" },
-    { key: "alcohol", label: "술 있는 날" },
+    { key: "lateSnack", label: "야식먹은날" },
+    { key: "alcohol", label: "술마신날" },
   ];
 
   const filteredLogs = logs.filter((log) => {
@@ -224,10 +224,6 @@ export function LogList({
                             <span className="text-muted-foreground">운동</span>
                             <span>{fmtExercise(log.exercise)}</span>
                           </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">야식</span>
-                            <span>{fmtLateSnack(log.lateSnack)}</span>
-                          </div>
                           {hasAlcohol(log) && (
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">술</span>
@@ -258,6 +254,15 @@ export function LogList({
                               {log.dinnerAlcohol ? " 🍺" : ""}
                             </span>
                           </div>
+                          {log.lateSnack && (
+                            <div className="flex gap-2">
+                              <span className="text-muted-foreground w-8 flex-shrink-0">야식</span>
+                              <span>
+                                {fmtLateSnack(log.lateSnack)}
+                                {log.lateSnackAlcohol ? " 🍺" : ""}
+                              </span>
+                            </div>
+                          )}
                           {settings.customField && log.customFieldValue != null && (
                             <div className="flex gap-2">
                               <span className="text-muted-foreground flex-shrink-0" style={{ width: "2rem" }}>

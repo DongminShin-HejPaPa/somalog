@@ -75,22 +75,27 @@ export function getLowestWeightFromLogs(logs: DailyLog[]): number {
 /**
  * 로그 배열 전체의 intensiveDay를 재계산·보정한다.
  *
+ * Hard Reset Mode 정의: "특정 날짜 기준으로 '그 전까지'의 최저 체중 대비
+ * 설정 임계값 이상 높아졌을 때" 발동. 따라서 각 날짜는 자신보다 이전 날짜들의
+ * 최저 체중(prefix-min)하고만 비교해야 한다. 미래 날짜에서 더 낮은 체중을
+ * 찍더라도 과거 날짜의 판정을 소급해서 바꾸면 안 된다.
+ *
  * - weight가 있는 날: 그 체중으로 판정
  * - weight가 없는 날: 직전 체중(lastKnownWeight)으로 판정
  * - 아직 체중 기록이 한 번도 없는 날: intensiveDay = false (판단 불가)
  *
- * DB에 이미 저장된 값이 stale 하거나 null 이더라도 읽기 시점에 항상 올바른 값을 반환.
+ * @param priorLowest logs 범위 '이전' 날들의 최저 체중. 전체 히스토리를 넘길
+ *   때는 Infinity(기본값). 페이지 일부만 넘길 때 이전 컨텍스트를 주입할 수 있다.
  */
 export function enrichIntensiveDay(
   logs: DailyLog[],
   criteria: string,
-  lowestWeight: number
+  priorLowest: number = Infinity
 ): DailyLog[] {
-  if (lowestWeight === Infinity) return logs; // 체중 기록 없음 → 변경 불필요
-
-  // 날짜 오름차순으로 순회해야 직전 체중을 올바르게 추적할 수 있음
+  // 날짜 오름차순으로 순회해야 직전 체중과 prefix-min을 올바르게 추적할 수 있음
   const sorted = [...logs].sort((a, b) => a.date.localeCompare(b.date));
   let lastKnownWeight: number | null = null;
+  let runningMin = priorLowest; // 현재 날짜 '이전'까지의 최저 체중
 
   const enriched = sorted.map((log) => {
     if (log.weight !== null) lastKnownWeight = log.weight;
@@ -99,10 +104,11 @@ export function enrichIntensiveDay(
       // 아직 체중이 한 번도 입력되지 않은 초기 날짜
       return { ...log, intensiveDay: false };
     }
-    return {
-      ...log,
-      intensiveDay: computeIntensiveDay(effective, criteria, lowestWeight),
-    };
+    // '그 전까지'의 최저와 비교 — 오늘 체중은 아직 runningMin에 반영하지 않음
+    const intensiveDay = computeIntensiveDay(effective, criteria, runningMin);
+    // 다음 날짜 판정을 위해 오늘 체중을 최저값에 반영
+    if (effective < runningMin) runningMin = effective;
+    return { ...log, intensiveDay };
   });
 
   // 원래 순서(내림차순)로 복원

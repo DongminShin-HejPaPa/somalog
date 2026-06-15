@@ -7,7 +7,6 @@ import {
   computeAvgWeight3d,
   computeIntensiveDay,
   enrichIntensiveDay,
-  getLowestWeightFromLogs,
 } from "@/lib/utils/compute-daily";
 import {
   generateDailySummary,
@@ -142,7 +141,7 @@ export async function getRecentDailyLogs(count: number): Promise<DailyLog[]> {
 
   if (!user) return [];
 
-  const [{ data, error }, settings, lowestRow] = await Promise.all([
+  const [{ data, error }, settings] = await Promise.all([
     supabase
       .from("daily_logs")
       .select("*")
@@ -150,14 +149,6 @@ export async function getRecentDailyLogs(count: number): Promise<DailyLog[]> {
       .order("date", { ascending: false })
       .limit(count),
     getSettings(),
-    supabase
-      .from("daily_logs")
-      .select("weight")
-      .eq("user_id", user.id)
-      .not("weight", "is", null)
-      .order("weight", { ascending: true })
-      .limit(1)
-      .maybeSingle(),
   ]);
 
   if (error || !data) return [];
@@ -165,8 +156,9 @@ export async function getRecentDailyLogs(count: number): Promise<DailyLog[]> {
   const logs = data.map((row) => rowToDailyLog(row as Record<string, unknown>));
   if (!settings.intensiveDayOn) return logs;
 
-  const lowestWeight = (lowestRow.data?.weight as number | null) ?? Infinity;
-  return enrichIntensiveDay(logs, settings.intensiveDayCriteria, lowestWeight);
+  // prefix-min 방식: 최근 window 안에서 '그 전까지'의 최저 대비 판정한다.
+  // 다이어트 중 최저 체중은 보통 최근 구간 안에 있으므로 별도 baseline 쿼리 불필요.
+  return enrichIntensiveDay(logs, settings.intensiveDayCriteria);
 }
 
 export async function upsertDailyLog(
@@ -772,7 +764,7 @@ export async function getDailyLogsWithOffset(count: number, offset: number): Pro
 
   if (!user) return [];
 
-  const [{ data, error }, settings, lowestRow] = await Promise.all([
+  const [{ data, error }, settings] = await Promise.all([
     supabase
       .from("daily_logs")
       .select("*")
@@ -780,14 +772,6 @@ export async function getDailyLogsWithOffset(count: number, offset: number): Pro
       .order("date", { ascending: false })
       .range(offset, offset + count - 1),
     getSettings(),
-    supabase
-      .from("daily_logs")
-      .select("weight")
-      .eq("user_id", user.id)
-      .not("weight", "is", null)
-      .order("weight", { ascending: true })
-      .limit(1)
-      .maybeSingle(),
   ]);
 
   if (error || !data) return [];
@@ -795,11 +779,11 @@ export async function getDailyLogsWithOffset(count: number, offset: number): Pro
   const logs = data.map((row) => rowToDailyLog(row as Record<string, unknown>));
   if (!settings.intensiveDayOn) return logs;
 
-  // 페이지 범위 밖의 직전 체중을 모르므로 enrichIntensiveDay에 앞 페이지 컨텍스트 없이 호출.
-  // offset > 0인 경우 첫 번째 날짜 이전 체중이 없을 수 있어 정확도가 낮을 수 있지만,
-  // 해당 범위 내에서 가능한 최선의 값을 반환한다.
-  const lowestWeight = (lowestRow.data?.weight as number | null) ?? Infinity;
-  return enrichIntensiveDay(logs, settings.intensiveDayCriteria, lowestWeight);
+  // prefix-min 방식: 페이지 범위 안에서 '그 전까지'의 최저 대비 판정한다.
+  // offset > 0인 더 오래된 페이지는 범위 밖 이전 최저를 모르므로 경계 날짜에서
+  // 약간 보수적으로(미발동 쪽) 판정될 수 있으나, 미래 체중이 과거를 소급
+  // 변경하던 버그는 제거된다. 전체 정확값은 graph(getAllDailyLogs)가 보장.
+  return enrichIntensiveDay(logs, settings.intensiveDayCriteria);
 }
 
 export async function getDailyLogsTotalCount(): Promise<number> {
@@ -841,9 +825,8 @@ export async function getAllDailyLogs(): Promise<DailyLog[]> {
   const logs = data.map((row) => rowToDailyLog(row as Record<string, unknown>));
   if (!settings.intensiveDayOn) return logs;
 
-  // getAllDailyLogs는 전체 로그를 갖고 있으므로 자체적으로 lowestWeight 계산 가능
-  const lowestWeight = getLowestWeightFromLogs(logs);
-  return enrichIntensiveDay(logs, settings.intensiveDayCriteria, lowestWeight);
+  // 전체 히스토리이므로 priorLowest 없이(Infinity) prefix-min만으로 정확히 판정된다.
+  return enrichIntensiveDay(logs, settings.intensiveDayCriteria);
 }
 
 /**

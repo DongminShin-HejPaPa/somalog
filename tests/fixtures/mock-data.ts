@@ -139,13 +139,20 @@ export function createMockSupabaseClient(overrides: {
   const mockSelect = vi.fn().mockReturnValue({
     eq: vi.fn().mockReturnThis(),
     single: mockSingle,
+    maybeSingle: mockSingle,
     order: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockResolvedValue({
+    limit: vi.fn().mockReturnValue({
       data: overrides.selectData ?? [],
       error: overrides.selectError ?? null,
+      maybeSingle: mockSingle,
     }),
     gte: vi.fn().mockReturnThis(),
     lte: vi.fn().mockReturnThis(),
+    lt: vi.fn().mockReturnThis(),
+    gt: vi.fn().mockReturnThis(),
+    neq: vi.fn().mockReturnThis(),
+    not: vi.fn().mockReturnThis(),
+    range: vi.fn().mockReturnThis(),
   });
 
   const mockUpsert = vi.fn().mockReturnValue({

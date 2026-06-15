@@ -6,6 +6,7 @@ import {
   computeAvgWeight3d,
   computeIntensiveDay,
   getLowestWeightFromLogs,
+  enrichIntensiveDay,
 } from "@/lib/utils/compute-daily";
 
 // DailyLog partial 생성 헬퍼
@@ -188,5 +189,47 @@ describe("getLowestWeightFromLogs", () => {
       makeLog("2024-01-01", null),
     ];
     expect(getLowestWeightFromLogs(logs)).toBe(75);
+  });
+});
+
+describe("enrichIntensiveDay (prefix-min)", () => {
+  function byDate(logs: DailyLog[]) {
+    return Object.fromEntries(logs.map((l) => [l.date, l.intensiveDay]));
+  }
+
+  it("미래의 더 낮은 체중이 과거 날짜의 Hard Reset 판정을 소급 변경하지 않는다", () => {
+    // 6/10에 77.6(당시 역대최저) → 6/13에 76.8(새 최저).
+    // 0.5kg 기준에서 6/10은 '그 전까지'의 최저가 없으므로 발동하면 안 됨.
+    const logs: DailyLog[] = [
+      makeLog("2024-06-13", 76.8),
+      makeLog("2024-06-10", 77.6),
+    ];
+    const result = byDate(enrichIntensiveDay(logs, "0.5kg"));
+    expect(result["2024-06-10"]).toBe(false); // 과거 최저 갱신일 → 미발동
+    expect(result["2024-06-13"]).toBe(false); // 새 최저 → 미발동
+  });
+
+  it("그 전까지 최저 대비 임계값 초과 시 발동한다", () => {
+    // 6/10:77.6(최저) → 6/11:78.2 (77.6+0.5=78.1 초과) → 발동
+    const logs: DailyLog[] = [
+      makeLog("2024-06-11", 78.2),
+      makeLog("2024-06-10", 77.6),
+    ];
+    const result = byDate(enrichIntensiveDay(logs, "0.5kg"));
+    expect(result["2024-06-10"]).toBe(false);
+    expect(result["2024-06-11"]).toBe(true);
+  });
+
+  it("첫 체중 기록일은 비교 대상이 없으므로 발동하지 않는다", () => {
+    const logs: DailyLog[] = [makeLog("2024-06-10", 77.6)];
+    const result = byDate(enrichIntensiveDay(logs, "역대최저"));
+    expect(result["2024-06-10"]).toBe(false);
+  });
+
+  it("priorLowest를 주면 범위 이전 최저를 기준으로 판정한다", () => {
+    // 이전 페이지 최저 75 → 76은 역대최저 기준 초과 → 발동
+    const logs: DailyLog[] = [makeLog("2024-06-10", 76)];
+    const result = byDate(enrichIntensiveDay(logs, "역대최저", 75));
+    expect(result["2024-06-10"]).toBe(true);
   });
 });

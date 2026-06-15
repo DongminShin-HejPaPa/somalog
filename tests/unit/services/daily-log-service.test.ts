@@ -199,9 +199,17 @@ describe("upsertDailyLog", () => {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnThis(),
           single: getSingle,
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          order: vi.fn().mockReturnThis(),
           gte: vi.fn().mockReturnThis(),
           lte: vi.fn().mockReturnThis(),
+          lt: vi.fn().mockReturnThis(),
+          neq: vi.fn().mockReturnThis(),
+          not: vi.fn().mockReturnThis(),
+          limit: vi.fn().mockReturnValue({
+            data: [],
+            error: null,
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }),
         }),
         upsert: vi.fn().mockReturnValue({
           select: vi.fn().mockReturnValue({ single: upsertSingle }),
@@ -240,9 +248,17 @@ describe("upsertDailyLog", () => {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnThis(),
           single: getSingle,
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          order: vi.fn().mockReturnThis(),
           gte: vi.fn().mockReturnThis(),
           lte: vi.fn().mockReturnThis(),
+          lt: vi.fn().mockReturnThis(),
+          neq: vi.fn().mockReturnThis(),
+          not: vi.fn().mockReturnThis(),
+          limit: vi.fn().mockReturnValue({
+            data: [],
+            error: null,
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }),
         }),
         upsert: vi.fn().mockReturnValue({
           select: vi.fn().mockReturnValue({ single: getSingle }),
@@ -285,9 +301,17 @@ describe("upsertDailyLog", () => {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnThis(),
           single: getSingle,
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          order: vi.fn().mockReturnThis(),
           gte: vi.fn().mockReturnThis(),
           lte: vi.fn().mockReturnThis(),
+          lt: vi.fn().mockReturnThis(),
+          neq: vi.fn().mockReturnThis(),
+          not: vi.fn().mockReturnThis(),
+          limit: vi.fn().mockReturnValue({
+            data: [],
+            error: null,
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }),
         }),
         upsert: vi.fn().mockReturnValue({
           select: vi.fn().mockReturnValue({ single: getSingle }),
@@ -327,9 +351,17 @@ describe("upsertDailyLog", () => {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnThis(),
           single: getSingle,
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          order: vi.fn().mockReturnThis(),
           gte: vi.fn().mockReturnThis(),
           lte: vi.fn().mockReturnThis(),
+          lt: vi.fn().mockReturnThis(),
+          neq: vi.fn().mockReturnThis(),
+          not: vi.fn().mockReturnThis(),
+          limit: vi.fn().mockReturnValue({
+            data: [],
+            error: null,
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }),
         }),
         upsert: upsertFn,
         delete: vi.fn().mockReturnValue({
@@ -360,9 +392,17 @@ describe("upsertDailyLog", () => {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnThis(),
           single: getSingle,
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          order: vi.fn().mockReturnThis(),
           gte: vi.fn().mockReturnThis(),
           lte: vi.fn().mockReturnThis(),
+          lt: vi.fn().mockReturnThis(),
+          neq: vi.fn().mockReturnThis(),
+          not: vi.fn().mockReturnThis(),
+          limit: vi.fn().mockReturnValue({
+            data: [],
+            error: null,
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }),
         }),
         upsert: vi.fn().mockReturnValue({
           select: vi.fn().mockReturnValue({
@@ -458,9 +498,17 @@ describe("closeDailyLog", () => {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnThis(),
           single: getSingle,
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          order: vi.fn().mockReturnThis(),
           gte: vi.fn().mockReturnThis(),
           lte: vi.fn().mockReturnThis(),
+          lt: vi.fn().mockReturnThis(),
+          neq: vi.fn().mockReturnThis(),
+          not: vi.fn().mockReturnThis(),
+          limit: vi.fn().mockReturnValue({
+            data: [],
+            error: null,
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }),
         }),
         upsert: vi.fn().mockReturnValue({
           select: vi.fn().mockReturnValue({ single: getSingle }),
@@ -499,9 +547,17 @@ describe("closeDailyLog", () => {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnThis(),
           single: getSingle,
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          order: vi.fn().mockReturnThis(),
           gte: vi.fn().mockReturnThis(),
           lte: weeklyQueryMock,
+          lt: vi.fn().mockReturnThis(),
+          neq: vi.fn().mockReturnThis(),
+          not: vi.fn().mockReturnThis(),
+          limit: vi.fn().mockReturnValue({
+            data: [],
+            error: null,
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }),
         }),
         upsert: vi.fn().mockReturnValue({
           select: vi.fn().mockReturnValue({ single: getSingle }),

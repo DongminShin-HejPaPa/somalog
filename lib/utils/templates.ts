@@ -1,5 +1,15 @@
 import type { DailyLog } from "@/lib/types";
 
+/** 운동 여부 (구형 "Y"/"N" + 신형 텍스트/"SKIP" 모두 처리) */
+function didExercise(v: string | null): boolean {
+  return v !== null && v !== "N" && v !== "SKIP";
+}
+
+/** 야식 여부 (구형 "Y"/"N" + 신형 텍스트/"SKIP" 모두 처리) */
+function hadLateSnack(v: string | null): boolean {
+  return v !== null && v !== "N" && v !== "SKIP";
+}
+
 /**
  * 체중 입력 시 즉시 피드백 생성 (Hard Reset 편향 없이, 오늘 행동 중심)
  */
@@ -41,11 +51,12 @@ export function generateFeedback(
     }
   }
 
-  if (log.exercise === "Y") {
+  if (didExercise(log.exercise)) {
     parts.push("오늘 운동까지 했어? 👍");
   }
 
-  if (log.lateSnack === "N" && log.exercise === "N") {
+  // 야식·운동 모두 명시적으로 "안 함/안 먹음" 선택한 경우에만
+  if ((log.lateSnack === "N" || log.lateSnack === "SKIP") && !didExercise(log.exercise)) {
     parts.push("야식 참은 것만으로도 오늘 잘 한 거야.");
   }
 
@@ -88,13 +99,15 @@ export function generateDailySummary(log: DailyLog, waterGoal: number): string {
   }
 
   // 운동+야식 복합 평가
-  if (log.exercise === "Y" && log.lateSnack === "N") {
+  const exercised = didExercise(log.exercise);
+  const ateSnack = hadLateSnack(log.lateSnack);
+  if (exercised && !ateSnack) {
     lines.push("운동하고 야식도 참았어 — 오늘 하루 완벽하게 관리했어. 이런 날이 쌓여야 결과가 나와.");
-  } else if (log.exercise === "Y" && log.lateSnack === "Y") {
+  } else if (exercised && ateSnack) {
     lines.push("운동한 건 좋은데, 야식이 그 효과를 일부 상쇄했어. 내일은 야식을 이겨내보자.");
-  } else if (log.exercise === "N" && log.lateSnack === "Y") {
+  } else if (!exercised && ateSnack) {
     lines.push("운동도 야식도 아쉬운 하루야. 하지만 기록한 것만으로 내일을 바꿀 수 있어.");
-  } else if (log.exercise === "N" && log.lateSnack === "N") {
+  } else if (!exercised && !ateSnack) {
     lines.push("야식은 참았어 — 운동 없이도 절제한 건 충분히 가치 있는 행동이야.");
   }
 
@@ -121,19 +134,27 @@ export function generateDailySummary(log: DailyLog, waterGoal: number): string {
  * 홈 탭 코치 한마디 (oneLiner) 생성
  */
 export function generateOneLiner(log: DailyLog): string {
-  if (log.exercise === "Y" && log.lateSnack === "N") {
-    if (log.intensiveDay) return `Hard Reset Mode에 운동까지 — 오늘 정말 잘 버텼어.`;
-    return `운동하고 야식 안 먹은 하루 — 착실한 관리야.`;
-  }
-  if (log.exercise === "Y" && log.lateSnack === "Y") {
-    return `운동했지만 야식은 아쉬웠어 — 그래도 움직인 것 자체가 의미 있어.`;
-  }
-  if (log.exercise === "N" && log.lateSnack === "N") {
-    return `운동은 없었지만 야식 절제 — 작은 승리가 쌓이는 거야.`;
-  }
-  if (log.exercise === "N" && log.lateSnack === "Y") {
-    if (log.intensiveDay) return `Hard Reset Mode인데 야식까지 — 내일은 반드시 만회하자.`;
-    return `운동도 야식도 아쉬운 하루 — 내일 반드시 만회해.`;
+  const exercised = didExercise(log.exercise);
+  const ateSnack = hadLateSnack(log.lateSnack);
+  const hasExerciseRecord = log.exercise !== null;
+  const hasSnackRecord = log.lateSnack !== null;
+
+  // 운동·야식 중 하나라도 명시적으로 기록된 경우에만 조합 멘트 (null=미입력은 조건 진입 안 함)
+  if (hasExerciseRecord || hasSnackRecord) {
+    if (exercised && !ateSnack) {
+      if (log.intensiveDay) return `Hard Reset Mode에 운동까지 — 오늘 정말 잘 버텼어.`;
+      return `운동하고 야식 안 먹은 하루 — 착실한 관리야.`;
+    }
+    if (exercised && ateSnack) {
+      return `운동했지만 야식은 아쉬웠어 — 그래도 움직인 것 자체가 의미 있어.`;
+    }
+    if (!exercised && !ateSnack && hasExerciseRecord && hasSnackRecord) {
+      return `운동은 없었지만 야식 절제 — 작은 승리가 쌓이는 거야.`;
+    }
+    if (!exercised && ateSnack) {
+      if (log.intensiveDay) return `Hard Reset Mode인데 야식까지 — 내일은 반드시 만회하자.`;
+      return `운동도 야식도 아쉬운 하루 — 내일 반드시 만회해.`;
+    }
   }
   if (log.weight !== null && (log.weightChange ?? 0) < -1) {
     return `체중 ${log.weight}kg, 시작 대비 ${Math.abs(log.weightChange!)}kg 감량 — 순항 중이야.`;

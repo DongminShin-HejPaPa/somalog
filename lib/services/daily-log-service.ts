@@ -29,11 +29,13 @@ function rowToDailyLog(row: Record<string, unknown>): DailyLog {
     avgWeight3d: (row.avg_weight_3d as number | null) ?? null,
     weightChange: (row.weight_change as number | null) ?? null,
     water: (row.water as number | null) ?? null,
-    exercise: (row.exercise as "Y" | "N" | null) ?? null,
+    exercise: (row.exercise as string | null) ?? null,
     breakfast: (row.breakfast as string | null) ?? null,
     lunch: (row.lunch as string | null) ?? null,
     dinner: (row.dinner as string | null) ?? null,
-    lateSnack: (row.late_snack as "Y" | "N" | null) ?? null,
+    dinnerAlcohol: (row.dinner_alcohol as boolean | null) ?? null,
+    lateSnack: (row.late_snack as string | null) ?? null,
+    lateSnackAlcohol: (row.late_snack_alcohol as boolean | null) ?? null,
     customFieldValue: (row.custom_field_value as string | null) ?? null,
     note: (row.note as string | null) ?? null,
     closed: (row.closed as boolean) ?? false,
@@ -60,7 +62,9 @@ function dailyLogToRow(
   if (log.breakfast !== undefined) row.breakfast = log.breakfast;
   if (log.lunch !== undefined) row.lunch = log.lunch;
   if (log.dinner !== undefined) row.dinner = log.dinner;
+  if (log.dinnerAlcohol !== undefined) row.dinner_alcohol = log.dinnerAlcohol;
   if (log.lateSnack !== undefined) row.late_snack = log.lateSnack;
+  if (log.lateSnackAlcohol !== undefined) row.late_snack_alcohol = log.lateSnackAlcohol;
   if (log.customFieldValue !== undefined) row.custom_field_value = log.customFieldValue;
   if (log.note !== undefined) row.note = log.note;
   if (log.closed !== undefined) row.closed = log.closed;
@@ -282,7 +286,7 @@ export async function upsertDailyLog(
     const fieldLabels: Partial<Record<keyof typeof data, string>> = {
       weight: "체중", water: "수분", exercise: "운동",
       breakfast: "아침 식단", lunch: "점심 식단", dinner: "저녁 식단",
-      lateSnack: "야식", note: "메모",
+      dinnerAlcohol: "저녁 술", lateSnack: "야식", lateSnackAlcohol: "야식 술", note: "메모",
     };
     const changedField = primaryKey ? (fieldLabels[primaryKey] ?? null) : null;
     merged.feedback = await generateAiFeedback(merged, prevWeight, settings, changedField, recentLogs);
@@ -418,8 +422,8 @@ export async function closeDailyLog(date: string, existingLog?: DailyLog): Promi
             (weights.reduce((s, w) => s + w, 0) / weights.length) * 10
           ) / 10
         : 0;
-    const exerciseDays = weekLogs.filter((l) => l.exercise === "Y").length;
-    const lateSnackCount = weekLogs.filter((l) => l.lateSnack === "Y").length;
+    const exerciseDays = weekLogs.filter((l) => l.exercise !== null && l.exercise !== "N" && l.exercise !== "SKIP").length;
+    const lateSnackCount = weekLogs.filter((l) => l.lateSnack !== null && l.lateSnack !== "N" && l.lateSnack !== "SKIP").length;
 
     await upsertWeeklyLog({
       weekStart,

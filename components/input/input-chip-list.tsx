@@ -31,9 +31,13 @@ function formatValue(key: ItemKey, value: unknown, waterGoal: number): string {
     case "water":
       return `${value}L / ${waterGoal}L`;
     case "exercise":
-      return value === "Y" ? "했음" : "안 했음";
+      if (value === "Y") return "했음";
+      if (value === "N" || value === "SKIP") return "안 했음";
+      return value as string;
     case "lateSnack":
-      return value === "Y" ? "먹음" : "안 먹음";
+      if (value === "Y") return "먹음";
+      if (value === "N" || value === "SKIP") return "안 먹음";
+      return value as string;
     case "breakfast":
     case "lunch":
     case "dinner":

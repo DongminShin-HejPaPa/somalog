@@ -21,6 +21,28 @@ function getDayOfWeek(dateStr: string) {
   return days[new Date(dateStr).getDay()];
 }
 
+function fmtExercise(v: string | null): string {
+  if (!v) return "";
+  if (v === "Y") return "했음";
+  if (v === "N" || v === "SKIP") return "안 했음";
+  return v;
+}
+
+function fmtLateSnack(v: string | null): string {
+  if (!v) return "";
+  if (v === "Y") return "먹음";
+  if (v === "N" || v === "SKIP") return "안 먹음";
+  return v;
+}
+
+function didExercise(v: string | null) {
+  return v !== null && v !== "N" && v !== "SKIP";
+}
+
+function hadLateSnack(v: string | null) {
+  return v !== null && v !== "N" && v !== "SKIP";
+}
+
 function RegenerateButton({ date, onRefresh }: { date: string; onRefresh?: () => Promise<void> }) {
   const [isLoading, setIsLoading] = useState(false);
   const handleClick = async () => {
@@ -65,6 +87,7 @@ export function LogList({
     ...(settings.intensiveDayOn ? [{ key: "intensive", label: "Hard Reset Mode" }] : []),
     { key: "exercise", label: "운동한 날" },
     { key: "lateSnack", label: "야식 있는 날" },
+    { key: "alcohol", label: "술 있는 날" },
   ];
 
   const filteredLogs = logs.filter((log) => {
@@ -74,10 +97,13 @@ export function LogList({
     }
     if (activeFilter === "unclosed") return log.closed === false;
     if (activeFilter === "intensive") return settings.intensiveDayOn && log.intensiveDay === true;
-    if (activeFilter === "exercise") return log.exercise === "Y";
-    if (activeFilter === "lateSnack") return log.lateSnack === "Y";
+    if (activeFilter === "exercise") return didExercise(log.exercise);
+    if (activeFilter === "lateSnack") return hadLateSnack(log.lateSnack);
+    if (activeFilter === "alcohol") return log.dinnerAlcohol === true || log.lateSnackAlcohol === true;
     return true;
   });
+
+  const hasAlcohol = (log: DailyLog) => log.dinnerAlcohol === true || log.lateSnackAlcohol === true;
 
   return (
     <div data-testid="log-list">
@@ -169,7 +195,8 @@ export function LogList({
                       </div>
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
                         <span>{log.weight ? `${log.weight}kg` : ""}</span>
-                        <span>{log.exercise === "Y" ? "운동" : ""}</span>
+                        <span>{didExercise(log.exercise) ? "운동" : ""}</span>
+                        {hasAlcohol(log) && <span>🍺</span>}
                         {isExpanded ? (
                           <ChevronUp className="w-4 h-4" />
                         ) : (
@@ -195,12 +222,18 @@ export function LogList({
                           </div>
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">운동</span>
-                            <span>{log.exercise ?? ""}</span>
+                            <span>{fmtExercise(log.exercise)}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">야식</span>
-                            <span>{log.lateSnack ?? ""}</span>
+                            <span>{fmtLateSnack(log.lateSnack)}</span>
                           </div>
+                          {hasAlcohol(log) && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">술</span>
+                              <span>Y</span>
+                            </div>
+                          )}
                           {settings.intensiveDayOn && log.intensiveDay && (
                             <div className="col-span-2 flex items-center gap-1.5 mt-1">
                               <span className="w-2 h-2 rounded-full bg-coral inline-block flex-shrink-0" />
@@ -220,7 +253,10 @@ export function LogList({
                           </div>
                           <div className="flex gap-2">
                             <span className="text-muted-foreground w-8 flex-shrink-0">저녁</span>
-                            <span>{log.dinner ?? ""}</span>
+                            <span>
+                              {log.dinner ?? ""}
+                              {log.dinnerAlcohol ? " 🍺" : ""}
+                            </span>
                           </div>
                           {settings.customField && log.customFieldValue != null && (
                             <div className="flex gap-2">

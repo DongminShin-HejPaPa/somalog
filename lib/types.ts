@@ -11,11 +11,13 @@ export interface DailyLog {
   avgWeight3d: number | null;
   weightChange: number | null;
   water: number | null;
-  exercise: "Y" | "N" | null;
+  exercise: string | null;
   breakfast: string | null;
   lunch: string | null;
   dinner: string | null;
-  lateSnack: "Y" | "N" | null;
+  dinnerAlcohol?: boolean | null;
+  lateSnack: string | null;
+  lateSnackAlcohol?: boolean | null;
   customFieldValue?: string | null;
   note: string | null;
   closed: boolean;
@@ -86,7 +88,9 @@ export type DailyLogInput = Pick<
   | "breakfast"
   | "lunch"
   | "dinner"
+  | "dinnerAlcohol"
   | "lateSnack"
+  | "lateSnackAlcohol"
   | "note"
 > & { customFieldValue?: string | null };
 

@@ -258,13 +258,19 @@ export function buildContext(
     lines.push(`수분: ${log.water}/${settings.waterGoal}L`);
   }
   if (log.exercise) {
-    lines.push(`운동: ${log.exercise === "Y" ? "함" : "안 함"}`);
+    const v = log.exercise === "Y" ? "함" : (log.exercise === "N" || log.exercise === "SKIP") ? "안 함" : log.exercise;
+    lines.push(`운동: ${v}`);
   }
   if (log.breakfast) lines.push(`아침: ${log.breakfast}`);
   if (log.lunch) lines.push(`점심: ${log.lunch}`);
-  if (log.dinner) lines.push(`저녁: ${log.dinner}`);
+  if (log.dinner) {
+    const alcoholTag = log.dinnerAlcohol ? " (술 포함)" : "";
+    lines.push(`저녁: ${log.dinner}${alcoholTag}`);
+  }
   if (log.lateSnack) {
-    lines.push(`야식: ${log.lateSnack === "Y" ? "먹음" : "안 먹음"}`);
+    const v = log.lateSnack === "Y" ? "먹음" : (log.lateSnack === "N" || log.lateSnack === "SKIP") ? "안 먹음" : log.lateSnack;
+    const alcoholTag = log.lateSnackAlcohol ? " (술 포함)" : "";
+    lines.push(`야식: ${v}${alcoholTag}`);
   }
   if (log.customFieldValue != null && settings.customField) {
     lines.push(`${settings.customField.name}: ${log.customFieldValue}`);
@@ -287,9 +293,19 @@ function buildRecentSection(recentLogs: DailyLog[], refDate: string): string {
       if (l.weight !== null) parts.push(`체중 ${l.weight}kg`);
       if (l.breakfast) parts.push(`아침 ${mealText(l.breakfast)}`);
       if (l.lunch) parts.push(`점심 ${mealText(l.lunch)}`);
-      if (l.dinner) parts.push(`저녁 ${mealText(l.dinner)}`);
-      if (l.lateSnack) parts.push(`야식 ${l.lateSnack === "Y" ? "O" : "X"}`);
-      if (l.exercise) parts.push(`운동 ${l.exercise === "Y" ? "O" : "X"}`);
+      if (l.dinner) {
+        const alcohol = l.dinnerAlcohol ? "+술" : "";
+        parts.push(`저녁 ${mealText(l.dinner)}${alcohol}`);
+      }
+      if (l.lateSnack) {
+        const v = l.lateSnack === "Y" ? "O" : (l.lateSnack === "N" || l.lateSnack === "SKIP") ? "X" : l.lateSnack;
+        const alcohol = l.lateSnackAlcohol ? "+술" : "";
+        parts.push(`야식 ${v}${alcohol}`);
+      }
+      if (l.exercise) {
+        const v = l.exercise === "Y" ? "O" : (l.exercise === "N" || l.exercise === "SKIP") ? "X" : l.exercise;
+        parts.push(`운동 ${v}`);
+      }
       if (l.water !== null) parts.push(`수분 ${l.water}L`);
       if (parts.length === 0) return null;
       return `- ${relativeDayLabel(l.date, refDate)}: ${parts.join(" · ")}`;

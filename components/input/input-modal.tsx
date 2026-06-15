@@ -45,18 +45,23 @@ function SaveButton({
   disabled,
   isSaving,
   testId,
+  className,
 }: {
   onClick: () => void;
   disabled?: boolean;
   isSaving?: boolean;
   testId?: string;
+  className?: string;
 }) {
   return (
     <button
       onClick={onClick}
       disabled={disabled || isSaving}
       data-testid={testId ?? "modal-save"}
-      className="w-full py-3 rounded-xl bg-navy text-white text-sm font-semibold min-h-[48px] disabled:opacity-40 flex items-center justify-center gap-2"
+      className={cn(
+        "py-3 rounded-xl bg-navy text-white text-sm font-semibold min-h-[48px] disabled:opacity-40 flex items-center justify-center gap-2",
+        className ?? "w-full"
+      )}
     >
       {isSaving ? (
         <>
@@ -82,6 +87,33 @@ function DeleteButton({ onClick, disabled }: { onClick: () => void; disabled?: b
   );
 }
 
+function AlcoholToggle({
+  checked,
+  onChange,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      disabled={disabled}
+      className={cn(
+        "py-3 px-3 rounded-xl text-sm font-semibold min-h-[48px] w-[60px] shrink-0 transition-colors flex flex-col items-center justify-center gap-0.5",
+        checked
+          ? "bg-red-50 text-red-500 border border-red-200"
+          : "bg-secondary text-muted-foreground border border-border"
+      )}
+    >
+      <span className="text-base leading-none">🍺</span>
+      <span className="text-[10px] leading-none font-normal">술</span>
+    </button>
+  );
+}
+
 export function InputModal({
   field,
   log,
@@ -96,6 +128,9 @@ export function InputModal({
   const [weightValue, setWeightValue] = useState("");
   const [waterValue, setWaterValue] = useState<number | null>(null);
   const [textValue, setTextValue] = useState("");
+  const [dinnerAlcohol, setDinnerAlcohol] = useState(false);
+  const [lateSnackAlcohol, setLateSnackAlcohol] = useState(false);
+  const [lateSnackConnected, setLateSnackConnected] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
 
   const keyboardOffset = useKeyboardOffset();
@@ -107,12 +142,21 @@ export function InputModal({
       setWeightValue(log.weight != null ? String(log.weight) : (prevWeight != null ? String(prevWeight) : "70"));
     } else if (field === "water") {
       setWaterValue(log.water ?? waterGoal);
+    } else if (field === "exercise") {
+      const v = log.exercise;
+      setTextValue(!v || v === "Y" || v === "N" || v === "SKIP" ? "" : v);
     } else if (field === "breakfast") {
       setTextValue(log.breakfast === "SKIP" ? "" : (log.breakfast ?? ""));
     } else if (field === "lunch") {
       setTextValue(log.lunch === "SKIP" ? "" : (log.lunch ?? ""));
     } else if (field === "dinner") {
       setTextValue(log.dinner === "SKIP" ? "" : (log.dinner ?? ""));
+      setDinnerAlcohol(log.dinnerAlcohol ?? false);
+      setLateSnackConnected(false);
+    } else if (field === "lateSnack") {
+      const v = log.lateSnack;
+      setTextValue(!v || v === "Y" || v === "N" || v === "SKIP" ? "" : v);
+      setLateSnackAlcohol(log.lateSnackAlcohol ?? false);
     } else if (field === "customFieldValue") {
       setTextValue(log.customFieldValue ?? "");
     }
@@ -132,7 +176,6 @@ export function InputModal({
 
   const handleWeightSave = () => {
     const trimmed = weightValue.trim();
-    // 빈 입력 or NaN → 삭제
     if (!trimmed || isNaN(parseFloat(trimmed))) {
       if (log.weight != null) onDelete("weight");
       else onClose();
@@ -146,24 +189,52 @@ export function InputModal({
     onSave({ water: waterValue });
   };
 
-  const handleTextSave = () => {
+  const handleExerciseSave = () => {
     const trimmed = textValue.trim();
-    // 빈 텍스트 저장 → 해당 필드 삭제
     if (!trimmed) {
-      const mealField = field as "breakfast" | "lunch" | "dinner";
-      const hasValue = log[mealField] != null;
-      if (hasValue) onDelete(mealField);
+      if (log.exercise != null) onDelete("exercise");
       else onClose();
       return;
     }
-    onSave({ [field]: trimmed } as DailyLogUpdate);
+    onSave({ exercise: trimmed });
+  };
+
+  const handleMealSave = (mealField: "breakfast" | "lunch") => {
+    const trimmed = textValue.trim();
+    if (!trimmed) {
+      if (log[mealField] != null) onDelete(mealField);
+      else onClose();
+      return;
+    }
+    onSave({ [mealField]: trimmed } as DailyLogUpdate);
+  };
+
+  const handleDinnerSave = () => {
+    const trimmed = textValue.trim();
+    if (!trimmed) {
+      if (log.dinner != null) onDelete("dinner");
+      else onClose();
+      return;
+    }
+    const update: DailyLogUpdate = { dinner: trimmed, dinnerAlcohol };
+    if (lateSnackConnected) update.lateSnack = "저녁 식사 연결";
+    onSave(update);
+  };
+
+  const handleLateSnackSave = () => {
+    const trimmed = textValue.trim();
+    if (!trimmed) {
+      if (log.lateSnack != null) onDelete("lateSnack");
+      else onClose();
+      return;
+    }
+    onSave({ lateSnack: trimmed, lateSnackAlcohol });
   };
 
   const label = field === "customFieldValue"
     ? (customFieldDef?.name ?? "맞춤 입력")
     : fieldLabels[field as Exclude<ItemKey, "customFieldValue">];
 
-  // 현재 값이 있는지 (삭제 버튼 노출 여부)
   const hasCurrentValue = ((): boolean => {
     if (field === "weight") return log.weight != null;
     if (field === "water") return log.water != null;
@@ -201,7 +272,6 @@ export function InputModal({
         {/* 체중 슬라이더 */}
         {field === "weight" && (
           <div className="space-y-3">
-            {/* 슬라이더 */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs text-muted-foreground">{sliderMin}kg</span>
@@ -245,7 +315,6 @@ export function InputModal({
                   +
                 </button>
               </div>
-              {/* 이전 체중 대비 +- 표시 */}
               {prevWeight != null && (() => {
                 const current = parseFloat(weightValue);
                 if (isNaN(current)) return null;
@@ -265,7 +334,6 @@ export function InputModal({
                 );
               })()}
             </div>
-            {/* 직접 입력 */}
             <div className="flex items-center gap-2">
               <input
                 type="number"
@@ -289,7 +357,6 @@ export function InputModal({
         {/* Water */}
         {field === "water" && (
           <div className="space-y-4">
-            {/* 슬라이더 */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs text-muted-foreground">0L</span>
@@ -340,7 +407,6 @@ export function InputModal({
               </div>
             </div>
 
-            {/* 빠른 선택 버튼 */}
             <div className="grid grid-cols-4 gap-2">
               {waterPresets.map((v) => (
                 <button
@@ -370,55 +436,54 @@ export function InputModal({
           </div>
         )}
 
-        {/* Exercise */}
+        {/* 운동 — 텍스트 입력 + 안 했음 */}
         {field === "exercise" && (
           <div className="space-y-3">
-            <div className="flex gap-3">
-              <button
-                onClick={() => onSave({ exercise: "Y" })}
-                data-testid="modal-exercise-y"
-                className={cn(
-                  "flex-1 py-4 rounded-xl text-sm font-semibold min-h-[60px] transition-colors",
-                  log.exercise === "Y"
-                    ? "bg-navy text-white"
-                    : "bg-secondary text-foreground border border-border"
-                )}
-              >
-                했음
-              </button>
-              <button
-                onClick={() => onSave({ exercise: "N" })}
-                data-testid="modal-exercise-n"
-                className={cn(
-                  "flex-1 py-4 rounded-xl text-sm font-semibold min-h-[60px] transition-colors",
-                  log.exercise === "N"
-                    ? "bg-coral text-white"
-                    : "bg-secondary text-foreground border border-border"
-                )}
-              >
-                안 했음
-              </button>
-            </div>
+            <input
+              type="text"
+              placeholder="예: 헬스 1시간, 줄넘기 30분, 산책"
+              value={textValue}
+              onChange={(e) => setTextValue(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleExerciseSave()}
+              autoFocus
+              data-testid="modal-exercise-input"
+              className="w-full px-4 py-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[52px]"
+            />
+            <SaveButton onClick={handleExerciseSave} isSaving={isSaving} />
+            <button
+              type="button"
+              onClick={() => onSave({ exercise: "SKIP" })}
+              disabled={isSaving}
+              data-testid="modal-exercise-skip"
+              className={cn(
+                "w-full py-3 rounded-xl text-sm font-semibold min-h-[48px] transition-colors",
+                log.exercise === "SKIP" || log.exercise === "N"
+                  ? "bg-coral text-white"
+                  : "bg-secondary text-foreground border border-border hover:border-coral/40 hover:text-coral"
+              )}
+            >
+              안 했음
+            </button>
             {hasCurrentValue && (
               <DeleteButton onClick={() => onDelete("exercise")} disabled={isSaving} />
             )}
           </div>
         )}
 
-        {/* Breakfast / Lunch / Dinner */}
-        {(field === "breakfast" || field === "lunch" || field === "dinner") && (
+        {/* 아침 / 점심 */}
+        {(field === "breakfast" || field === "lunch") && (
           <div className="space-y-3">
             <input
               type="text"
               placeholder="예: 버섯크림파스타와 콜라ㅠㅠ, 한식 소식, 고칼로리 식단"
               value={textValue}
               onChange={(e) => setTextValue(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleTextSave()}
+              onKeyDown={(e) => e.key === "Enter" && handleMealSave(field)}
               autoFocus
               data-testid="modal-meal-input"
               className="w-full px-4 py-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[52px]"
             />
-            <SaveButton onClick={handleTextSave} isSaving={isSaving} />
+            <SaveButton onClick={() => handleMealSave(field)} isSaving={isSaving} />
             <button
               type="button"
               onClick={() => onSave({ [field]: "SKIP" } as DailyLogUpdate)}
@@ -442,35 +507,96 @@ export function InputModal({
           </div>
         )}
 
-        {/* LateSnack */}
+        {/* 저녁 — 텍스트 + 술 토글 + 야식 연결 */}
+        {field === "dinner" && (
+          <div className="space-y-3">
+            <input
+              type="text"
+              placeholder="예: 버섯크림파스타와 콜라ㅠㅠ, 한식 소식, 고칼로리 식단"
+              value={textValue}
+              onChange={(e) => setTextValue(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleDinnerSave()}
+              autoFocus
+              data-testid="modal-meal-input"
+              className="w-full px-4 py-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[52px]"
+            />
+            <div className="flex gap-2">
+              <SaveButton onClick={handleDinnerSave} isSaving={isSaving} className="flex-1 py-3" />
+              <AlcoholToggle checked={dinnerAlcohol} onChange={setDinnerAlcohol} disabled={isSaving} />
+            </div>
+            {/* 야식 연결 토글 */}
+            <button
+              type="button"
+              onClick={() => setLateSnackConnected(!lateSnackConnected)}
+              className={cn(
+                "w-full py-2.5 px-4 rounded-xl text-sm font-medium min-h-[44px] flex items-center justify-between transition-colors",
+                lateSnackConnected
+                  ? "bg-navy/10 text-navy border border-navy/30"
+                  : "bg-secondary text-muted-foreground border border-border hover:border-navy/30"
+              )}
+            >
+              <span>🌙 야식 연결</span>
+              <div className={cn(
+                "relative w-10 h-6 rounded-full transition-colors shrink-0",
+                lateSnackConnected ? "bg-navy" : "bg-border"
+              )}>
+                <div className={cn(
+                  "absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform",
+                  lateSnackConnected ? "translate-x-5" : "translate-x-1"
+                )} />
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => onSave({ dinner: "SKIP" })}
+              disabled={isSaving}
+              data-testid="modal-meal-skip"
+              className={cn(
+                "w-full py-3 rounded-xl text-sm font-semibold min-h-[48px] transition-colors",
+                log.dinner === "SKIP"
+                  ? "bg-coral text-white"
+                  : "bg-secondary text-foreground border border-border hover:border-coral/40 hover:text-coral"
+              )}
+            >
+              안 먹음
+            </button>
+            {hasCurrentValue && (
+              <DeleteButton onClick={() => onDelete("dinner")} disabled={isSaving} />
+            )}
+          </div>
+        )}
+
+        {/* 야식 — 텍스트 + 술 토글 + 안 먹음 */}
         {field === "lateSnack" && (
           <div className="space-y-3">
-            <div className="flex gap-3">
-              <button
-                onClick={() => onSave({ lateSnack: "Y" })}
-                data-testid="modal-late-snack-y"
-                className={cn(
-                  "flex-1 py-4 rounded-xl text-sm font-semibold min-h-[60px] transition-colors",
-                  log.lateSnack === "Y"
-                    ? "bg-coral text-white"
-                    : "bg-secondary text-foreground border border-border"
-                )}
-              >
-                먹음
-              </button>
-              <button
-                onClick={() => onSave({ lateSnack: "N" })}
-                data-testid="modal-late-snack-n"
-                className={cn(
-                  "flex-1 py-4 rounded-xl text-sm font-semibold min-h-[60px] transition-colors",
-                  log.lateSnack === "N"
-                    ? "bg-navy text-white"
-                    : "bg-secondary text-foreground border border-border"
-                )}
-              >
-                안 먹음
-              </button>
+            <input
+              type="text"
+              placeholder="예: 치킨, 라면, 과자"
+              value={textValue}
+              onChange={(e) => setTextValue(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleLateSnackSave()}
+              autoFocus
+              data-testid="modal-late-snack-input"
+              className="w-full px-4 py-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[52px]"
+            />
+            <div className="flex gap-2">
+              <SaveButton onClick={handleLateSnackSave} isSaving={isSaving} className="flex-1 py-3" />
+              <AlcoholToggle checked={lateSnackAlcohol} onChange={setLateSnackAlcohol} disabled={isSaving} />
             </div>
+            <button
+              type="button"
+              onClick={() => onSave({ lateSnack: "SKIP" })}
+              disabled={isSaving}
+              data-testid="modal-late-snack-skip"
+              className={cn(
+                "w-full py-3 rounded-xl text-sm font-semibold min-h-[48px] transition-colors",
+                log.lateSnack === "SKIP" || log.lateSnack === "N"
+                  ? "bg-navy text-white"
+                  : "bg-secondary text-foreground border border-border hover:border-navy/30"
+              )}
+            >
+              안 먹음
+            </button>
             {hasCurrentValue && (
               <DeleteButton onClick={() => onDelete("lateSnack")} disabled={isSaving} />
             )}

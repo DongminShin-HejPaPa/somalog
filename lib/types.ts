@@ -57,8 +57,57 @@ export interface Settings {
   coachStylePreset: "strong" | "balanced" | "empathy" | "data";
   coachStyleExtra: string[];
   customField: CustomFieldDef | null; // 맞춤 입력 필드 정의
+  mode: "losing" | "maintaining"; // 감량 모드 / (목표 달성 후) 유지 모드
   onboardingComplete: boolean;
   lastNoticeSeenAt: string | null; // ISO string — 마지막 공지 팝업 확인 시각
+}
+
+// ─── 목표 달성 경험 (Goal Achievement) ───
+
+/** 목표 달성 순간의 스냅샷 — 세리머니/리포트/명예의 전당에서 사용 */
+export interface GoalSnapshot {
+  startWeight: number;
+  targetWeight: number;
+  finalWeight: number;   // 달성한 날의 체중
+  daysElapsed: number;   // D+N
+  recordedDays: number;  // 기록한 날 수
+  coachName: string;
+}
+
+/** 마감 직후 클라이언트에 전달되는 목표 달성 이벤트 */
+export interface GoalEvent {
+  kind: "first" | "repeat"; // first = 최초 달성(풀 세리머니), repeat = 재달성(미니 토스트)
+  snapshot: GoalSnapshot;
+}
+
+/** achievements 테이블 1행 */
+export interface Achievement {
+  id: string;
+  type: string;
+  achievedAt: string;  // ISO
+  payload: GoalSnapshot | null;
+  seenAt: string | null;
+}
+
+/** actionCloseDailyLog 반환 — 마감된 로그 + 목표 이벤트(있으면) */
+export interface CloseDailyLogResult {
+  log: DailyLog | null;
+  goalEvent: GoalEvent | null;
+}
+
+/** 여정 회고 리포트 (2막) — 전체 기록 집계 */
+export interface JourneyReport {
+  startWeight: number;
+  finalWeight: number;
+  totalLoss: number;       // startWeight - finalWeight (양수 = 감량)
+  daysElapsed: number;     // 시작일~달성일
+  recordedDays: number;    // 기록한 날 수
+  lowestWeight: number;
+  exerciseDays: number;
+  exerciseRate: number;    // 운동한 날 / 기록일 (%)
+  waterGoalDays: number;   // 수분 목표 달성일 수
+  longestStreak: number;   // 최장 연속 기록일
+  hardResetSurvived: number; // Hard Reset Mode였던 날 수
 }
 
 export interface Notice {
@@ -99,6 +148,6 @@ export type DailyLogUpdate = Partial<DailyLogInput>;
 /** 개별 삭제 가능한 필드 */
 export type ClearableField = "weight" | "water" | "exercise" | "breakfast" | "lunch" | "dinner" | "lateSnack" | "customFieldValue";
 
-export type SettingsInput = Omit<Settings, "onboardingComplete" | "lastNoticeSeenAt" | "customField">;
+export type SettingsInput = Omit<Settings, "onboardingComplete" | "lastNoticeSeenAt" | "customField" | "mode">;
 
 export type SettingsUpdate = Partial<Settings>;

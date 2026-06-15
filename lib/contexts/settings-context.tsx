@@ -71,6 +71,7 @@ export const DEFAULT_SETTINGS: Settings = {
   coachStylePreset: "strong",
   coachStyleExtra: [],
   customField: null,
+  mode: "losing",
   onboardingComplete: false,
   lastNoticeSeenAt: null,
 };
@@ -161,7 +162,7 @@ export function SettingsProvider({
       setSettings(initialized);
       writeCachedSettings(initialized, uid);
     } catch {
-      const fallback: Settings = { ...data, customField: null, onboardingComplete: true, lastNoticeSeenAt: null };
+      const fallback: Settings = { ...data, customField: null, mode: "losing", onboardingComplete: true, lastNoticeSeenAt: null };
       setSettings(fallback);
       writeCachedSettings(fallback, uid);
     }

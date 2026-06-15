@@ -2,13 +2,19 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { actionGetDailyLog, actionGetRecentDailyLogs, actionCloseDailyLog, actionAutoCloseOldLogs, actionGetPrefetchData, actionGetHomeInitialData } from "@/app/actions/log-actions";
 import { HomeContent } from "./home-content";
 import { formatDate } from "@/lib/utils/date-utils";
 import { getGreetingMessage } from "@/lib/utils/greeting-messages";
 import { useSettings } from "@/lib/contexts/settings-context";
-import type { DailyLog } from "@/lib/types";
+import type { DailyLog, GoalEvent } from "@/lib/types";
 import { logStore } from "@/lib/stores/log-store";
+
+const GoalCeremony = dynamic(
+  () => import("@/components/celebration/goal-ceremony"),
+  { ssr: false }
+);
 
 interface HomeContainerProps {
   userId: string | null;
@@ -32,6 +38,8 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
   const [recentLogs, setRecentLogs] = useState<DailyLog[]>(bootCache?.recentLogs ?? []);
   const [greeting, setGreeting] = useState<string | null>(null);
   const [isClosingDay, setIsClosingDay] = useState(false);
+  const [goalEvent, setGoalEvent] = useState<GoalEvent | null>(null);
+  const [goalToast, setGoalToast] = useState<string | null>(null);
   const { settings } = useSettings();
 
   useEffect(() => {
@@ -111,7 +119,13 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
     setIsClosingDay(true);
     try {
       const today = formatDate(new Date());
-      await actionCloseDailyLog(activeLog.date, activeLog);
+      const closeResult = await actionCloseDailyLog(activeLog.date, activeLog);
+      if (closeResult.goalEvent?.kind === "first") {
+        setGoalEvent(closeResult.goalEvent);
+      } else if (closeResult.goalEvent?.kind === "repeat") {
+        setGoalToast("🎉 목표 체중 복귀! 다시 잘 버텼어요");
+        setTimeout(() => setGoalToast(null), 4000);
+      }
 
       const [updatedLogs, todayLog] = await Promise.all([
         actionGetRecentDailyLogs(30),
@@ -134,6 +148,16 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
 
   return (
     <div className="pb-6">
+      {goalEvent && (
+        <GoalCeremony snapshot={goalEvent.snapshot} onClose={() => setGoalEvent(null)} />
+      )}
+      {goalToast && (
+        <div className="fixed top-16 inset-x-0 flex justify-center z-[55] pointer-events-none px-4">
+          <div className="bg-navy text-white text-sm font-semibold px-5 py-2.5 rounded-full shadow-xl text-center">
+            {goalToast}
+          </div>
+        </div>
+      )}
       <header className="px-4 pt-4 pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-end gap-2">

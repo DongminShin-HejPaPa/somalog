@@ -29,6 +29,7 @@ export const mockSettings: Settings = {
   coachStylePreset: "balanced",
   coachStyleExtra: [],
   customField: null,
+  mode: "losing",
   onboardingComplete: true,
   lastNoticeSeenAt: null,
 };

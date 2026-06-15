@@ -18,7 +18,21 @@ import {
 } from "@/lib/services/daily-log-service";
 import { getWeeklyLogs } from "@/lib/services/weekly-log-service";
 import { getLowestWeight } from "@/lib/services/stats-service";
-import type { DailyLog, DailyLogUpdate, ClearableField, WeeklyLog } from "@/lib/types";
+import {
+  detectGoalAchievement,
+  getAchievements,
+  getJourneyReport,
+  markAchievementSeen,
+} from "@/lib/services/achievement-service";
+import type {
+  DailyLog,
+  DailyLogUpdate,
+  ClearableField,
+  WeeklyLog,
+  CloseDailyLogResult,
+  Achievement,
+  JourneyReport,
+} from "@/lib/types";
 
 export async function actionGetDailyLog(
   date: string
@@ -40,12 +54,27 @@ export async function actionUpsertDailyLog(
 export async function actionCloseDailyLog(
   date: string,
   log?: DailyLog
-): Promise<DailyLog | null> {
+): Promise<CloseDailyLogResult> {
   const result = await closeDailyLog(date, log);
   revalidatePath("/home");
   revalidatePath("/log");
   revalidatePath("/graph");
-  return result;
+
+  // 마감 직후 목표 달성 판정 (closeDailyLog는 미변경 — 별도 서비스에서 처리)
+  const goalEvent = result ? await detectGoalAchievement(result) : null;
+  return { log: result, goalEvent };
+}
+
+export async function actionGetAchievements(): Promise<Achievement[]> {
+  return getAchievements();
+}
+
+export async function actionGetJourneyReport(): Promise<JourneyReport | null> {
+  return getJourneyReport();
+}
+
+export async function actionMarkGoalSeen(type: string): Promise<void> {
+  await markAchievementSeen(type);
 }
 
 export async function actionReopenDailyLog(

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/lib/contexts/settings-context";
 import { formatDate, getDayNumber } from "@/lib/utils/date-utils";
@@ -22,8 +23,14 @@ import { InputChipList } from "./input-chip-list";
 import { InputModal, type ItemKey } from "./input-modal";
 import { FeedbackArea } from "./feedback-area";
 import { FreeTextInput } from "./free-text-input";
-import type { DailyLog, DailyLogUpdate, ClearableField } from "@/lib/types";
+import type { DailyLog, DailyLogUpdate, ClearableField, GoalEvent } from "@/lib/types";
 import { logStore } from "@/lib/stores/log-store";
+
+// 세리머니는 지연 로드 — 입력 탭 초기 진입 번들에 포함되지 않음
+const GoalCeremony = dynamic(
+  () => import("@/components/celebration/goal-ceremony"),
+  { ssr: false }
+);
 
 function fmtShort(dateStr: string): string {
   const [, m, d] = dateStr.split("-");
@@ -48,6 +55,8 @@ export function InputContainer() {
   const [minDate, setMinDate] = useState<string | null>(null);
   const [autoCloseToast, setAutoCloseToast] = useState<string | null>(null);
   const [pendingOldClose, setPendingOldClose] = useState<{ from: string; to: string } | null>(null);
+  const [goalEvent, setGoalEvent] = useState<GoalEvent | null>(null);
+  const [goalToast, setGoalToast] = useState<string | null>(null);
 
   const prevWeight = useMemo(() => {
     const before = allLogs
@@ -275,13 +284,22 @@ export function InputContainer() {
     setIsClosing(true);
     setCloseError(null);
     try {
-      const updated = await actionCloseDailyLog(currentDate, currentLog ?? undefined);
+      const result = await actionCloseDailyLog(currentDate, currentLog ?? undefined);
+      const updated = result.log;
       if (!updated) {
         setCloseError("마감에 실패했습니다. 잠시 후 다시 시도해주세요.");
         return;
       }
       setCurrentLog(updated);
       updateCache(updated);
+
+      // 목표 달성 이벤트 처리 — 최초: 풀 세리머니 / 재달성: 미니 토스트
+      if (result.goalEvent?.kind === "first") {
+        setGoalEvent(result.goalEvent);
+      } else if (result.goalEvent?.kind === "repeat") {
+        setGoalToast("🎉 목표 체중 복귀! 다시 잘 버텼어요");
+        setTimeout(() => setGoalToast(null), 4000);
+      }
 
       const logs = await actionGetRecentDailyLogs(30);
       logStore.setRecentLogs(logs);
@@ -418,6 +436,18 @@ export function InputContainer() {
 
   return (
     <div className="pb-20">
+      {goalEvent && (
+        <GoalCeremony snapshot={goalEvent.snapshot} onClose={() => setGoalEvent(null)} />
+      )}
+
+      {goalToast && (
+        <div className="fixed top-16 inset-x-0 flex justify-center z-[55] pointer-events-none px-4">
+          <div className="bg-navy text-white text-sm font-semibold px-5 py-2.5 rounded-full shadow-xl text-center">
+            {goalToast}
+          </div>
+        </div>
+      )}
+
       {autoCloseToast && (
         <div className="fixed top-16 inset-x-0 flex justify-center z-50 pointer-events-none px-4">
           <div className="bg-foreground text-background text-sm font-medium px-4 py-2.5 rounded-full shadow-xl flex items-center gap-2 max-w-xs text-center">

@@ -27,6 +27,7 @@ export function createDefaultSettings(): Settings {
     coachStylePreset: "strong",
     coachStyleExtra: [],
     customField: null,
+    mode: "losing",
     onboardingComplete: false,
     lastNoticeSeenAt: null,
   };
@@ -63,6 +64,7 @@ function rowToSettings(row: Record<string, unknown>): Settings {
       "strong",
     coachStyleExtra: (row.coach_style_extra as string[]) ?? [],
     customField: (row.custom_field as CustomFieldDef | null) ?? null,
+    mode: (row.mode as "losing" | "maintaining") ?? "losing",
     onboardingComplete: ((row.onboarding_complete as boolean) ?? false) || !!(row.diet_start_date as string),
     lastNoticeSeenAt: (row.last_notice_seen_at as string | null) ?? null,
   };
@@ -92,6 +94,7 @@ function settingsToRow(
     intensive_day_criteria: s.intensiveDayCriteria,
     coach_style_preset: s.coachStylePreset,
     coach_style_extra: s.coachStyleExtra,
+    mode: "mode" in s ? s.mode : "losing",
     custom_field: "customField" in s ? s.customField : null,
     onboarding_complete:
       "onboardingComplete" in s ? s.onboardingComplete : false,
@@ -149,7 +152,7 @@ export async function initializeSettings(
   const user = await getAuthUser();
   if (!user) throw new Error("Unauthorized");
 
-  const full: Settings = { ...data, customField: null, onboardingComplete: true, lastNoticeSeenAt: null };
+  const full: Settings = { ...data, customField: null, mode: "losing", onboardingComplete: true, lastNoticeSeenAt: null };
   const supabase = await createClient();
   const row = settingsToRow(full, user.id);
 

@@ -36,8 +36,8 @@ export async function generateAiFeedback(
 
   const fieldLine = changedField ? `\n방금 입력한 항목: ${changedField}` : "";
   const focusInstruction = changedField
-    ? `"${changedField}"을/를 중심으로 나머지 오늘 맥락과 연결해 코칭 한 마디(2~3문장).`
-    : `오늘 입력 내용을 중심으로 코칭 한 마디(2~3문장).`;
+    ? `"${changedField}"을/를 중심으로 코칭 한 마디(2~3문장). 단, [사용자 루틴] 규칙에 위배되는 인과 연결은 절대 하지 마라.`
+    : `오늘 입력 내용을 중심으로 코칭 한 마디(2~3문장). 단, [사용자 루틴] 규칙에 위배되는 인과 연결은 절대 하지 마라.`;
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);

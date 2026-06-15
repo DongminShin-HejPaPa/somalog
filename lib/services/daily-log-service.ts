@@ -218,12 +218,11 @@ export async function upsertDailyLog(
   ] = await Promise.all([
     supabase
       .from("daily_logs")
-      .select("date, weight")
+      .select("*")
       .eq("user_id", user.id)
       .lt("date", date)        // 현재 날짜보다 이전 기록만
-      .not("weight", "is", null)
       .order("date", { ascending: false })
-      .limit(3),               // 3일치 평균을 위해 최근 3개만 조회
+      .limit(7),               // 최근 1주: avg3d 계산 + 피드백 최근 맥락용 공용
     supabase
       .from("daily_logs")
       .select("weight")
@@ -235,16 +234,16 @@ export async function upsertDailyLog(
       .maybeSingle()
   ]);
 
-  const recentDbLogs = (recentRows || []).map((r) => ({
-    date: r.date,
-    weight: r.weight,
-  } as DailyLog));
+  // 최근 1주 전체 로그 (날짜 내림차순) — 파생 계산 + 피드백 최근 맥락에 공용
+  const recentLogs = (recentRows || []).map((r) =>
+    rowToDailyLog(r as Record<string, unknown>)
+  );
 
   // avgWeight3d 계산을 위해 현재 입력 로그(merged)와 최근 로그들을 합성
-  const subsetLogs = [merged, ...recentDbLogs];
+  const subsetLogs = [merged, ...recentLogs];
 
-  // 직전 체중 기록 (피드백을 위해 필요)
-  const prevWeight = recentDbLogs.length > 0 ? recentDbLogs[0].weight : null;
+  // 직전 체중 기록 (피드백·weightChange를 위해 필요) — 최근 weight가 있는 날
+  const prevWeight = recentLogs.find((l) => l.weight !== null)?.weight ?? null;
 
   // 5. 파생 필드 계산
   const dbLowestW = (lowestRow?.weight as number | null) ?? Infinity;
@@ -286,7 +285,7 @@ export async function upsertDailyLog(
       lateSnack: "야식", note: "메모",
     };
     const changedField = primaryKey ? (fieldLabels[primaryKey] ?? null) : null;
-    merged.feedback = await generateAiFeedback(merged, prevWeight, settings, changedField);
+    merged.feedback = await generateAiFeedback(merged, prevWeight, settings, changedField, recentLogs);
   }
   // changedKeys가 비어 있으면(빈 로그 생성 등) 기존 feedback 그대로 유지 (신규 로그는 null)
 

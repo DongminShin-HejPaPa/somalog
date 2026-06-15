@@ -9,6 +9,7 @@ import {
   COACH_HARD_RESET_SECTION,
   COACH_ROUTINE_SECTION,
   COACH_SYSTEM_PROMPT,
+  COACH_FEEDBACK_PROMPT,
   COACH_DAILY_SUMMARY_PROMPT,
   COACH_ONE_LINER_PROMPT,
   fillPrompt,
@@ -26,7 +27,8 @@ export async function generateAiFeedback(
   log: DailyLog,
   prevWeight: number | null,
   settings: Settings,
-  changedField: string | null
+  changedField: string | null,
+  recentLogs: DailyLog[] = []
 ): Promise<string> {
   if (!process.env.OPENROUTER_API_KEY) {
     return fallbackFeedback(log, prevWeight, settings.waterGoal);
@@ -43,7 +45,12 @@ export async function generateAiFeedback(
     const { text, usage } = await generateText({
       model: openrouter(MODEL),
       system: buildSystemPrompt(settings, log.intensiveDay ?? false),
-      prompt: `오늘 입력 데이터:\n${buildContext(log, prevWeight, settings)}${fieldLine}\n\n${focusInstruction} 단순 수치 나열 금지. Hard Reset Mode는 맥락 정보 단서일 뿐야.`,
+      prompt: fillPrompt(COACH_FEEDBACK_PROMPT, {
+        today_context: buildContext(log, prevWeight, settings),
+        field_line: fieldLine,
+        recent_section: buildRecentSection(recentLogs, log.date),
+        focus_instruction: focusInstruction,
+      }),
       maxOutputTokens: 150,
       temperature: 0.7,
       abortSignal: controller.signal,
@@ -265,6 +272,47 @@ export function buildContext(
   if (log.intensiveDay) lines.push(`오늘은 Hard Reset Mode`);
 
   return lines.join("\n");
+}
+
+/**
+ * 최근 1주 기록을 피드백 맥락으로 요약한다.
+ * recentLogs: 날짜 내림차순(가까운 날부터), refDate(=오늘) 이전 날들.
+ * 측정 시점 기반 인과 분석에 쓰이도록 어제→과거 순으로 각 날을 한 줄씩 압축.
+ */
+function buildRecentSection(recentLogs: DailyLog[], refDate: string): string {
+  const lines = recentLogs
+    .slice(0, 7)
+    .map((l) => {
+      const parts: string[] = [];
+      if (l.weight !== null) parts.push(`체중 ${l.weight}kg`);
+      if (l.breakfast) parts.push(`아침 ${mealText(l.breakfast)}`);
+      if (l.lunch) parts.push(`점심 ${mealText(l.lunch)}`);
+      if (l.dinner) parts.push(`저녁 ${mealText(l.dinner)}`);
+      if (l.lateSnack) parts.push(`야식 ${l.lateSnack === "Y" ? "O" : "X"}`);
+      if (l.exercise) parts.push(`운동 ${l.exercise === "Y" ? "O" : "X"}`);
+      if (l.water !== null) parts.push(`수분 ${l.water}L`);
+      if (parts.length === 0) return null;
+      return `- ${relativeDayLabel(l.date, refDate)}: ${parts.join(" · ")}`;
+    })
+    .filter((v): v is string => v !== null);
+
+  if (lines.length === 0) return "";
+  return `[최근 기록 (가까운 날부터)]\n${lines.join("\n")}`;
+}
+
+function mealText(v: string): string {
+  return v === "SKIP" ? "안 먹음" : v;
+}
+
+function relativeDayLabel(date: string, refDate: string): string {
+  const diff = Math.round(
+    (new Date(refDate + "T00:00:00").getTime() -
+      new Date(date + "T00:00:00").getTime()) /
+      86_400_000
+  );
+  const [, m, d] = date.split("-");
+  const md = `${parseInt(m)}/${parseInt(d)}`;
+  return diff === 1 ? `어제(${md})` : `${diff}일 전(${md})`;
 }
 
 /** API 키 없거나 오류 시 규칙 기반 fallback */

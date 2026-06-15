@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import type { GoalSnapshot, JourneyReport } from "@/lib/types";
@@ -16,7 +16,6 @@ interface GoalCeremonyProps {
   onClose: () => void;
 }
 
-/** requestAnimationFrame 기반 카운트업 */
 function useCountUp(target: number, durationMs = 1200, decimals = 0): number {
   const [value, setValue] = useState(0);
   useEffect(() => {
@@ -24,7 +23,7 @@ function useCountUp(target: number, durationMs = 1200, decimals = 0): number {
     const start = performance.now();
     const tick = (now: number) => {
       const p = Math.min((now - start) / durationMs, 1);
-      const eased = 1 - Math.pow(1 - p, 3); // easeOutCubic
+      const eased = 1 - Math.pow(1 - p, 3);
       setValue(Math.round(target * eased * 10 ** decimals) / 10 ** decimals);
       if (p < 1) raf = requestAnimationFrame(tick);
     };
@@ -34,6 +33,50 @@ function useCountUp(target: number, durationMs = 1200, decimals = 0): number {
   return value;
 }
 
+function Stars() {
+  const data = useMemo(
+    () =>
+      [
+        [6, 12, 0, 0.9],
+        [14, 78, 0.6, 0.7],
+        [22, 44, 0.2, 1.0],
+        [35, 8, 1.0, 0.6],
+        [48, 92, 0.4, 1.0],
+        [58, 28, 0.8, 0.7],
+        [68, 68, 0.3, 0.9],
+        [76, 18, 1.2, 0.8],
+        [83, 85, 0.7, 0.6],
+        [90, 52, 0.1, 1.0],
+        [25, 58, 1.3, 0.7],
+        [72, 38, 0.5, 0.9],
+        [10, 35, 0.9, 0.6],
+        [55, 72, 0.4, 0.8],
+      ] as const,
+    []
+  );
+  const glyphs = ["✦", "✧", "✸", "✺"];
+
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none select-none" aria-hidden>
+      {data.map(([top, left, delay, opacity], i) => (
+        <span
+          key={i}
+          className="absolute animate-pulse text-yellow-200"
+          style={{
+            top: `${top}%`,
+            left: `${left}%`,
+            animationDelay: `${delay}s`,
+            opacity,
+            fontSize: i % 3 === 0 ? "1.3rem" : i % 3 === 1 ? "0.7rem" : "1rem",
+          }}
+        >
+          {glyphs[i % glyphs.length]}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 type Step = "celebrate" | "report" | "next";
 
 export default function GoalCeremony({ snapshot, onClose }: GoalCeremonyProps) {
@@ -41,7 +84,6 @@ export default function GoalCeremony({ snapshot, onClose }: GoalCeremonyProps) {
   const [step, setStep] = useState<Step>("celebrate");
   const seenRef = useRef(false);
 
-  // 진입 시 1회: 햅틱 + 본 시각 기록(중복 노출 방지)
   useEffect(() => {
     if (seenRef.current) return;
     seenRef.current = true;
@@ -54,7 +96,7 @@ export default function GoalCeremony({ snapshot, onClose }: GoalCeremonyProps) {
   }, []);
 
   return (
-    <div className="fixed inset-0 z-[100] bg-gradient-to-b from-navy via-navy to-[#0f1f33] text-white flex flex-col overflow-y-auto">
+    <div className="fixed inset-0 z-[100] bg-gradient-to-br from-[#0c0920] via-navy to-[#0f1f33] text-white flex flex-col overflow-y-auto">
       {step === "celebrate" && (
         <CelebrateAct snapshot={snapshot} onNext={() => setStep("report")} />
       )}
@@ -86,39 +128,59 @@ function CelebrateAct({
   snapshot: GoalSnapshot;
   onNext: () => void;
 }) {
-  const loss = useCountUp(Math.max(snapshot.startWeight - snapshot.finalWeight, 0), 1400, 1);
+  const totalLoss = Math.max(snapshot.startWeight - snapshot.finalWeight, 0);
+  const loss = useCountUp(totalLoss, 1400, 1);
   const days = useCountUp(snapshot.daysElapsed, 1400, 0);
   const recorded = useCountUp(snapshot.recordedDays, 1400, 0);
 
   return (
-    <div className="relative flex-1 flex flex-col items-center justify-center px-6 py-12 text-center">
-      <Confetti />
-      <div className="relative z-10 animate-goal-pop">
-        <p className="text-sm font-semibold tracking-wide text-white/70 mb-3">
-          목표 체중 달성 🎉
-        </p>
-        <h1 className="text-4xl font-extrabold mb-2">
-          {snapshot.targetWeight}kg
-        </h1>
-        <p className="text-base text-white/80 mb-10">
-          {snapshot.coachName}와 함께 해냈어요
+    <div className="relative flex-1 flex flex-col items-center justify-center px-6 py-10 text-center">
+      <Confetti count={60} />
+      <Stars />
+      {/* 따뜻한 배경 글로우 */}
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full bg-yellow-400/10 blur-3xl pointer-events-none" />
+
+      <div className="relative z-10 animate-goal-pop w-full max-w-sm mx-auto">
+        {/* 트로피 */}
+        <div className="text-6xl mb-3 drop-shadow-lg">🏆</div>
+
+        {/* 달성 체중 — 오늘 실제 측정값 */}
+        <div className="mb-1">
+          <span className="text-7xl font-black text-yellow-300 drop-shadow-md tabular-nums">
+            {snapshot.finalWeight}
+          </span>
+          <span className="text-3xl font-bold text-yellow-200 ml-1">kg</span>
+        </div>
+        <p className="text-xs text-white/50 mb-6 tracking-wide">
+          목표 {snapshot.targetWeight}kg 달성 🎯
         </p>
 
-        <div className="grid grid-cols-3 gap-3 mb-10 w-full max-w-sm mx-auto">
-          <Metric label="총 감량" value={`${loss}`} unit="kg" />
+        {/* 3가지 메트릭 */}
+        <div className="grid grid-cols-3 gap-3 mb-6 w-full">
+          <Metric label="총 감량" value={`−${loss.toFixed(1)}`} unit="kg" gold />
           <Metric label="여정" value={`${days}`} unit="일" />
           <Metric label="기록한 날" value={`${recorded}`} unit="일" />
         </div>
 
-        <p className="text-sm leading-relaxed text-white/85 max-w-xs mx-auto mb-10">
-          {snapshot.startWeight}kg에서 시작해 {snapshot.daysElapsed}일.
-          <br />
-          포기하지 않은 당신이 만든 결과예요.
-        </p>
+        {/* 감성 카드 */}
+        <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 mb-8 text-left border border-white/10">
+          <p className="text-base font-bold text-white mb-1">
+            {snapshot.coachName}와 함께 해냈어요! 🎉
+          </p>
+          <p className="text-sm leading-relaxed text-white/85">
+            {snapshot.startWeight}kg에서 시작해 {snapshot.daysElapsed}일 동안{" "}
+            <strong className="text-yellow-300">
+              {Math.round(totalLoss * 10) / 10}kg
+            </strong>
+            를 빼냈어요.
+            <br />
+            포기하지 않은 당신이 만든 진짜 결과예요. ✨
+          </p>
+        </div>
 
         <button
           onClick={onNext}
-          className="px-8 py-3 rounded-full bg-white text-navy font-bold text-sm shadow-lg hover:bg-white/90 transition-colors"
+          className="w-full py-3.5 rounded-full bg-yellow-400 text-[#0c0920] font-extrabold text-sm shadow-xl hover:bg-yellow-300 active:scale-[0.98] transition-all"
         >
           내 여정 돌아보기 →
         </button>
@@ -131,14 +193,26 @@ function Metric({
   label,
   value,
   unit,
+  gold,
 }: {
   label: string;
   value: string;
   unit: string;
+  gold?: boolean;
 }) {
   return (
-    <div className="bg-white/10 rounded-2xl py-4 px-2 backdrop-blur-sm">
-      <p className="text-2xl font-extrabold leading-none">
+    <div
+      className={cn(
+        "rounded-2xl py-4 px-2 backdrop-blur-sm",
+        gold ? "bg-yellow-400/20 ring-1 ring-yellow-400/40" : "bg-white/10"
+      )}
+    >
+      <p
+        className={cn(
+          "text-2xl font-extrabold leading-none tabular-nums",
+          gold ? "text-yellow-300" : "text-white"
+        )}
+      >
         {value}
         <span className="text-sm font-semibold ml-0.5">{unit}</span>
       </p>
@@ -185,29 +259,40 @@ function ReportAct({
               <SmallStat label="최저 체중" value={`${report.lowestWeight}kg`} />
               <SmallStat label="최장 연속 기록" value={`${report.longestStreak}일`} />
               <SmallStat
-                label="운동한 날"
+                label="🏃 운동한 날"
                 value={`${report.exerciseDays}일`}
                 sub={`${report.exerciseRate}%`}
               />
-              <SmallStat label="수분 목표 달성" value={`${report.waterGoalDays}일`} />
-              <SmallStat label="기록한 날" value={`${report.recordedDays}일`} />
               <SmallStat
-                label="Hard Reset 극복"
+                label="💧 수분 목표 달성"
+                value={`${report.waterGoalDays}일`}
+                sub={`${report.waterGoalRate}%`}
+              />
+              <SmallStat label="📅 기록한 날" value={`${report.recordedDays}일`} />
+              <SmallStat
+                label="🔥 Hard Reset 극복"
                 value={`${report.hardResetSurvived}일`}
+              />
+              <SmallStat
+                label="🍺 술 마신 날"
+                value={`${report.alcoholDays}일`}
+                sub={`${report.alcoholRate}%`}
+                wide
               />
             </div>
           </div>
         ) : (
           <div className="py-16 text-center text-white/60 text-sm">
-            {snapshot.startWeight}kg → {snapshot.finalWeight}kg, {snapshot.daysElapsed}일의 여정
+            {snapshot.startWeight}kg → {snapshot.finalWeight}kg,{" "}
+            {snapshot.daysElapsed}일의 여정
           </div>
         )}
 
         <button
           onClick={onNext}
-          className="mt-10 w-full py-3 rounded-full bg-white text-navy font-bold text-sm shadow-lg hover:bg-white/90 transition-colors"
+          className="mt-10 w-full py-3 rounded-full bg-white text-navy font-bold text-sm shadow-lg hover:bg-white/90 active:scale-[0.98] transition-all"
         >
-          다음 →
+          나의 다음 선택 →
         </button>
       </div>
     </div>
@@ -238,17 +323,21 @@ function SmallStat({
   label,
   value,
   sub,
+  wide,
 }: {
   label: string;
   value: string;
   sub?: string;
+  wide?: boolean;
 }) {
   return (
-    <div className="bg-white/10 rounded-2xl p-3">
+    <div className={cn("bg-white/10 rounded-2xl p-3", wide && "col-span-2")}>
       <p className="text-[11px] text-white/60 mb-1">{label}</p>
       <p className="text-lg font-extrabold leading-none">
         {value}
-        {sub && <span className="text-xs font-semibold text-white/70 ml-1">{sub}</span>}
+        {sub && (
+          <span className="text-xs font-semibold text-white/70 ml-1">{sub}</span>
+        )}
       </p>
     </div>
   );
@@ -324,7 +413,7 @@ function NextButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "w-full text-left rounded-2xl p-4 bg-white/10 hover:bg-white/15 transition-colors flex items-start gap-3 disabled:opacity-50",
+        "w-full text-left rounded-2xl p-4 bg-white/10 hover:bg-white/15 active:scale-[0.98] transition-all flex items-start gap-3 disabled:opacity-50"
       )}
     >
       <span className="text-2xl leading-none">{emoji}</span>

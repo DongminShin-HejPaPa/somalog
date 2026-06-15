@@ -106,6 +106,9 @@ export interface JourneyReport {
   exerciseDays: number;
   exerciseRate: number;    // 운동한 날 / 기록일 (%)
   waterGoalDays: number;   // 수분 목표 달성일 수
+  waterGoalRate: number;   // 수분 목표 달성 / 기록일 (%)
+  alcoholDays: number;     // 술 마신 날 수
+  alcoholRate: number;     // 술 마신 날 / 기록일 (%)
   longestStreak: number;   // 최장 연속 기록일
   hardResetSurvived: number; // Hard Reset Mode였던 날 수
 }

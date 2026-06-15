@@ -183,6 +183,9 @@ export async function getJourneyReport(): Promise<JourneyReport | null> {
   const waterGoalDays = sorted.filter(
     (l) => l.water !== null && settings.waterGoal > 0 && l.water >= settings.waterGoal
   ).length;
+  const alcoholDays = sorted.filter(
+    (l) => l.dinnerAlcohol === true || l.lateSnackAlcohol === true
+  ).length;
   const hardResetSurvived = sorted.filter((l) => l.intensiveDay === true).length;
 
   // 최장 연속 기록일 (날짜가 하루씩 이어지는 최대 길이)
@@ -218,9 +221,26 @@ export async function getJourneyReport(): Promise<JourneyReport | null> {
     exerciseRate:
       recordedDays > 0 ? Math.round((exerciseDays / recordedDays) * 100) : 0,
     waterGoalDays,
+    waterGoalRate:
+      recordedDays > 0 ? Math.round((waterGoalDays / recordedDays) * 100) : 0,
+    alcoholDays,
+    alcoholRate:
+      recordedDays > 0 ? Math.round((alcoholDays / recordedDays) * 100) : 0,
     longestStreak,
     hardResetSurvived,
   };
+}
+
+/** 목표 달성 기록 삭제 — targetWeight 재설정 시 새 목표를 첫 달성으로 처리하기 위해 호출 */
+export async function deleteGoalAchievement(): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from("achievements").delete()
+    .eq("user_id", user.id)
+    .eq("type", GOAL_TYPE);
 }
 
 /** 세리머니를 본 시각 기록 (중복 노출 방지) */

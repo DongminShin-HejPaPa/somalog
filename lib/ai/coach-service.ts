@@ -7,6 +7,7 @@ import { getAuthUser } from "@/lib/supabase/server";
 import {
   COACH_STYLE_MAP,
   COACH_HARD_RESET_SECTION,
+  COACH_ROUTINE_SECTION,
   COACH_SYSTEM_PROMPT,
   COACH_DAILY_SUMMARY_PROMPT,
   COACH_ONE_LINER_PROMPT,
@@ -205,7 +206,30 @@ export function buildSystemPrompt(settings: Settings, intensiveDay?: boolean): s
   return fillPrompt(COACH_SYSTEM_PROMPT, {
     coach_name: settings.coachName,
     coach_style: COACH_STYLE_MAP[settings.coachStylePreset] ?? "오늘 행동 중심으로",
+    style_extra: buildStyleExtra(settings.coachStyleExtra),
+    routine_section: buildRoutineSection(settings),
     hard_reset_section: intensiveDay ? COACH_HARD_RESET_SECTION : "",
+  });
+}
+
+/** settings.coachStyleExtra(사용자 추가 스타일 지시) → 시스템 프롬프트 조각 */
+function buildStyleExtra(extra: string[] | undefined): string {
+  const items = (extra ?? []).map((s) => s.trim()).filter(Boolean);
+  if (items.length === 0) return "";
+  return ` 사용자가 추가한 스타일 지시(반드시 반영): ${items.join(" / ")}.`;
+}
+
+/** settings.routineWeightTime / routineExtra → 루틴 섹션 (체중 측정 시점 + 추가 규칙) */
+function buildRoutineSection(settings: Settings): string {
+  const weightTime = settings.routineWeightTime?.trim() || "아침 기상 직후";
+  const extraLines = (settings.routineExtra ?? [])
+    .map((r) => r.trim())
+    .filter(Boolean)
+    .map((r) => `- ${r}`)
+    .join("\n");
+  return fillPrompt(COACH_ROUTINE_SECTION, {
+    routine_weight_time: weightTime,
+    routine_extra_lines: extraLines,
   });
 }
 

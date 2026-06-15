@@ -16,5 +16,10 @@ export const openrouter = createOpenAI({
   },
 });
 
-/** 기본 모델 — Gemini 2.0 Flash (non-reasoning, $0.10/M tokens) */
-export const MODEL = "google/gemini-2.0-flash-001";
+/**
+ * 기본 모델 — Gemini 2.5 Flash Lite (non-reasoning, in $0.10/M · out $0.40/M)
+ * 구 모델 google/gemini-2.0-flash-001 은 OpenRouter에서 endpoint가 제거되어
+ * ("No endpoints found") 2026-06-01 이후 전 호출 실패 → 동일 단가의 후속 모델로 교체.
+ * 코칭 품질을 더 높이려면 google/gemini-2.5-flash (in $0.30/M · out $2.50/M) 로 상향 가능.
+ */
+export const MODEL = "google/gemini-2.5-flash-lite";

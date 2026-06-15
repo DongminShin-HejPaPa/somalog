@@ -74,17 +74,35 @@ export const COACH_HARD_RESET_SECTION = `
 - 'Hard Reset Mode라니 각오가 대단한데?' 같은 문장 무조건 안 됨. 사용자가 스스로 탠 것이 아니니까.`;
 
 // -----------------------------------------------------------------------------
+// 공통: 사용자 루틴 섹션
+// settings.routineWeightTime / settings.routineExtra 를 시스템 프롬프트에 주입한다.
+// 핵심 목적: "체중 측정 시점"을 AI에게 알려, 오늘 체중의 등락을 '오늘 한 행동'
+//           (특히 식사) 탓으로 잘못 귀인하지 않도록 한다.
+//
+// 변수 목록:
+//   {routine_weight_time} — 체중 측정 시점 (settings.routineWeightTime, 예: "아침 기상 직후")
+//   {routine_extra_lines} — 사용자가 추가한 루틴 규칙들 ("- 규칙" 줄들, 없으면 "")
+// -----------------------------------------------------------------------------
+export const COACH_ROUTINE_SECTION = `
+
+[사용자 루틴 — 반드시 반영]
+- 체중 측정 시점: {routine_weight_time}. 이 측정 시점 '이후'에 한 식사·운동·수분은 그날 기록된 체중에는 아직 반영되지 않는다(다음 측정부터 반영).
+{routine_extra_lines}`;
+
+// -----------------------------------------------------------------------------
 // 공통: 코칭 시스템 프롬프트 (한마디 / 하루평가 / 피드백 공통)
 //
 // 변수 목록:
 //   {coach_name}         — 코치 이름 (settings.coachName)
 //   {coach_style}        — 코치 스타일 지시문 (COACH_STYLE_MAP[settings.coachStylePreset])
+//   {style_extra}        — 사용자가 추가한 코치 스타일 지시문 (settings.coachStyleExtra, 없으면 "")
+//   {routine_section}    — 사용자 루틴 섹션 (COACH_ROUTINE_SECTION 채운 값)
 //   {hard_reset_section} — Hard Reset Mode 배경 (intensiveDay 활성 시 COACH_HARD_RESET_SECTION, 비활성 시 "")
 // -----------------------------------------------------------------------------
 export const COACH_SYSTEM_PROMPT = `
 너는 다이어트 코치 "{coach_name}"야.
 가장 중요한 것: 코치의 효과는 "오늘 사용자가 한 행동"을 가장 먼저 짚는 것이야. 나머지 데이터는 모두 행동을 평가하는 재료야.
-코치 스타일: {coach_style}.{hard_reset_section}
+코치 스타일: {coach_style}.{style_extra}{routine_section}{hard_reset_section}
 
 규칙: 한국어로만, 존댓말 금지, 2~3문장 이내, 수치 언급 시 kg/L 단위 포함.
 `.trim();

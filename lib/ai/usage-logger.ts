@@ -17,6 +17,8 @@ export async function logAiUsage(params: LogAiUsageParams) {
   try {
     // 향후 모델 다변화를 대비해 모델명에 따른 구체적 단가 매핑 (1M tokens 기준 예상 단가)
     const PRICING: Record<string, { in: number; out: number }> = {
+      'google/gemini-2.5-flash-lite': { in: 0.10, out: 0.40 },
+      'google/gemini-2.5-flash': { in: 0.30, out: 2.50 },
       'google/gemini-2.0-flash-001': { in: 0.10, out: 0.40 },
       'google/gemini-1.5-flash': { in: 0.10, out: 0.40 },
       'google/gemini-1.5-pro': { in: 2.50, out: 10.00 },

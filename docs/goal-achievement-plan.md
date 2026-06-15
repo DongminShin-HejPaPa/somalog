@@ -1,7 +1,30 @@
 # 목표 달성 경험(Goal Achievement) 구현 플랜
 
 > 사용자가 `settings.targetWeight`에 도달하는 순간을 SomaLog 여정의 클라이맥스로 만드는 기능.
-> 작성일: 2026-06-15. 상태: **착수 대기** (선행: AI 모델/Hard Reset 버그 수정 완료 후 시작).
+> 작성일: 2026-06-15. 상태: **1차 구현 완료** (커밋 50ecbbe).
+
+---
+
+## ✅ 구현 완료 요약 (2026-06-16)
+
+- **데이터:** `achievements` 테이블(RLS) + `settings.mode('losing'|'maintaining')`.
+  마이그레이션 `supabase/migrations/20260616000000_create_achievements.sql` — **수동 적용 필요**(MCP read-only).
+- **판정:** `lib/services/achievement-service.ts`
+  - 순수 로직 `decideGoalEventKind()` + 유닛 테스트 9종.
+  - `detectGoalAchievement()`는 `actionCloseDailyLog`에서 마감 직후 호출(`closeDailyLog` 자체는 미변경).
+- **재달성 정책(C안):**
+  - 최초 달성 → 풀 세리머니(1막→2막→3막), `achievements` 1행 INSERT(`seen_at`로 중복 방지).
+  - 재달성(요요 후 목표 재진입, 감량 모드, 직전 체중이 목표 위였을 때만) → 미니 토스트.
+  - 유지 모드 또는 목표 이하 연속 → 이벤트 없음(매일 토스트 방지).
+- **UI:** `components/celebration/goal-ceremony.tsx`(지연 로드) + `confetti.tsx`(경량 CSS).
+  입력탭·홈탭 마감 직후 모두 배선 — 어느 탭에서 마감해도 노출. 초기 번들 영향 0.
+- **3막 동작:** 유지 모드 전환(`mode='maintaining'`) / 새 목표(설정 이동) / 나중에.
+
+### 아직 안 한 것 (후속)
+- 명예의 전당 화면(데이터·`getAchievements` 액션은 준비됨, 전용 UI 미구현).
+- 2막 공유(Web Share/카카오 카드).
+- 5절 빌드업(게이지 글로우/마일스톤).
+- 스케일링(단기/소형 목표 시 미니 버전) — 현재는 항상 풀 세리머니.
 
 ---
 

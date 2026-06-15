@@ -61,7 +61,10 @@ export async function actionCloseDailyLog(
   revalidatePath("/graph");
 
   // 마감 직후 목표 달성 판정 (closeDailyLog는 미변경 — 별도 서비스에서 처리)
-  const goalEvent = result ? await detectGoalAchievement(result) : null;
+  // 판정 실패(예: 마이그레이션 미적용)가 마감 자체를 깨뜨리지 않도록 방어
+  const goalEvent = result
+    ? await detectGoalAchievement(result).catch(() => null)
+    : null;
   return { log: result, goalEvent };
 }
 

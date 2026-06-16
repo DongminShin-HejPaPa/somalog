@@ -658,6 +658,38 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
         </div>
       </Section>
 
+      <Section title="다이어트 모드">
+        <div className="flex items-center justify-between py-2">
+          <div>
+            <p className="text-sm text-muted-foreground">현재 모드</p>
+            <p className="text-xs text-muted-foreground/70 mt-0.5">
+              {form.mode === "losing"
+                ? "목표 체중을 향해 감량 중이에요"
+                : "목표 체중 유지에 집중하고 있어요"}
+            </p>
+          </div>
+          <div className="flex gap-1.5">
+            {(["losing", "maintaining"] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => handleChange("mode", m)}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-sm font-medium min-h-[36px] transition-colors",
+                  form.mode === m
+                    ? "bg-navy text-white"
+                    : "bg-secondary text-muted-foreground"
+                )}
+              >
+                {m === "losing" ? "감량 중" : "유지 중"}
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">
+          목표 달성 후 유지 단계에 들어섰을 때만 유지 중으로 전환하세요.
+        </p>
+      </Section>
+
       <Section title="하루 수분 목표">
         <InputField
           label="수분 목표"

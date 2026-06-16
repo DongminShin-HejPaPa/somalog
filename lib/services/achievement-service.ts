@@ -172,36 +172,37 @@ export async function getJourneyReport(): Promise<JourneyReport | null> {
   const sortedWeights = [...withWeight].sort((a, b) => a.date.localeCompare(b.date));
 
   const finalWeight = sortedWeights[sortedWeights.length - 1].weight;
-  const lowestWeight = withWeight.reduce(
-    (min, l) => (l.weight < min ? l.weight : min),
-    withWeight[0].weight
-  );
   const recordedDays = sorted.length;
+
+  // 비율 계산: 해당 항목을 실제로 입력한 날만 분모로 사용 (입력 자체가 없는 날은 제외)
+  const exerciseEnteredDays = sorted.filter((l) => l.exercise !== null).length;
   const exerciseDays = sorted.filter(
     (l) => l.exercise !== null && l.exercise !== "N" && l.exercise !== "SKIP"
   ).length;
+
+  const waterEnteredDays = sorted.filter((l) => l.water !== null).length;
   const waterGoalDays = sorted.filter(
     (l) => l.water !== null && settings.waterGoal > 0 && l.water >= settings.waterGoal
+  ).length;
+
+  const lateSnackEnteredDays = sorted.filter((l) => l.lateSnack !== null).length;
+  const lateSnackDays = sorted.filter(
+    (l) => l.lateSnack !== null && l.lateSnack !== "N" && l.lateSnack !== "SKIP"
+  ).length;
+
+  const mealsEnteredDays = sorted.filter(
+    (l) => l.dinner !== null || l.lateSnack !== null
   ).length;
   const alcoholDays = sorted.filter(
     (l) => l.dinnerAlcohol === true || l.lateSnackAlcohol === true
   ).length;
-  const hardResetSurvived = sorted.filter((l) => l.intensiveDay === true).length;
 
-  // 최장 연속 기록일 (날짜가 하루씩 이어지는 최대 길이)
-  let longestStreak = 0;
-  let cur = 0;
-  let prevTime: number | null = null;
-  for (const l of sorted) {
-    const t = new Date(l.date + "T00:00:00").getTime();
-    if (prevTime !== null && t - prevTime === 86_400_000) {
-      cur += 1;
-    } else {
-      cur = 1;
-    }
-    if (cur > longestStreak) longestStreak = cur;
-    prevTime = t;
-  }
+  const anyMealEnteredDays = sorted.filter(
+    (l) => l.breakfast !== null || l.lunch !== null || l.dinner !== null
+  ).length;
+  const allMealsDays = sorted.filter(
+    (l) => l.breakfast !== null && l.lunch !== null && l.dinner !== null
+  ).length;
 
   const daysElapsed =
     Math.round(
@@ -209,25 +210,35 @@ export async function getJourneyReport(): Promise<JourneyReport | null> {
         new Date(settings.dietStartDate + "T00:00:00").getTime()) /
         86_400_000
     ) + 1;
+  const safeDaysElapsed = Math.max(daysElapsed, 1);
+
+  const totalLoss = Math.round((settings.startWeight - finalWeight) * 10) / 10;
+  const dailyAvgLoss = Math.round((totalLoss / safeDaysElapsed) * 100) / 100;
+  const weeklyAvgLoss = Math.round(dailyAvgLoss * 7 * 100) / 100;
 
   return {
     startWeight: settings.startWeight,
     finalWeight,
-    totalLoss: Math.round((settings.startWeight - finalWeight) * 10) / 10,
-    daysElapsed: Math.max(daysElapsed, 1),
+    totalLoss,
+    daysElapsed: safeDaysElapsed,
     recordedDays,
-    lowestWeight,
     exerciseDays,
     exerciseRate:
-      recordedDays > 0 ? Math.round((exerciseDays / recordedDays) * 100) : 0,
+      exerciseEnteredDays > 0 ? Math.round((exerciseDays / exerciseEnteredDays) * 100) : 0,
     waterGoalDays,
     waterGoalRate:
-      recordedDays > 0 ? Math.round((waterGoalDays / recordedDays) * 100) : 0,
+      waterEnteredDays > 0 ? Math.round((waterGoalDays / waterEnteredDays) * 100) : 0,
+    lateSnackDays,
+    lateSnackRate:
+      lateSnackEnteredDays > 0 ? Math.round((lateSnackDays / lateSnackEnteredDays) * 100) : 0,
     alcoholDays,
     alcoholRate:
-      recordedDays > 0 ? Math.round((alcoholDays / recordedDays) * 100) : 0,
-    longestStreak,
-    hardResetSurvived,
+      mealsEnteredDays > 0 ? Math.round((alcoholDays / mealsEnteredDays) * 100) : 0,
+    allMealsDays,
+    allMealsRate:
+      anyMealEnteredDays > 0 ? Math.round((allMealsDays / anyMealEnteredDays) * 100) : 0,
+    dailyAvgLoss,
+    weeklyAvgLoss,
   };
 }
 

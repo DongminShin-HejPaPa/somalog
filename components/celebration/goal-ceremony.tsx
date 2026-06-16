@@ -232,6 +232,7 @@ function ReportAct({
   const [report, setReport] = useState<JourneyReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSharing, setIsSharing] = useState(false);
+  const [savedToast, setSavedToast] = useState<string | null>(null);
   const shareCard1Ref = useRef<HTMLDivElement>(null);
   const shareCard2Ref = useRef<HTMLDivElement>(null);
 
@@ -276,6 +277,8 @@ function ReportAct({
           a.download = i === 0 ? "somalog-달성.png" : "somalog-여정.png";
           a.click();
         });
+        setSavedToast("이미지 2장이 저장됐어요 📸 사진첩(갤러리)에서 확인할 수 있어요");
+        setTimeout(() => setSavedToast(null), 4000);
       }
     } catch (err) {
       console.error("Share failed", err);
@@ -308,8 +311,6 @@ function ReportAct({
               highlight={`−${report.totalLoss}kg`}
             />
             <div className="grid grid-cols-2 gap-3">
-              <SmallStat label="최저 체중" value={`${report.lowestWeight}kg`} />
-              <SmallStat label="최장 연속 기록" value={`${report.longestStreak}일`} />
               <SmallStat
                 label="🏃 운동한 날"
                 value={`${report.exerciseDays}일`}
@@ -320,16 +321,31 @@ function ReportAct({
                 value={`${report.waterGoalDays}일`}
                 sub={`${report.waterGoalRate}%`}
               />
-              <SmallStat label="📅 기록한 날" value={`${report.recordedDays}일`} />
               <SmallStat
-                label="🔥 Hard Reset 극복"
-                value={`${report.hardResetSurvived}일`}
+                label="🌙 야식 먹은 날"
+                value={`${report.lateSnackDays}일`}
+                sub={`${report.lateSnackRate}%`}
               />
               <SmallStat
                 label="🍺 술 마신 날"
                 value={`${report.alcoholDays}일`}
                 sub={`${report.alcoholRate}%`}
-                wide
+              />
+              <SmallStat
+                label="🍽️ 세 끼 모두 먹은 날"
+                value={`${report.allMealsDays}일`}
+                sub={`${report.allMealsRate}%`}
+              />
+              <SmallStat label="📅 기록한 날" value={`${report.recordedDays}일`} />
+              <SmallStat
+                label="📉 일 평균 감량"
+                value={`${report.dailyAvgLoss.toFixed(2)}kg`}
+                sub="/일"
+              />
+              <SmallStat
+                label="📉 주 평균 감량"
+                value={`${report.weeklyAvgLoss.toFixed(2)}kg`}
+                sub="/주"
               />
             </div>
           </div>
@@ -358,6 +374,14 @@ function ReportAct({
           )}
         </div>
       </div>
+
+      {savedToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[110] px-4 w-full max-w-sm">
+          <div className="bg-white/95 text-navy text-sm font-semibold rounded-2xl px-4 py-3 shadow-xl text-center animate-goal-pop">
+            {savedToast}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -547,12 +571,14 @@ function JourneyShareCard({
   cardRef: React.RefObject<HTMLDivElement | null>;
 }) {
   const stats = [
-    { label: "최저 체중", value: `${report.lowestWeight}kg` },
-    { label: "최장 연속", value: `${report.longestStreak}일` },
     { label: "🏃 운동한 날", value: `${report.exerciseDays}일`, sub: `${report.exerciseRate}%` },
     { label: "💧 수분 달성", value: `${report.waterGoalDays}일`, sub: `${report.waterGoalRate}%` },
-    { label: "📅 기록한 날", value: `${report.recordedDays}일` },
+    { label: "🌙 야식 먹은 날", value: `${report.lateSnackDays}일`, sub: `${report.lateSnackRate}%` },
     { label: "🍺 술 마신 날", value: `${report.alcoholDays}일`, sub: `${report.alcoholRate}%` },
+    { label: "🍽️ 세 끼 모두", value: `${report.allMealsDays}일`, sub: `${report.allMealsRate}%` },
+    { label: "📅 기록한 날", value: `${report.recordedDays}일` },
+    { label: "📉 일 평균 감량", value: `${report.dailyAvgLoss.toFixed(2)}kg`, sub: "/일" },
+    { label: "📉 주 평균 감량", value: `${report.weeklyAvgLoss.toFixed(2)}kg`, sub: "/주" },
   ];
   return (
     <div ref={cardRef} style={{ width: SHARE_W, height: 620, background: SHARE_BG, display: "flex", flexDirection: "column", padding: "32px 24px", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", boxSizing: "border-box", color: "#fff" }}>

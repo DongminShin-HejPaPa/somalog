@@ -102,15 +102,18 @@ export interface JourneyReport {
   totalLoss: number;       // startWeight - finalWeight (양수 = 감량)
   daysElapsed: number;     // 시작일~달성일
   recordedDays: number;    // 기록한 날 수
-  lowestWeight: number;
   exerciseDays: number;
-  exerciseRate: number;    // 운동한 날 / 기록일 (%)
+  exerciseRate: number;    // 운동한 날 / 운동 기록이 있는 날 (%)
   waterGoalDays: number;   // 수분 목표 달성일 수
-  waterGoalRate: number;   // 수분 목표 달성 / 기록일 (%)
+  waterGoalRate: number;   // 수분 목표 달성 / 수분 기록이 있는 날 (%)
+  lateSnackDays: number;   // 야식 먹은 날 수
+  lateSnackRate: number;   // 야식 먹은 날 / 야식 기록이 있는 날 (%)
   alcoholDays: number;     // 술 마신 날 수
-  alcoholRate: number;     // 술 마신 날 / 기록일 (%)
-  longestStreak: number;   // 최장 연속 기록일
-  hardResetSurvived: number; // Hard Reset Mode였던 날 수
+  alcoholRate: number;     // 술 마신 날 / 식사 기록이 있는 날 (%)
+  allMealsDays: number;    // 세 끼 모두 먹은 날 수
+  allMealsRate: number;    // 세 끼 모두 먹은 날 / 끼니 기록이 있는 날 (%)
+  dailyAvgLoss: number;    // 일 평균 감량 (kg, 소수점 둘째자리)
+  weeklyAvgLoss: number;   // 주 평균 감량 (kg, 소수점 둘째자리)
 }
 
 export interface Notice {

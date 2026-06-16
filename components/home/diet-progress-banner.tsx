@@ -6,10 +6,10 @@ interface DietProgressBannerProps {
   /** 첫 기록일부터의 누적 일수 — 이전 챕터가 있을 때만 보조로 표시 */
   cumulativeDay?: number;
   currentWeight: number | null;
+  /** 오늘 체중 미입력 시 진행률 계산에 쓸 최근 기록 체중 */
+  fallbackWeight?: number | null;
   startWeight: number;
   targetWeight: number;
-  weightChange: number | null;
-  fallbackWeightChange?: number | null;
   isIntensiveDay: boolean;
 }
 
@@ -24,24 +24,26 @@ export function DietProgressBanner({
   day,
   cumulativeDay,
   currentWeight,
+  fallbackWeight,
   startWeight,
   targetWeight,
-  weightChange,
-  fallbackWeightChange,
   isIntensiveDay,
 }: DietProgressBannerProps) {
   const totalToLose = startWeight - targetWeight;
-  // 오늘 체중 미입력 시 최근 기록의 weightChange로 진행률 계산
-  const effectiveWeightChange = weightChange ?? fallbackWeightChange ?? null;
-  const actualLost = effectiveWeightChange !== null ? Math.max(-effectiveWeightChange, 0) : 0;
+  // 변화/진행률은 항상 현재 챕터의 startWeight 기준으로 live 계산 (저장된 weight_change는
+  // 새 챕터 시작 후 이전 startWeight 기준이라 stale → 사용하지 않음)
+  const effectiveWeight = currentWeight ?? fallbackWeight ?? null;
+  const change =
+    effectiveWeight !== null ? Math.round((effectiveWeight - startWeight) * 10) / 10 : null;
+  // 오늘 체중 입력 시 보여줄 배지 값 (시작 대비 총 변화)
+  const todayChange =
+    currentWeight !== null ? Math.round((currentWeight - startWeight) * 10) / 10 : null;
+  const actualLost = change !== null ? Math.max(-change, 0) : 0;
   const progress = totalToLose > 0 ? Math.min((actualLost / totalToLose) * 100, 100) : 0;
-  // 남은 kg: 오늘 체중 있으면 직접 계산, 없으면 fallback weightChange로 추정
   const remaining =
-    currentWeight !== null
-      ? currentWeight - targetWeight
-      : effectiveWeightChange !== null
-        ? startWeight + effectiveWeightChange - targetWeight
-        : startWeight - targetWeight;
+    effectiveWeight !== null
+      ? Math.round((effectiveWeight - targetWeight) * 10) / 10
+      : totalToLose;
 
   return (
     <div
@@ -75,15 +77,15 @@ export function DietProgressBanner({
         <span data-testid="home-weight-display" className="text-2xl font-bold">
           {currentWeight ? `${currentWeight} kg` : "미입력"}
         </span>
-        {weightChange !== null && (
+        {todayChange !== null && (
           <span
             className={cn(
               "text-sm font-medium",
-              weightChange < 0 ? "text-success" : "text-coral"
+              todayChange <= 0 ? "text-success" : "text-coral"
             )}
           >
-            {weightChange > 0 ? "+" : ""}
-            {weightChange.toFixed(1)} kg
+            {todayChange > 0 ? "+" : ""}
+            {todayChange.toFixed(1)} kg
           </span>
         )}
       </div>

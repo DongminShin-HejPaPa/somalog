@@ -53,11 +53,11 @@ export function HomeContent({ todayLog, recentLogs, cumulativeDay, onCloseToday,
     }
   }
 
-  // 오늘 체중 미입력 시 최근 기록 기준으로 진행률/남은 kg 표시
+  // 오늘 체중 미입력 시 최근 기록 체중으로 진행률/남은 kg 표시 (변화량은 배너에서 startWeight 기준 live 계산)
   const lastKnownWithWeight = recentLogs.find(
-    (l) => l.date !== todayLog.date && l.weight !== null && l.weightChange !== null
+    (l) => l.date !== todayLog.date && l.weight !== null
   );
-  const fallbackWeightChange = todayLog.weight === null ? (lastKnownWithWeight?.weightChange ?? null) : null;
+  const fallbackWeight = todayLog.weight === null ? (lastKnownWithWeight?.weight ?? null) : null;
 
   return (
     <>
@@ -66,10 +66,9 @@ export function HomeContent({ todayLog, recentLogs, cumulativeDay, onCloseToday,
         day={settings.dietStartDate ? Math.max(getDayNumber(todayLog.date, settings.dietStartDate), 1) : todayLog.day}
         cumulativeDay={cumulativeDay}
         currentWeight={todayLog.weight}
+        fallbackWeight={fallbackWeight}
         startWeight={settings.startWeight}
         targetWeight={settings.targetWeight}
-        weightChange={todayLog.weightChange}
-        fallbackWeightChange={fallbackWeightChange}
         isIntensiveDay={settings.intensiveDayOn && todayLog.intensiveDay === true}
       />
 

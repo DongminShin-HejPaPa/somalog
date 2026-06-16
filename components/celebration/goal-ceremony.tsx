@@ -111,7 +111,7 @@ export default function GoalCeremony({ snapshot, onClose }: GoalCeremonyProps) {
           }}
           onNewGoal={() => {
             onClose();
-            router.push("/settings");
+            router.push("/settings?newChapter=1");
           }}
           onLater={onClose}
         />

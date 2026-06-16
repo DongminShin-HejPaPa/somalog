@@ -116,6 +116,24 @@ export interface JourneyReport {
   weeklyAvgLoss: number;   // 주 평균 감량 (kg, 소수점 둘째자리)
 }
 
+/** 종료된 다이어트 챕터(캠페인) 1행 — diet_chapters 테이블 */
+export interface DietChapter {
+  id: string;
+  startDate: string;     // YYYY-MM-DD
+  startWeight: number;
+  targetWeight: number;
+  endDate: string;       // YYYY-MM-DD
+  endWeight: number | null;
+  achieved: boolean;     // 목표 달성으로 종료됐는지
+  createdAt: string;     // ISO
+}
+
+/** 새 챕터 시작(새 목표 / 새출발) 입력 — 달성 여부는 서버에서 계산 */
+export interface StartNewChapterInput {
+  targetWeight: number;  // 새 챕터 목표 체중
+  startWeight: number;   // 새 챕터 시작 체중 (보통 현재 체중)
+}
+
 export interface Notice {
   id: string;
   title: string;

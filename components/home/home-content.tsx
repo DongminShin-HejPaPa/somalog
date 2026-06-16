@@ -5,16 +5,18 @@ import { DietProgressBanner } from "./diet-progress-banner";
 import { InputStatusChips } from "./input-status-chips";
 import { CoachOneLiner } from "./coach-one-liner";
 import type { DailyLog } from "@/lib/types";
-import { formatDate } from "@/lib/utils/date-utils";
+import { formatDate, getDayNumber } from "@/lib/utils/date-utils";
 
 interface HomeContentProps {
   todayLog: DailyLog | null;
   recentLogs: DailyLog[];
+  /** 첫 기록일부터의 누적 일수 (이전 챕터 보조 표시용) */
+  cumulativeDay?: number;
   onCloseToday?: () => void;
   isClosingToday?: boolean;
 }
 
-export function HomeContent({ todayLog, recentLogs, onCloseToday, isClosingToday }: HomeContentProps) {
+export function HomeContent({ todayLog, recentLogs, cumulativeDay, onCloseToday, isClosingToday }: HomeContentProps) {
   const { settings } = useSettings();
 
   if (!todayLog) {
@@ -61,7 +63,8 @@ export function HomeContent({ todayLog, recentLogs, onCloseToday, isClosingToday
     <>
       <DietProgressBanner
         date={todayLog.date}
-        day={todayLog.day}
+        day={settings.dietStartDate ? Math.max(getDayNumber(todayLog.date, settings.dietStartDate), 1) : todayLog.day}
+        cumulativeDay={cumulativeDay}
         currentWeight={todayLog.weight}
         startWeight={settings.startWeight}
         targetWeight={settings.targetWeight}

@@ -16,6 +16,7 @@ import { AccountInfoDialog } from "./account-info-dialog";
 import { actionGetRecentDailyLogs } from "@/app/actions/log-actions";
 import { logStore } from "@/lib/stores/log-store";
 import { computeRecommendedWater } from "@/lib/utils/compute-daily";
+import { NewChapterModal } from "@/components/chapter/new-chapter-modal";
 
 type DialogState = "idle" | "confirm-reset" | "confirm-onboarding" | "confirm-demo" | "confirm-delete-custom-field" | "confirm-delete-account" | "confirm-delete-account-final";
 
@@ -239,7 +240,7 @@ function ExtraItemList({
 }
 
 export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
-  const { settings, updateSettings, resetAllSettings, loadDemoSettings, isLoaded } = useSettings();
+  const { settings, updateSettings, syncSettings, resetAllSettings, loadDemoSettings, isLoaded } = useSettings();
   const [form, setForm] = useState<Settings>(settings);
   const [saved, setSaved] = useState(false);
   const [dialog, setDialog] = useState<DialogState>("idle");
@@ -268,6 +269,7 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
   const customFieldNameRef = useRef<HTMLInputElement>(null);
 
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
+  const [showNewChapter, setShowNewChapter] = useState(false);
 
   useEffect(() => {
     actionGetRecentDailyLogs(30).then((logs) => {
@@ -287,6 +289,10 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
     if (searchParams.get("highlightBirthDate") === "true") {
       setIsBirthDateFromDirectLink(true);
       setBirthDateBlinkOn(true);
+    }
+    // 세레머니 "새 목표 설정하기" 등에서 새 챕터 모달 자동 오픈
+    if (searchParams.get("newChapter") === "1") {
+      setShowNewChapter(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
@@ -602,19 +608,24 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
             </div>
           ))}
         </div>
-        <InputField
-          label="시작일"
-          value={form.dietStartDate}
-          type="date"
-          onChange={(v) => handleChange("dietStartDate", v)}
-        />
-        <InputField
-          label="시작 체중"
-          value={form.startWeight.toString()}
-          suffix="kg"
-          inputMode="decimal"
-          onChange={(v) => handleChange("startWeight", Number(v) || 0)}
-        />
+        {/* 시작일·시작 체중은 직접 편집 대신 "새 챕터 시작"으로만 변경 */}
+        <div className="flex items-center justify-between py-2">
+          <div>
+            <p className="text-sm text-muted-foreground">시작일 · 시작 체중</p>
+            <p className="text-xs text-muted-foreground/70 mt-0.5">
+              {form.dietStartDate || "—"} · {form.startWeight}kg
+            </p>
+          </div>
+          <button
+            onClick={() => setShowNewChapter(true)}
+            className="px-3 py-1.5 rounded-lg text-sm font-medium min-h-[36px] bg-navy text-white hover:bg-navy/90 transition-colors"
+          >
+            🔄 새 챕터
+          </button>
+        </div>
+        <p className="text-xs text-muted-foreground mb-1">
+          새 목표를 세우거나 처음부터 다시 시작할 때 눌러요. 이전 챕터는 보존되고 며칠째가 1일부터 다시 시작돼요.
+        </p>
         <InputField
           label="목표 체중"
           value={form.targetWeight.toString()}
@@ -1295,6 +1306,22 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
         isOpen={showAccountInfo}
         onClose={() => setShowAccountInfo(false)}
       />
+
+      {/* 새 챕터 시작 모달 */}
+      {showNewChapter && (
+        <NewChapterModal
+          dietStartDate={form.dietStartDate}
+          currentTargetWeight={form.targetWeight}
+          defaultStartWeight={latestWeight ?? form.currentWeight}
+          onClose={() => setShowNewChapter(false)}
+          onSuccess={(updated) => {
+            syncSettings(updated);
+            setForm(updated);
+            setShowNewChapter(false);
+            router.refresh();
+          }}
+        />
+      )}
     </div>
   );
 }

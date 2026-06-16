@@ -79,6 +79,8 @@ export const DEFAULT_SETTINGS: Settings = {
 interface SettingsContextValue {
   settings: Settings;
   updateSettings: (data: SettingsUpdate) => void;
+  /** 서버에서 이미 갱신된 Settings를 추가 쓰기 없이 클라이언트 상태에만 반영 */
+  syncSettings: (s: Settings) => void;
   initializeSettings: (data: SettingsInput) => void;
   resetAllSettings: () => void;
   loadDemoSettings: () => void;
@@ -156,6 +158,11 @@ export function SettingsProvider({
     }
   }, [uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const syncSettings = useCallback((s: Settings) => {
+    setSettings(s);
+    if (s.onboardingComplete) writeCachedSettings(s, uid);
+  }, [uid]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const initializeSettings = useCallback(async (data: SettingsInput) => {
     try {
       const initialized = await actionInitializeSettings(data);
@@ -196,6 +203,7 @@ export function SettingsProvider({
       value={{
         settings,
         updateSettings,
+        syncSettings,
         initializeSettings,
         resetAllSettings,
         loadDemoSettings,

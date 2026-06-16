@@ -3,6 +3,8 @@ import { cn } from "@/lib/utils";
 interface DietProgressBannerProps {
   date: string;
   day: number;
+  /** 첫 기록일부터의 누적 일수 — 이전 챕터가 있을 때만 보조로 표시 */
+  cumulativeDay?: number;
   currentWeight: number | null;
   startWeight: number;
   targetWeight: number;
@@ -20,6 +22,7 @@ function formatShortDate(dateStr: string) {
 export function DietProgressBanner({
   date,
   day,
+  cumulativeDay,
   currentWeight,
   startWeight,
   targetWeight,
@@ -54,6 +57,11 @@ export function DietProgressBanner({
         <div className="flex items-baseline gap-1.5">
           <span className="text-lg font-bold">{formatShortDate(date)}</span>
           <span className="text-sm font-normal text-muted-foreground">D+{day}</span>
+          {cumulativeDay !== undefined && cumulativeDay > day && (
+            <span className="text-xs font-normal text-muted-foreground/60">
+              · 총 {cumulativeDay}일째
+            </span>
+          )}
         </div>
         {isIntensiveDay && (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-coral text-white text-xs font-semibold">

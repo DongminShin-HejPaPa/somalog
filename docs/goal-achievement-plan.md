@@ -8,7 +8,7 @@
 ## ✅ 구현 완료 요약 (2026-06-16)
 
 - **데이터:** `achievements` 테이블(RLS) + `settings.mode('losing'|'maintaining')`.
-  마이그레이션 `supabase/migrations/20260616000000_create_achievements.sql` — **수동 적용 필요**(MCP read-only).
+  마이그레이션 `supabase/migrations/20260616000000_create_achievements.sql` — **적용 완료**(이력은 `migration repair`로 정합화).
 - **판정:** `lib/services/achievement-service.ts`
   - 순수 로직 `decideGoalEventKind()` + 유닛 테스트 9종.
   - `detectGoalAchievement()`는 `actionCloseDailyLog`에서 마감 직후 호출(`closeDailyLog` 자체는 미변경).
@@ -18,7 +18,22 @@
   - 유지 모드 또는 목표 이하 연속 → 이벤트 없음(매일 토스트 방지).
 - **UI:** `components/celebration/goal-ceremony.tsx`(지연 로드) + `confetti.tsx`(경량 CSS).
   입력탭·홈탭 마감 직후 모두 배선 — 어느 탭에서 마감해도 노출. 초기 번들 영향 0.
-- **3막 동작:** 유지 모드 전환(`mode='maintaining'`) / 새 목표(설정 이동) / 나중에.
+- **3막 동작:** 유지 모드 전환(`mode='maintaining'`) / 새 목표(새 챕터 모달) / 나중에.
+
+### ✅ 추가 완료 (2026-06-16, 챕터 모델 도입)
+
+- **2막 리포트 개편(B 일부):** 카드 8종 재배치(운동·수분·야식·술·세끼·기록·일평균·주평균),
+  습관 비율 분모를 "해당 항목을 입력한 날"로 보정(미입력일 제외), 일/주 평균 감량 추가.
+  **공유 완료** — `html-to-image`로 1막·2막 카드 2장 캡처 → `navigator.share`(미지원 시 로컬 저장 + 안내 토스트).
+- **챕터(캠페인) 모델:** `diet_chapters` 테이블(RLS) — 마이그레이션 `20260616010000_create_diet_chapters.sql` **적용 완료**.
+  - 개념 분리: **기록 타임라인**(`daily_logs`, 불변) ↔ **현재 챕터**(`settings`의 시작일·시작체중·목표).
+  - `lib/services/chapter-service.ts` — `startNewChapter()`(직전 챕터 아카이브 + 달성 기록 초기화 + settings 갱신), `getChapters()`.
+  - `app/actions/chapter-actions.ts` — `actionStartNewChapter` / `actionGetChapters`.
+  - **새출발/새 목표 UX:** `components/chapter/new-chapter-modal.tsx` — 결과(이전 챕터 종료·기록 보존·Day 리셋·시작체중 갱신)를 명시하고 재확인.
+    설정 탭의 시작일/시작체중 **직접 편집 제거** → 모달 경유로만. 세레머니 3막 "새 목표"는 `/settings?newChapter=1`로 모달 자동 오픈.
+  - **며칠째 = 현재 챕터 기준(메인)** + **총 누적 일수(보조)**: 홈 배너는 `dietStartDate` live 계산(D+N) + 첫 기록일 기준 "총 N일째"(이전 챕터 있을 때만, 캐시된 전체 로그 사용 — 신규 쿼리 0).
+- **데모 갱신:** `mock-data-new.ts`에 술(`dinnerAlcohol`/`lateSnackAlcohol`)·야식 연결("저녁 식사 연결") 사례 추가, `loadMockDailyLogs`가 술 컬럼 매핑하도록 보정.
+- **마이그레이션 이력 정렬:** 원격에 적용됐으나 이력 누락이던 `20260421/20260615/20260616000000`을 `migration repair`로 정합화(스키마는 이미 존재, 재실행 아님).
 
 ---
 
@@ -27,22 +42,24 @@
 > **공통 제약:** 모든 후속 작업도 **앱 진입·탭 이동 속도 훼손 0** 원칙을 지킨다.
 > 무거운 자산은 지연 로드, 신규 쿼리는 세리머니/리포트 진입 시점에만, 탭 마운트 경로에 fetch 추가 금지.
 
-### A. 명예의 전당 (Hall of Fame) — 우선순위 ★★★
-- **상태:** 데이터·액션 준비됨(`getAchievements` / `actionGetAchievements`), 전용 UI 미구현.
+### A. 명예의 전당 (Hall of Fame) — 우선순위 ★★★  *(데이터 기반 완료, UI는 나중에)*
+- **상태:** 데이터·액션 준비됨 — `getAchievements`/`actionGetAchievements`(달성 순간)에 더해
+  **`diet_chapters` 테이블 + `getChapters`/`actionGetChapters`(종료된 챕터 이력)까지 완비**. 전용 **UI만** 미구현.
+- **설계 합의(2026-06-16):** 챕터 데이터 기반은 지금 깔아두고, **명예의 전당 화면(UI)은 나중에** 만든다.
+  각 종료된 챕터(달성/미달성)가 트로피 카드 1장이 되도록 `diet_chapters` + `achievements`를 함께 렌더.
 - **할 일:**
   - 화면 위치 결정: 설정 하위(`/settings` 내 섹션) 또는 신규 라우트. 탭 추가는 지양(탭 진입 속도 영향).
+  - 소스: `diet_chapters`(종료 챕터: 시작/목표/종료 체중·기간·달성여부) + `achievements`(달성 스냅샷). 시간순 카드 리스트.
   - `achievements` 타임라인 카드 리스트: `payload`(시작/목표/최종 체중, D+N, 기록일수)로 달성 요약.
   - 3막 `next-step-sheet`의 "명예의 전당" 진입점을 이 화면에 연결(현재 3막은 유지/새목표/나중에만 노출).
   - 재진입 배너: 홈 상단에 "내 달성 기록 보기"(이미 `seen_at` 있는 업적 대상) — 선택.
 - **주의:** 명예의 전당 화면 자체도 지연 로드(`dynamic`)로, 설정 탭 초기 번들에 안 실리게.
 
-### B. 2막 리포트 공유 (Web Share / 카카오) — 우선순위 ★★
-- **상태:** 2막 리포트(`ReportAct`)는 화면에만 존재, 공유 버튼 없음.
-- **할 일:**
-  - 공유 카드 이미지 생성: 클라이언트 렌더 후 캡처(html-to-image류) 또는 서버 OG 이미지(`/api/og`) — **번들 영향 측정 필수**, 캡처 라이브러리는 동적 import.
-  - `navigator.share()`(Web Share) 우선, 미지원 시 카카오 링크 폴백.
-  - 기존 share 자산 재사용(`components/graph/weight-chart.tsx`에 공유 경로 있음 — 회귀 주의).
-  - 프라이버시: 카드엔 데이터만(−Nkg / D+N / 기록 N일), 식단 원문·민감정보 제외.
+### B. 2막 리포트 공유 (Web Share) — ✅ 완료 (2026-06-16)
+- **구현:** `ReportAct`에 "친구에게 자랑하기" — `html-to-image`로 1막(달성)·2막(여정) 카드 2장 캡처(동적 import),
+  `navigator.share({ files })` 우선, 미지원 시 로컬 PNG 2장 저장 + "사진첩에서 확인" 토스트.
+  오프스크린 캡처용 카드는 인라인 스타일(캡처 안정성). 프라이버시: 카드엔 집계 데이터만, 식단 원문 제외.
+- **남은 선택지:** 카카오 링크 공유(현재 Web Share만). 필요 시 추가.
 
 ### C. 점진적 빌드업 (게이지 글로우 / 마일스톤) — 우선순위 ★★
 - **상태:** 미구현. 최종 세리머니가 갑작스럽지 않게 "쌓아온 결과"로 느껴지게 하는 선행 연출.
@@ -67,9 +84,10 @@
   - 데모 데이터/리셋 경로에서 `achievements` 정합성(리셋 시 업적도 정리할지 정책 결정).
   - 이미 목표 이하로 시작한 계정/목표 미설정 계정 무오작동 재확인(현재 판정 가드로 1차 보장).
 
-### F. 선행 의존성 (작업 전 반드시)
-- **DB 마이그레이션 수동 적용:** `20260616000000_create_achievements.sql`
-  (`achievements` 테이블 + `settings.mode`). 미적용 시 설정 저장 실패 — 최우선.
+### F. 선행 의존성 — ✅ 해소
+- **DB 마이그레이션 적용 완료:** `20260616000000_create_achievements.sql`(achievements + `settings.mode`),
+  `20260616010000_create_diet_chapters.sql`(diet_chapters). 원격 적용 + 이력 정합화(`migration repair`) 완료.
+- 앞으로 `supabase db push`로 정상 적용 가능(드리프트 해소됨).
 
 ---
 

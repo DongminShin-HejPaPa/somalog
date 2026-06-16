@@ -5,7 +5,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { actionGetDailyLog, actionGetRecentDailyLogs, actionCloseDailyLog, actionAutoCloseOldLogs, actionGetPrefetchData, actionGetHomeInitialData } from "@/app/actions/log-actions";
 import { HomeContent } from "./home-content";
-import { formatDate } from "@/lib/utils/date-utils";
+import { formatDate, getDayNumber } from "@/lib/utils/date-utils";
 import { getGreetingMessage } from "@/lib/utils/greeting-messages";
 import { useSettings } from "@/lib/contexts/settings-context";
 import type { DailyLog, GoalEvent } from "@/lib/types";
@@ -15,6 +15,14 @@ const GoalCeremony = dynamic(
   () => import("@/components/celebration/goal-ceremony"),
   { ssr: false }
 );
+
+/** 첫 기록일부터의 누적 일수 — 이전 챕터 존재 시 보조 표시용 (추가 쿼리 없이 캐시된 전체 로그 사용) */
+function computeCumulativeDay(logs: DailyLog[] | null, today: string): number | null {
+  if (!logs || logs.length === 0) return null;
+  let earliest = logs[0].date;
+  for (const l of logs) if (l.date < earliest) earliest = l.date;
+  return Math.max(getDayNumber(today, earliest), 1);
+}
 
 interface HomeContainerProps {
   userId: string | null;
@@ -40,6 +48,7 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
   const [isClosingDay, setIsClosingDay] = useState(false);
   const [goalEvent, setGoalEvent] = useState<GoalEvent | null>(null);
   const [goalToast, setGoalToast] = useState<string | null>(null);
+  const [cumulativeDay, setCumulativeDay] = useState<number | null>(null);
   const { settings } = useSettings();
 
   useEffect(() => {
@@ -53,6 +62,9 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
       logStore.setRecentLogs(bootCache.recentLogs);
       if (bootCache.activeLog) logStore.setLog(bootCache.activeLog);
     }
+
+    // 누적 일수: 이미 캐시된 전체 로그가 있으면 즉시 계산 (신규 쿼리 없음)
+    setCumulativeDay(computeCumulativeDay(logStore.getAllLogs(), today));
 
     // 마운트 시 무조건 최신 데이터 1회 fetch.
     // familyTime ChatRoom 과 동일: 캐시는 "즉시 표시", 네트워크는 "백그라운드 동기화".
@@ -85,7 +97,10 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
         .then((res) => {
           if (res.w) logStore.setWeeklyLogs(res.w);
           if (res.c !== undefined) logStore.setTotalCount(res.c);
-          if (res.all) logStore.setAllLogs(res.all);
+          if (res.all) {
+            logStore.setAllLogs(res.all);
+            setCumulativeDay(computeCumulativeDay(res.all, today));
+          }
           if (res.low) logStore.setLowestWeight(res.low);
         })
         .catch(() => {});
@@ -187,6 +202,7 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
       <HomeContent
         todayLog={activeLog}
         recentLogs={recentLogs.slice(0, 14)}
+        cumulativeDay={cumulativeDay ?? undefined}
         onCloseToday={handleCloseDay}
         isClosingToday={isClosingDay}
       />

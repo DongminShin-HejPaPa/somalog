@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { useSettings } from "@/lib/contexts/settings-context";
 import type { Settings, CustomFieldDef } from "@/lib/types";
 import Link from "next/link";
-import { LogOut, UserPen, ChevronRight, Trash2 } from "lucide-react";
+import { LogOut, UserPen, ChevronRight, Trash2, Trophy } from "lucide-react";
 import { serverResetAllData, serverLoadDemoData } from "@/app/actions/data-actions";
 import { actionDeleteCustomField } from "@/app/actions/settings-actions";
 import { mockSettings } from "@/lib/mock-data-new";
@@ -480,6 +480,18 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
           관리자 페이지
         </Link>
       )}
+
+      {/* 명예의 전당 메뉴 */}
+      <Link
+        href="/settings/chapters"
+        className="flex items-center justify-between px-4 py-4 border-b border-border hover:bg-secondary/50 active:bg-secondary transition-colors"
+      >
+        <span className="inline-flex items-center gap-1.5 text-sm font-semibold">
+          <Trophy className="w-4 h-4 text-amber-500" />
+          명예의 전당
+        </span>
+        <ChevronRight className="w-4 h-4 text-muted-foreground" />
+      </Link>
 
       {/* 공지사항 메뉴 */}
       <Link

@@ -4,13 +4,16 @@ import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import type { Settings } from "@/lib/types";
 import { actionStartNewChapter } from "@/app/actions/chapter-actions";
+import { actionGetRecentDailyLogs } from "@/app/actions/log-actions";
 import { getDayNumber, formatDate } from "@/lib/utils/date-utils";
 import { DIET_PRESETS, computePresetMonths } from "@/lib/utils/diet-presets";
 
 interface NewChapterModalProps {
   dietStartDate: string;
-  /** 새 챕터 시작 체중 기본값 (최근 기록 체중) */
+  /** 새 챕터 시작 체중 기본값 (설정의 현재 체중 — 최신 기록 도착 전 임시값) */
   defaultStartWeight: number;
+  /** 종료되는(현재) 챕터의 목표 체중 — 목표 달성 여부 판정·안내문 분기에 사용 */
+  currentChapterTarget: number;
   onSuccess: (settings: Settings) => void;
   onClose: () => void;
 }
@@ -30,6 +33,7 @@ function projectedEndLabel(months: number): string {
 export function NewChapterModal({
   dietStartDate,
   defaultStartWeight,
+  currentChapterTarget,
   onSuccess,
   onClose,
 }: NewChapterModalProps) {
@@ -45,6 +49,9 @@ export function NewChapterModal({
   const [monthsInput, setMonthsInput] = useState(String(initMonths || 12));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 사용자가 직접 만진 칸은 자동 채움이 덮어쓰지 않도록 추적
+  const [startTouched, setStartTouched] = useState(false);
+  const [targetTouched, setTargetTouched] = useState(false);
 
   const today = formatDate(new Date());
   const currentChapterDays = dietStartDate
@@ -55,6 +62,9 @@ export function NewChapterModal({
   const sw = Number(startWeight) || 0;
   const invalid = tw <= 0 || sw <= 0 || tw >= sw || targetMonths <= 0;
 
+  // 종료되는 챕터의 목표를 실제로 달성했는가 (현재 체중 ≤ 직전 목표) — 서버 판정과 동일
+  const achieved = sw > 0 && currentChapterTarget > 0 && sw <= currentChapterTarget;
+
   // 시작/목표 체중·프리셋 변경 시 비커스텀 프리셋의 기간 자동 재계산 (설정·온보딩과 동일 로직)
   useEffect(() => {
     if (preset === "custom") return;
@@ -62,6 +72,24 @@ export function NewChapterModal({
     setTargetMonths(months);
     setMonthsInput(String(months));
   }, [preset, sw, tw]);
+
+  // 최신 기록 체중을 직접 가져와 시작 체중 기본값을 보정 (prop 타이밍/설정값 의존 제거)
+  useEffect(() => {
+    let cancelled = false;
+    actionGetRecentDailyLogs(30).then((logs) => {
+      if (cancelled) return;
+      const latest = logs.find((l) => l.weight !== null)?.weight;
+      if (latest == null) return;
+      if (!startTouched) setStartWeight(String(latest));
+      if (!targetTouched) {
+        setTargetWeight(String(Math.round((latest - DEFAULT_GOAL_DROP) * 10) / 10));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleConfirm = async () => {
     if (invalid || submitting) return;
@@ -92,21 +120,37 @@ export function NewChapterModal({
         </div>
 
         <div className="px-6 py-5 space-y-5">
-          {/* 무슨 일이 일어나는지 명확히 */}
+          {/* 무슨 일이 일어나는지 명확히 — 목표 달성 여부에 따라 분기 */}
           <div className="space-y-2.5">
-            <ConseqRow
-              emoji="🏁"
-              text={
-                currentChapterDays > 0 ? (
-                  <>
-                    지금까지의 챕터(<b>{currentChapterDays}일</b>)가 종료되고{" "}
-                    <b>명예의 전당</b>에 보관돼요
-                  </>
-                ) : (
-                  <>지금 챕터가 종료되고 기록에 보관돼요</>
-                )
-              }
-            />
+            {achieved ? (
+              <ConseqRow
+                emoji="🏆"
+                text={
+                  currentChapterDays > 0 ? (
+                    <>
+                      <b>목표를 달성한</b> 이번 챕터(<b>{currentChapterDays}일</b>)가{" "}
+                      <b>명예의 전당</b>에 보관돼요
+                    </>
+                  ) : (
+                    <>목표를 달성한 이번 챕터가 <b>명예의 전당</b>에 보관돼요</>
+                  )
+                }
+              />
+            ) : (
+              <ConseqRow
+                emoji="🗂️"
+                text={
+                  currentChapterDays > 0 ? (
+                    <>
+                      이번 챕터(<b>{currentChapterDays}일</b>)는 <b>지난 도전 기록</b>으로 보관돼요{" "}
+                      <span className="text-muted-foreground">(명예의 전당은 목표 달성 시에만)</span>
+                    </>
+                  ) : (
+                    <>이번 챕터는 <b>지난 도전 기록</b>으로 보관돼요</>
+                  )
+                }
+              />
+            )}
             <ConseqRow emoji="📚" text={<>지금까지의 기록은 <b>하나도 사라지지 않아요</b></>} />
             <ConseqRow emoji="🔄" text={<><b>며칠째</b> 카운터가 오늘(Day 1)부터 다시 시작돼요</>} />
             <ConseqRow emoji="⚖️" text={<>시작 체중·목표·기간이 아래 값으로 새로 맞춰져요</>} />
@@ -114,8 +158,18 @@ export function NewChapterModal({
 
           {/* 체중 입력 */}
           <div className="space-y-3 pt-1">
-            <Field label="새 시작 체중 (오늘)" value={startWeight} onChange={setStartWeight} suffix="kg" />
-            <Field label="새 목표 체중" value={targetWeight} onChange={setTargetWeight} suffix="kg" />
+            <Field
+              label="새 시작 체중 (오늘)"
+              value={startWeight}
+              onChange={(v) => { setStartTouched(true); setStartWeight(v); }}
+              suffix="kg"
+            />
+            <Field
+              label="새 목표 체중"
+              value={targetWeight}
+              onChange={(v) => { setTargetTouched(true); setTargetWeight(v); }}
+              suffix="kg"
+            />
             {tw > 0 && sw > 0 && tw >= sw && (
               <p className="text-xs text-red-500">목표 체중은 시작 체중보다 낮아야 해요</p>
             )}

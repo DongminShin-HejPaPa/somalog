@@ -1312,6 +1312,7 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
         <NewChapterModal
           dietStartDate={form.dietStartDate}
           defaultStartWeight={latestWeight ?? form.currentWeight}
+          currentChapterTarget={form.targetWeight}
           onClose={() => setShowNewChapter(false)}
           onSuccess={(updated) => {
             syncSettings(updated);

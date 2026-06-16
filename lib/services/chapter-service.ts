@@ -72,11 +72,13 @@ export async function startNewChapter(
   // 2. 달성 기록 초기화 (새 목표를 첫 달성으로)
   await deleteGoalAchievement().catch(() => {});
 
-  // 3. settings 를 새 챕터로 갱신
+  // 3. settings 를 새 챕터로 갱신 (시작일·시작체중·목표·프리셋·기간 모두 새로 설정)
   return updateSettings({
     dietStartDate: today,
     startWeight: input.startWeight,
     targetWeight: input.targetWeight,
+    dietPreset: input.dietPreset,
+    targetMonths: input.targetMonths,
     mode: "losing",
   });
 }

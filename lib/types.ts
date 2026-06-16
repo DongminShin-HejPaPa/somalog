@@ -130,8 +130,10 @@ export interface DietChapter {
 
 /** 새 챕터 시작(새 목표 / 새출발) 입력 — 달성 여부는 서버에서 계산 */
 export interface StartNewChapterInput {
-  targetWeight: number;  // 새 챕터 목표 체중
-  startWeight: number;   // 새 챕터 시작 체중 (보통 현재 체중)
+  targetWeight: number;          // 새 챕터 목표 체중
+  startWeight: number;           // 새 챕터 시작 체중 (보통 현재 체중)
+  dietPreset: Settings["dietPreset"]; // 감량 속도 프리셋
+  targetMonths: number;          // 목표 기간(개월) — 종료일 추정 기준
 }
 
 export interface Notice {

@@ -9,14 +9,16 @@ import { DIET_PRESETS, computePresetMonths } from "@/lib/utils/diet-presets";
 
 interface NewChapterModalProps {
   dietStartDate: string;
-  currentTargetWeight: number;
-  currentPreset: Settings["dietPreset"];
-  currentTargetMonths: number;
-  /** 새 챕터 시작 체중 기본값 (보통 최근 기록 체중) */
+  /** 새 챕터 시작 체중 기본값 (최근 기록 체중) */
   defaultStartWeight: number;
   onSuccess: (settings: Settings) => void;
   onClose: () => void;
 }
+
+/** 새 챕터 기본 감량 속도 — "착실하게"(추천) */
+const DEFAULT_PRESET: Settings["dietPreset"] = "sustainable";
+/** 새 목표 체중 기본값 = 시작 체중 - 5kg */
+const DEFAULT_GOAL_DROP = 5;
 
 /** 오늘부터 N개월 뒤 날짜를 "YYYY년 M월 D일"로 */
 function projectedEndLabel(months: number): string {
@@ -27,22 +29,20 @@ function projectedEndLabel(months: number): string {
 
 export function NewChapterModal({
   dietStartDate,
-  currentTargetWeight,
-  currentPreset,
-  currentTargetMonths,
   defaultStartWeight,
   onSuccess,
   onClose,
 }: NewChapterModalProps) {
-  const [targetWeight, setTargetWeight] = useState(
-    currentTargetWeight > 0 ? String(currentTargetWeight) : ""
-  );
-  const [startWeight, setStartWeight] = useState(
-    defaultStartWeight > 0 ? String(defaultStartWeight) : ""
-  );
-  const [preset, setPreset] = useState<Settings["dietPreset"]>(currentPreset);
-  const [targetMonths, setTargetMonths] = useState(currentTargetMonths || 12);
-  const [monthsInput, setMonthsInput] = useState(String(currentTargetMonths || 12));
+  // 기본값: 시작 체중 = 최근 기록 체중, 목표 = 시작 - 5kg, 속도 = 착실하게
+  const initStart = defaultStartWeight > 0 ? defaultStartWeight : 0;
+  const initTarget = initStart > 0 ? Math.round((initStart - DEFAULT_GOAL_DROP) * 10) / 10 : 0;
+  const initMonths = computePresetMonths(DEFAULT_PRESET, initStart, initTarget);
+
+  const [startWeight, setStartWeight] = useState(initStart > 0 ? String(initStart) : "");
+  const [targetWeight, setTargetWeight] = useState(initTarget > 0 ? String(initTarget) : "");
+  const [preset, setPreset] = useState<Settings["dietPreset"]>(DEFAULT_PRESET);
+  const [targetMonths, setTargetMonths] = useState(initMonths || 12);
+  const [monthsInput, setMonthsInput] = useState(String(initMonths || 12));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

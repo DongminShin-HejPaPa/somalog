@@ -270,6 +270,8 @@ function ReportAct({
           text: `${snapshot.coachName}와 함께 ${totalLoss}kg 감량 달성! SomaLog로 같이 도전해볼래?`,
           url: "https://somalog.vercel.app",
         });
+        setSavedToast("공유 완료! 🎉 사진첩에 저장했다면 거기서 확인할 수 있어요");
+        setTimeout(() => setSavedToast(null), 4000);
       } else {
         [dataUrl1, dataUrl2].forEach((url, i) => {
           const a = document.createElement("a");

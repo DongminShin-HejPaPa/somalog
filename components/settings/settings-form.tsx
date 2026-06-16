@@ -1311,9 +1311,6 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
       {showNewChapter && (
         <NewChapterModal
           dietStartDate={form.dietStartDate}
-          currentTargetWeight={form.targetWeight}
-          currentPreset={form.dietPreset}
-          currentTargetMonths={form.targetMonths}
           defaultStartWeight={latestWeight ?? form.currentWeight}
           onClose={() => setShowNewChapter(false)}
           onSuccess={(updated) => {

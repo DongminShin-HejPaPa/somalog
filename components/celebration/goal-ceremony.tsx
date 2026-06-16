@@ -231,6 +231,9 @@ function ReportAct({
 }) {
   const [report, setReport] = useState<JourneyReport | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isSharing, setIsSharing] = useState(false);
+  const shareCard1Ref = useRef<HTMLDivElement>(null);
+  const shareCard2Ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     actionGetJourneyReport()
@@ -238,8 +241,57 @@ function ReportAct({
       .finally(() => setLoading(false));
   }, []);
 
+  const handleShare = async () => {
+    if (!shareCard1Ref.current || !shareCard2Ref.current) return;
+    setIsSharing(true);
+    try {
+      const { toPng } = await import("html-to-image");
+      const [dataUrl1, dataUrl2] = await Promise.all([
+        toPng(shareCard1Ref.current, { quality: 1, pixelRatio: 2 }),
+        toPng(shareCard2Ref.current, { quality: 1, pixelRatio: 2 }),
+      ]);
+      const [blob1, blob2] = await Promise.all([
+        fetch(dataUrl1).then((r) => r.blob()),
+        fetch(dataUrl2).then((r) => r.blob()),
+      ]);
+      const file1 = new File([blob1], "somalog-달성.png", { type: "image/png" });
+      const file2 = new File([blob2], "somalog-여정.png", { type: "image/png" });
+      const totalLoss = Math.round((snapshot.startWeight - snapshot.finalWeight) * 10) / 10;
+
+      if (
+        typeof navigator !== "undefined" &&
+        navigator.share &&
+        navigator.canShare?.({ files: [file1, file2] })
+      ) {
+        await navigator.share({
+          files: [file1, file2],
+          title: "목표 달성! 🏆",
+          text: `${snapshot.coachName}와 함께 ${totalLoss}kg 감량 달성! SomaLog로 같이 도전해볼래?`,
+          url: "https://somalog.vercel.app",
+        });
+      } else {
+        [dataUrl1, dataUrl2].forEach((url, i) => {
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = i === 0 ? "somalog-달성.png" : "somalog-여정.png";
+          a.click();
+        });
+      }
+    } catch (err) {
+      console.error("Share failed", err);
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col px-6 py-12">
+      {/* 오프스크린 공유 카드 — html-to-image 캡처용 */}
+      <div aria-hidden style={{ position: "fixed", left: "-9999px", top: 0, pointerEvents: "none" }}>
+        <CelebrationShareCard snapshot={snapshot} cardRef={shareCard1Ref} />
+        {report && <JourneyShareCard snapshot={snapshot} report={report} cardRef={shareCard2Ref} />}
+      </div>
+
       <div className="max-w-sm mx-auto w-full">
         <p className="text-sm font-semibold text-white/70 mb-1">SomaLog Wrapped</p>
         <h2 className="text-2xl font-extrabold mb-8">나의 다이어트 여정</h2>
@@ -288,12 +340,23 @@ function ReportAct({
           </div>
         )}
 
-        <button
-          onClick={onNext}
-          className="mt-10 w-full py-3 rounded-full bg-white text-navy font-bold text-sm shadow-lg hover:bg-white/90 active:scale-[0.98] transition-all"
-        >
-          나의 다음 선택 →
-        </button>
+        <div className="mt-10 space-y-3">
+          <button
+            onClick={onNext}
+            className="w-full py-3 rounded-full bg-white text-navy font-bold text-sm shadow-lg hover:bg-white/90 active:scale-[0.98] transition-all"
+          >
+            나의 다음 선택 →
+          </button>
+          {report && (
+            <button
+              onClick={handleShare}
+              disabled={isSharing}
+              className="w-full py-3 rounded-full bg-white/10 text-white font-semibold text-sm hover:bg-white/15 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {isSharing ? "이미지 만드는 중..." : "📸 친구에게 자랑하기"}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -422,5 +485,98 @@ function NextButton({
         <span className="block text-xs text-white/60 mt-0.5">{desc}</span>
       </span>
     </button>
+  );
+}
+
+// ─── 오프스크린 공유 카드 (html-to-image 캡처용) ───
+// Tailwind 미사용 — 인라인 스타일로 캡처 안정성 확보
+
+const SHARE_BG = "linear-gradient(135deg, #0c0920 0%, #0d1b4a 55%, #0f1f33 100%)";
+const SHARE_YELLOW = "#fbbf24";
+const SHARE_W = 375;
+
+function CelebrationShareCard({
+  snapshot,
+  cardRef,
+}: {
+  snapshot: GoalSnapshot;
+  cardRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  const totalLoss = Math.round((snapshot.startWeight - snapshot.finalWeight) * 10) / 10;
+  const cell = (label: string, value: string, unit: string, gold?: boolean) => (
+    <div key={label} style={{ flex: 1, background: "rgba(255,255,255,0.1)", borderRadius: 16, padding: "16px 8px", textAlign: "center" }}>
+      <p style={{ fontSize: 22, fontWeight: 900, color: gold ? SHARE_YELLOW : "#fff", margin: 0, lineHeight: 1 }}>
+        {value}<span style={{ fontSize: 12, marginLeft: 2 }}>{unit}</span>
+      </p>
+      <p style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", margin: "6px 0 0" }}>{label}</p>
+    </div>
+  );
+  return (
+    <div ref={cardRef} style={{ width: SHARE_W, height: 620, background: SHARE_BG, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 28px", textAlign: "center", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", boxSizing: "border-box" }}>
+      <div style={{ fontSize: 68, marginBottom: 12, lineHeight: 1 }}>🏆</div>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 4 }}>
+        <span style={{ fontSize: 72, fontWeight: 900, color: SHARE_YELLOW, lineHeight: 1 }}>{snapshot.finalWeight}</span>
+        <span style={{ fontSize: 28, fontWeight: 700, color: "#fde68a" }}>kg</span>
+      </div>
+      <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", marginBottom: 28, letterSpacing: "0.5px" }}>
+        목표 {snapshot.targetWeight}kg 달성 🎯
+      </p>
+      <div style={{ display: "flex", gap: 10, marginBottom: 24, width: "100%" }}>
+        {cell("총 감량", `−${totalLoss}`, "kg", true)}
+        {cell("여정", `${snapshot.daysElapsed}`, "일")}
+        {cell("기록한 날", `${snapshot.recordedDays}`, "일")}
+      </div>
+      <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 16, padding: "14px 18px", marginBottom: 28, width: "100%", boxSizing: "border-box", textAlign: "left" }}>
+        <p style={{ fontSize: 14, fontWeight: 700, color: "#fff", margin: "0 0 4px" }}>{snapshot.coachName}와 함께 해냈어요! 🎉</p>
+        <p style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", lineHeight: 1.6, margin: 0 }}>
+          {snapshot.startWeight}kg에서 시작해 {snapshot.daysElapsed}일 동안 <strong style={{ color: SHARE_YELLOW }}>{totalLoss}kg</strong>를 빼냈어요.
+        </p>
+      </div>
+      <p style={{ fontSize: 12, color: "rgba(255,255,255,0.25)", fontWeight: 600, letterSpacing: "2px", margin: 0 }}>SOMALOG</p>
+    </div>
+  );
+}
+
+function JourneyShareCard({
+  snapshot,
+  report,
+  cardRef,
+}: {
+  snapshot: GoalSnapshot;
+  report: JourneyReport;
+  cardRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  const stats = [
+    { label: "최저 체중", value: `${report.lowestWeight}kg` },
+    { label: "최장 연속", value: `${report.longestStreak}일` },
+    { label: "🏃 운동한 날", value: `${report.exerciseDays}일`, sub: `${report.exerciseRate}%` },
+    { label: "💧 수분 달성", value: `${report.waterGoalDays}일`, sub: `${report.waterGoalRate}%` },
+    { label: "📅 기록한 날", value: `${report.recordedDays}일` },
+    { label: "🍺 술 마신 날", value: `${report.alcoholDays}일`, sub: `${report.alcoholRate}%` },
+  ];
+  return (
+    <div ref={cardRef} style={{ width: SHARE_W, height: 620, background: SHARE_BG, display: "flex", flexDirection: "column", padding: "32px 24px", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", boxSizing: "border-box", color: "#fff" }}>
+      <p style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", fontWeight: 600, margin: "0 0 4px", letterSpacing: "0.5px" }}>SomaLog Wrapped</p>
+      <h2 style={{ fontSize: 22, fontWeight: 900, margin: "0 0 18px" }}>나의 다이어트 여정</h2>
+      <div style={{ background: "rgba(255,255,255,0.1)", borderRadius: 16, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div>
+          <p style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", margin: "0 0 3px" }}>시작 → 달성</p>
+          <p style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>{report.startWeight}kg → {report.finalWeight}kg</p>
+        </div>
+        <p style={{ fontSize: 30, fontWeight: 900, color: "#6ee7b7", margin: 0 }}>−{report.totalLoss}kg</p>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, flex: 1 }}>
+        {stats.map((s) => (
+          <div key={s.label} style={{ background: "rgba(255,255,255,0.08)", borderRadius: 14, padding: 12 }}>
+            <p style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", margin: "0 0 4px" }}>{s.label}</p>
+            <p style={{ fontSize: 20, fontWeight: 900, margin: 0, lineHeight: 1 }}>
+              {s.value}
+              {s.sub && <span style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", marginLeft: 3 }}>{s.sub}</span>}
+            </p>
+          </div>
+        ))}
+      </div>
+      <p style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", fontWeight: 600, letterSpacing: "2px", margin: "16px 0 0", textAlign: "center" }}>SOMALOG</p>
+    </div>
   );
 }

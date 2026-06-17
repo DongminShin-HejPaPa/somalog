@@ -116,6 +116,10 @@ export default function GoalCeremony({ snapshot, onClose }: GoalCeremonyProps) {
             onClose();
             router.push("/settings?newChapter=1");
           }}
+          onHallOfFame={() => {
+            onClose();
+            router.push("/settings/chapters");
+          }}
         />
       )}
     </div>
@@ -438,9 +442,11 @@ function SmallStat({
 function NextStepAct({
   onMaintain,
   onNewGoal,
+  onHallOfFame,
 }: {
   onMaintain: () => void;
   onNewGoal: () => void;
+  onHallOfFame: () => void;
 }) {
   const [busy, setBusy] = useState(false);
 
@@ -473,7 +479,15 @@ function NextStepAct({
           />
         </div>
 
-        <p className="text-xs text-white/45 mt-6 leading-relaxed">
+        <button
+          onClick={onHallOfFame}
+          disabled={busy}
+          className="mt-5 text-sm text-yellow-300/90 hover:text-yellow-200 font-semibold transition-colors disabled:opacity-50"
+        >
+          🏆 명예의 전당 보기
+        </button>
+
+        <p className="text-xs text-white/45 mt-4 leading-relaxed">
           유지 모드에서는 목표 체중에 다시 도달해도 축하가 다시 뜨지 않아요.
           언제든 설정에서 다시 바꿀 수 있어요.
         </p>

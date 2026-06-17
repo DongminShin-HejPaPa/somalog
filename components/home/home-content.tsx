@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { Trophy, ChevronRight } from "lucide-react";
 import { useSettings } from "@/lib/contexts/settings-context";
 import { DietProgressBanner } from "./diet-progress-banner";
 import { InputStatusChips } from "./input-status-chips";
@@ -59,11 +61,17 @@ export function HomeContent({ todayLog, recentLogs, cumulativeDay, onCloseToday,
   );
   const fallbackWeight = todayLog.weight === null ? (lastKnownWithWeight?.weight ?? null) : null;
 
+  const currentChapterDay = settings.dietStartDate
+    ? Math.max(getDayNumber(todayLog.date, settings.dietStartDate), 1)
+    : todayLog.day;
+  // 이전 챕터가 있을 때만 명예의 전당 재진입 노출 (이미 계산된 cumulativeDay 활용 — 신규 쿼리 0)
+  const hasPriorChapters = cumulativeDay !== undefined && cumulativeDay > currentChapterDay;
+
   return (
     <>
       <DietProgressBanner
         date={todayLog.date}
-        day={settings.dietStartDate ? Math.max(getDayNumber(todayLog.date, settings.dietStartDate), 1) : todayLog.day}
+        day={currentChapterDay}
         cumulativeDay={cumulativeDay}
         currentWeight={todayLog.weight}
         fallbackWeight={fallbackWeight}
@@ -71,6 +79,19 @@ export function HomeContent({ todayLog, recentLogs, cumulativeDay, onCloseToday,
         targetWeight={settings.targetWeight}
         isIntensiveDay={settings.intensiveDayOn && todayLog.intensiveDay === true}
       />
+
+      {hasPriorChapters && (
+        <Link
+          href="/settings/chapters"
+          className="mx-4 mt-3 flex items-center justify-between px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200/70 active:scale-[0.99] transition-transform"
+        >
+          <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-amber-700">
+            <Trophy className="w-4 h-4 text-amber-500" />
+            명예의 전당 · 지난 도전 기록
+          </span>
+          <ChevronRight className="w-4 h-4 text-amber-400" />
+        </Link>
+      )}
 
       <InputStatusChips log={todayLog} customFieldDef={settings.customField} onCloseToday={onCloseToday} isClosingToday={isClosingToday} />
 

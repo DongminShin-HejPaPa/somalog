@@ -17,6 +17,16 @@ function mapChapter(row: Record<string, unknown>): DietChapter {
   };
 }
 
+/** 모든 종료 챕터 삭제 — 데이터 초기화/데모 로드 시 정합성 유지 */
+export async function resetChapters(): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from("diet_chapters").delete().eq("user_id", user.id);
+}
+
 /** 종료된 챕터 목록 — 최신순 (명예의 전당에서 사용) */
 export async function getChapters(): Promise<DietChapter[]> {
   const supabase = await createClient();

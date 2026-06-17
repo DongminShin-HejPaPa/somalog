@@ -44,6 +44,8 @@ export function DietProgressBanner({
     effectiveWeight !== null
       ? Math.round((effectiveWeight - targetWeight) * 10) / 10
       : totalToLose;
+  // 목표 임박(남은 ≤ 3kg) — Hard Reset이 아닐 때만 게이지 글로우 (CSS만, 쿼리 0)
+  const nearGoal = !isIntensiveDay && remaining > 0 && remaining <= 3;
 
   return (
     <div
@@ -52,7 +54,9 @@ export function DietProgressBanner({
         "p-4 rounded-xl mx-4 mt-4",
         isIntensiveDay
           ? "bg-coral-light border border-coral/30"
-          : "bg-navy-light/50 border border-navy/10"
+          : nearGoal
+            ? "bg-amber-50 border border-amber-300/70 shadow-[0_0_22px_-2px_rgba(251,191,36,0.5)]"
+            : "bg-navy-light/50 border border-navy/10"
       )}
     >
       <div className="flex items-center justify-between mb-2">
@@ -90,9 +94,11 @@ export function DietProgressBanner({
         )}
       </div>
 
-      <p className="text-sm text-muted-foreground mb-3">
+      <p className={cn("text-sm mb-3", nearGoal ? "text-amber-700 font-semibold" : "text-muted-foreground")}>
         {remaining > 0
-          ? `목표까지 ${remaining.toFixed(1)} kg`
+          ? nearGoal
+            ? `목표까지 ${remaining.toFixed(1)} kg · 마지막 스퍼트예요 🔥`
+            : `목표까지 ${remaining.toFixed(1)} kg`
           : remaining < 0
             ? `목표 달성! 🎉 목표보다 ${Math.abs(remaining).toFixed(1)}kg 아래`
             : "목표 달성! 🎉"}
@@ -102,7 +108,7 @@ export function DietProgressBanner({
         <div
           className={cn(
             "h-full rounded-full transition-all",
-            isIntensiveDay ? "bg-coral" : "bg-navy"
+            isIntensiveDay ? "bg-coral" : nearGoal ? "bg-amber-400" : "bg-navy"
           )}
           style={{ width: `${progress.toFixed(1)}%` }}
         />

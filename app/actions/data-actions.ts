@@ -12,19 +12,32 @@ import {
   resetWeeklyLogs,
   loadMockWeeklyLogs,
 } from "@/lib/services/weekly-log-service";
+import { resetAchievements } from "@/lib/services/achievement-service";
+import { resetChapters } from "@/lib/services/chapter-service";
 
-/** 모든 Supabase 데이터를 초기화합니다 */
+/** 모든 Supabase 데이터를 초기화합니다 (업적·챕터 포함 — 정합성) */
 export async function serverResetAllData(): Promise<void> {
-  await Promise.all([resetSettings(), resetDailyLogs(), resetWeeklyLogs()]);
+  await Promise.all([
+    resetSettings(),
+    resetDailyLogs(),
+    resetWeeklyLogs(),
+    resetAchievements(),
+    resetChapters(),
+  ]);
 }
 
 /** Supabase 데이터를 데모(mock) 데이터로 교체합니다 (기존 데이터 초기화 후 로드) */
 export async function serverLoadDemoData(): Promise<void> {
-  await Promise.all([resetSettings(), resetDailyLogs(), resetWeeklyLogs()]);
+  await Promise.all([
+    resetSettings(),
+    resetDailyLogs(),
+    resetWeeklyLogs(),
+    resetAchievements(),
+    resetChapters(),
+  ]);
   await Promise.all([
     loadMockSettings(),
     loadMockDailyLogs(),
     loadMockWeeklyLogs(),
   ]);
 }
-

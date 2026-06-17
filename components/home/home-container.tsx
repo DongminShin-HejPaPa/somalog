@@ -140,6 +140,9 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
       } else if (closeResult.goalEvent?.kind === "repeat") {
         setGoalToast("🎉 목표 체중 복귀! 다시 잘 버텼어요");
         setTimeout(() => setGoalToast(null), 4000);
+      } else if (closeResult.milestoneEvent) {
+        setGoalToast(`🎉 −${closeResult.milestoneEvent.lostKg}kg 달성! 이 흐름 그대로 가요`);
+        setTimeout(() => setGoalToast(null), 4000);
       }
 
       const [updatedLogs, todayLog] = await Promise.all([

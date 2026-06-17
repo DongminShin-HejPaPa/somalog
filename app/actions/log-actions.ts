@@ -20,6 +20,7 @@ import { getWeeklyLogs } from "@/lib/services/weekly-log-service";
 import { getLowestWeight } from "@/lib/services/stats-service";
 import {
   detectGoalAchievement,
+  detectMilestone,
   getAchievements,
   getJourneyReport,
   markAchievementSeen,
@@ -65,7 +66,12 @@ export async function actionCloseDailyLog(
   const goalEvent = result
     ? await detectGoalAchievement(result).catch(() => null)
     : null;
-  return { log: result, goalEvent };
+  // 목표 달성이 없을 때만 마일스톤(−5/−10kg…) 판정 — 목표 세리머니가 우선
+  const milestoneEvent =
+    result && !goalEvent
+      ? await detectMilestone(result).catch(() => null)
+      : null;
+  return { log: result, goalEvent, milestoneEvent };
 }
 
 export async function actionGetAchievements(): Promise<Achievement[]> {

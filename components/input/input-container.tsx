@@ -293,11 +293,14 @@ export function InputContainer() {
       setCurrentLog(updated);
       updateCache(updated);
 
-      // 목표 달성 이벤트 처리 — 최초: 풀 세리머니 / 재달성: 미니 토스트
+      // 목표 달성 이벤트 처리 — 최초: 풀 세리머니 / 재달성: 미니 토스트 / 마일스톤: 작은 토스트
       if (result.goalEvent?.kind === "first") {
         setGoalEvent(result.goalEvent);
       } else if (result.goalEvent?.kind === "repeat") {
         setGoalToast("🎉 목표 체중 복귀! 다시 잘 버텼어요");
+        setTimeout(() => setGoalToast(null), 4000);
+      } else if (result.milestoneEvent) {
+        setGoalToast(`🎉 −${result.milestoneEvent.lostKg}kg 달성! 이 흐름 그대로 가요`);
         setTimeout(() => setGoalToast(null), 4000);
       }
 

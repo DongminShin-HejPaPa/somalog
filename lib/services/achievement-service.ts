@@ -6,11 +6,36 @@ import type {
   GoalSnapshot,
   Achievement,
   JourneyReport,
+  MilestoneEvent,
 } from "@/lib/types";
 import { getSettings } from "./settings-service";
 import { getAllDailyLogs } from "./daily-log-service";
 
 const GOAL_TYPE = "goal_reached";
+const MILESTONE_PREFIX = "milestone_";
+const MILESTONE_STEP = 5; // kg
+
+/**
+ * 마일스톤 판정의 순수 로직 (DB 비의존 — 단위 테스트 대상).
+ * 시작 체중 대비 누적 감량이 5kg 단위를 '처음' 넘었을 때 그 마일스톤(kg)을 반환.
+ * 이미 달성한 것보다 더 큰 단위만 새 마일스톤으로 인정(중간 단위는 건너뛰어도 한 번만).
+ * @returns 새로 도달한 마일스톤 kg (5/10/15…) 또는 null
+ */
+export function decideMilestoneReached(params: {
+  weight: number | null;
+  startWeight: number;
+  reachedMilestones: number[]; // 이미 축하한 마일스톤 kg 목록
+  step?: number;
+}): number | null {
+  const { weight, startWeight, reachedMilestones, step = MILESTONE_STEP } = params;
+  if (weight === null || startWeight <= 0) return null;
+  const loss = startWeight - weight;
+  if (loss < step) return null;
+  const highestCrossed = Math.floor(loss / step) * step; // 예: 12.3kg 감량 → 10
+  if (highestCrossed <= 0) return null;
+  const maxReached = reachedMilestones.length ? Math.max(...reachedMilestones) : 0;
+  return highestCrossed > maxReached ? highestCrossed : null;
+}
 
 /**
  * 목표 달성 판정의 순수 로직 (DB 비의존 — 단위 테스트 대상).
@@ -115,6 +140,50 @@ export async function detectGoalAchievement(
   }
 
   return { kind, snapshot };
+}
+
+/**
+ * 마감된 로그가 새 감량 마일스톤(−5/−10kg…)에 도달했는지 판정.
+ * 도달 시 achievements에 milestone_{kg} 1행(UNIQUE) INSERT + 이벤트 반환(작은 토스트용).
+ * 목표 달성과 동시면 호출하지 않는다(goal 우선 — log-actions에서 분기).
+ */
+export async function detectMilestone(
+  closedLog: DailyLog
+): Promise<MilestoneEvent | null> {
+  if (closedLog.weight === null) return null;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const settings = await getSettings();
+  if (!settings.startWeight || settings.startWeight <= 0) return null;
+
+  const { data: rows } = await supabase
+    .from("achievements")
+    .select("type")
+    .eq("user_id", user.id)
+    .like("type", `${MILESTONE_PREFIX}%`);
+
+  const reachedMilestones = (rows ?? [])
+    .map((r) => parseInt((r.type as string).slice(MILESTONE_PREFIX.length), 10))
+    .filter((n) => !Number.isNaN(n));
+
+  const milestone = decideMilestoneReached({
+    weight: closedLog.weight,
+    startWeight: settings.startWeight,
+    reachedMilestones,
+  });
+  if (milestone === null) return null;
+
+  await supabase.from("achievements").insert({
+    user_id: user.id,
+    type: `${MILESTONE_PREFIX}${milestone}`,
+  });
+
+  return { lostKg: milestone };
 }
 
 async function buildSnapshot(
@@ -240,6 +309,16 @@ export async function getJourneyReport(): Promise<JourneyReport | null> {
     dailyAvgLoss,
     weeklyAvgLoss,
   };
+}
+
+/** 모든 업적(goal_reached + 마일스톤) 삭제 — 데이터 초기화/데모 로드 시 정합성 유지 */
+export async function resetAchievements(): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from("achievements").delete().eq("user_id", user.id);
 }
 
 /** 목표 달성 기록 삭제 — targetWeight 재설정 시 새 목표를 첫 달성으로 처리하기 위해 호출 */

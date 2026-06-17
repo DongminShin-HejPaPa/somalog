@@ -732,7 +732,8 @@ export function WeightChart({
     (Date.now() - new Date(startDate).getTime()) / 86400000
   );
   const dailyRate = daysSoFar > 0 ? (startWeight - currentWeight) / daysSoFar : 0;
-  const daysToGoal = dailyRate > 0 ? Math.ceil(remaining / dailyRate) : null;
+  // 이미 목표 도달/초과(remaining ≤ 0)면 투영하지 않음 — 과거 날짜가 '예상 달성일'로 뜨는 것 방지
+  const daysToGoal = remaining > 0 && dailyRate > 0 ? Math.ceil(remaining / dailyRate) : null;
   const estimatedDate = daysToGoal
     ? new Date(Date.now() + daysToGoal * 86400000)
     : null;
@@ -954,10 +955,20 @@ export function WeightChart({
               <p className="text-xs text-muted-foreground">{fmtCardDate(new Date(lowestWeightDate + "T00:00:00"))}</p>
             </div>
             <div className="p-3 bg-secondary rounded-xl">
-              <p className="text-xs text-muted-foreground">목표까지</p>
-              <p className="text-lg font-bold">{remaining.toFixed(1)} kg</p>
-              {estimatedDate && (
-                <p className="text-xs text-muted-foreground">예상 {fmtCardDate(estimatedDate)}</p>
+              {remaining > 0 ? (
+                <>
+                  <p className="text-xs text-muted-foreground">목표까지</p>
+                  <p className="text-lg font-bold">{remaining.toFixed(1)} kg</p>
+                  {estimatedDate && (
+                    <p className="text-xs text-muted-foreground">예상 {fmtCardDate(estimatedDate)}</p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <p className="text-xs text-muted-foreground">목표 달성 🎉</p>
+                  <p className="text-lg font-bold">{remaining < 0 ? `−${Math.abs(remaining).toFixed(1)} kg` : "도달"}</p>
+                  {remaining < 0 && <p className="text-xs text-muted-foreground">목표보다 아래</p>}
+                </>
               )}
             </div>
           </div>
@@ -1263,10 +1274,20 @@ export function WeightChart({
                   <p style={{ fontSize: 10, color: "#94a3b8" }}>{fmtCardDate(new Date(lowestWeightDate + "T00:00:00"))}</p>
                 </div>
                 <div className="p-3 rounded-xl" style={{ backgroundColor: "#f1f5f9" }}>
-                  <p style={{ fontSize: 10, color: "#64748b" }}>목표까지</p>
-                  <p style={{ fontSize: 18, fontWeight: 700, color: "#1e293b" }}>{remaining.toFixed(1)} kg</p>
-                  {estimatedDate && (
-                    <p style={{ fontSize: 10, color: "#94a3b8" }}>예상 {fmtCardDate(estimatedDate)}</p>
+                  {remaining > 0 ? (
+                    <>
+                      <p style={{ fontSize: 10, color: "#64748b" }}>목표까지</p>
+                      <p style={{ fontSize: 18, fontWeight: 700, color: "#1e293b" }}>{remaining.toFixed(1)} kg</p>
+                      {estimatedDate && (
+                        <p style={{ fontSize: 10, color: "#94a3b8" }}>예상 {fmtCardDate(estimatedDate)}</p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <p style={{ fontSize: 10, color: "#64748b" }}>목표 달성 🎉</p>
+                      <p style={{ fontSize: 18, fontWeight: 700, color: "#1e293b" }}>{remaining < 0 ? `−${Math.abs(remaining).toFixed(1)} kg` : "도달"}</p>
+                      {remaining < 0 && <p style={{ fontSize: 10, color: "#94a3b8" }}>목표보다 아래</p>}
+                    </>
                   )}
                 </div>
               </div>

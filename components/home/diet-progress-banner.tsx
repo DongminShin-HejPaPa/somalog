@@ -91,7 +91,11 @@ export function DietProgressBanner({
       </div>
 
       <p className="text-sm text-muted-foreground mb-3">
-        목표까지 {remaining.toFixed(1)} kg
+        {remaining > 0
+          ? `목표까지 ${remaining.toFixed(1)} kg`
+          : remaining < 0
+            ? `목표 달성! 🎉 목표보다 ${Math.abs(remaining).toFixed(1)}kg 아래`
+            : "목표 달성! 🎉"}
       </p>
 
       <div className="w-full h-2.5 bg-white/60 rounded-full overflow-hidden">

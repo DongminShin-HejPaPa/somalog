@@ -44,8 +44,15 @@ export function DietProgressBanner({
     effectiveWeight !== null
       ? Math.round((effectiveWeight - targetWeight) * 10) / 10
       : totalToLose;
-  // 목표 임박(남은 ≤ 3kg) — Hard Reset이 아닐 때만 게이지 글로우 (CSS만, 쿼리 0)
-  const nearGoal = !isIntensiveDay && remaining > 0 && remaining <= 3;
+  // 게이지 글로우: 총 감량 목표가 GLOW_MIN_TOTAL_KG 이상일 때만 활성화,
+  // 활성화 시 임박 임계값은 총 목표의 GLOW_RATIO 비율로 비례 계산 (CSS만, 쿼리 0)
+  const GLOW_MIN_TOTAL_KG = 5; // 이 미만 목표는 글로우 없음 (e.g. 3kg, 4kg 목표)
+  const GLOW_RATIO = 0.15;     // 20kg → 3kg, 10kg → 1.5kg, 5kg → 0.75kg
+  const glowThresholdKg =
+    totalToLose >= GLOW_MIN_TOTAL_KG
+      ? Math.round(totalToLose * GLOW_RATIO * 10) / 10
+      : 0;
+  const nearGoal = !isIntensiveDay && glowThresholdKg > 0 && remaining > 0 && remaining <= glowThresholdKg;
 
   return (
     <div

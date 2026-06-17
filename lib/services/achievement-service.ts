@@ -23,7 +23,8 @@ export function decideGoalEventKind(params: {
   hasExistingAchievement: boolean;
   prevWeight: number | null; // 직전(이전 날) 체중
 }): "first" | "repeat" | null {
-  const { weight, targetWeight, mode, hasExistingAchievement, prevWeight } = params;
+  // mode는 더 이상 판정에 쓰지 않는다 (감량/유지 공통 규칙) — 시그니처 호환 위해 받기만 함
+  const { weight, targetWeight, hasExistingAchievement, prevWeight } = params;
 
   if (weight === null) return null;
   if (!targetWeight || targetWeight <= 0) return null;
@@ -32,10 +33,9 @@ export function decideGoalEventKind(params: {
   // 최초 달성
   if (!hasExistingAchievement) return "first";
 
-  // 이미 달성 이력 있음 — 유지 모드면 목표 이하가 정상이므로 이벤트 없음
-  if (mode === "maintaining") return null;
-
-  // 재달성은 '직전 체중이 목표 위'였다가 복귀한 경우에만 (목표 이하 유지 중 매일 토스트 방지)
+  // 재달성(미니 토스트)은 '직전 체중이 목표 위'였다가 다시 목표 이하로 복귀한 경우에만.
+  // 감량/유지 모드 공통 — 유지 중 요요 후 복귀도 격려하고, 목표 이하로 계속 머무는
+  // 날에는 매일 토스트가 뜨지 않게 막는다.
   const isFreshCrossing = prevWeight === null || prevWeight > targetWeight;
   return isFreshCrossing ? "repeat" : null;
 }
@@ -53,9 +53,9 @@ function rowToAchievement(row: Record<string, unknown>): Achievement {
 /**
  * 마감된 로그가 목표 달성(또는 재달성)인지 판정한다.
  * - 최초 달성: achievements에 goal_reached 행이 없을 때 → INSERT + 풀 세리머니(kind:"first")
- * - 재달성: 행이 있고 mode가 'losing'이며, 직전 체중이 목표 위였다가 다시 목표 이하로 '복귀'했을 때 → 미니 토스트(kind:"repeat")
- * - 유지 모드('maintaining'): 목표 이하가 정상 상태이므로 이벤트 없음
- * - 목표 미설정 / 체중 미입력 / 목표 초과: 이벤트 없음
+ * - 재달성: 행이 있고, 직전 체중이 목표 위였다가 다시 목표 이하로 '복귀'했을 때 → 미니 토스트(kind:"repeat")
+ *   (감량/유지 모드 공통 — 유지 중 요요 후 복귀도 격려)
+ * - 목표 이하로 계속 머무는 날 / 목표 미설정 / 체중 미입력 / 목표 초과: 이벤트 없음
  *
  * closeDailyLog 자체는 건드리지 않고, actionCloseDailyLog에서 마감 직후 호출한다.
  * (closeDailyLog는 같은 요청에서 getSettings를 이미 호출 → React.cache로 중복 조회 없음)

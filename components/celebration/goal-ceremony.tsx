@@ -8,7 +8,7 @@ import {
   actionGetJourneyReport,
   actionMarkGoalSeen,
 } from "@/app/actions/log-actions";
-import { actionUpdateSettings } from "@/app/actions/settings-actions";
+import { useSettings } from "@/lib/contexts/settings-context";
 import { Confetti } from "./confetti";
 
 interface GoalCeremonyProps {
@@ -81,6 +81,7 @@ type Step = "celebrate" | "report" | "next";
 
 export default function GoalCeremony({ snapshot, onClose }: GoalCeremonyProps) {
   const router = useRouter();
+  const { updateSettings } = useSettings();
   const [step, setStep] = useState<Step>("celebrate");
   const seenRef = useRef(false);
 
@@ -105,8 +106,10 @@ export default function GoalCeremony({ snapshot, onClose }: GoalCeremonyProps) {
       )}
       {step === "next" && (
         <NextStepAct
-          onMaintain={async () => {
-            await actionUpdateSettings({ mode: "maintaining" }).catch(() => {});
+          onMaintain={() => {
+            // context 경유로 DB + 클라이언트 상태 + 캐시를 모두 동기화
+            // (raw action만 호출하면 설정 탭이 캐시된 옛 mode를 계속 보여줌)
+            updateSettings({ mode: "maintaining" });
             onClose();
           }}
           onNewGoal={() => {

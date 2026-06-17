@@ -688,7 +688,7 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
             <p className="text-xs text-muted-foreground/70 mt-0.5">
               {form.mode === "losing"
                 ? "목표 체중을 향해 감량 중이에요"
-                : "목표 체중 유지에 집중하고 있어요"}
+                : "목표를 이루고 지금 체중을 지키고 있어요"}
             </p>
           </div>
           <div className="flex gap-1.5">
@@ -709,7 +709,9 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
           </div>
         </div>
         <p className="text-xs text-muted-foreground mt-1">
-          목표 달성 후 유지 단계에 들어섰을 때만 유지 중으로 전환하세요.
+          목표를 달성하면 유지 중으로 바꿀 수 있어요. 유지 중에는 목표 체중에 다시
+          도달해도 축하 세레머니가 뜨지 않아요. 다시 감량하려면 감량 중으로 바꾸거나
+          새 챕터를 시작하세요.
         </p>
       </Section>
 

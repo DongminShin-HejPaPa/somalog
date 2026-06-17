@@ -113,7 +113,6 @@ export default function GoalCeremony({ snapshot, onClose }: GoalCeremonyProps) {
             onClose();
             router.push("/settings?newChapter=1");
           }}
-          onLater={onClose}
         />
       )}
     </div>
@@ -436,11 +435,9 @@ function SmallStat({
 function NextStepAct({
   onMaintain,
   onNewGoal,
-  onLater,
 }: {
   onMaintain: () => void;
   onNewGoal: () => void;
-  onLater: () => void;
 }) {
   const [busy, setBusy] = useState(false);
 
@@ -456,7 +453,7 @@ function NextStepAct({
           <NextButton
             emoji="⚖️"
             title="유지 모드로 전환"
-            desc="지금 체중을 지키는 게 새 목표가 돼요"
+            desc="더 빼지 않고 지금 체중을 지켜요"
             onClick={async () => {
               if (busy) return;
               setBusy(true);
@@ -471,14 +468,12 @@ function NextStepAct({
             onClick={onNewGoal}
             disabled={busy}
           />
-          <button
-            onClick={onLater}
-            disabled={busy}
-            className="w-full py-3 text-sm text-white/60 hover:text-white/90 transition-colors disabled:opacity-50"
-          >
-            나중에 할게요
-          </button>
         </div>
+
+        <p className="text-xs text-white/45 mt-6 leading-relaxed">
+          유지 모드에서는 목표 체중에 다시 도달해도 축하가 다시 뜨지 않아요.
+          언제든 설정에서 다시 바꿀 수 있어요.
+        </p>
       </div>
     </div>
   );

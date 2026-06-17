@@ -80,18 +80,22 @@ describe("getDailyLog", () => {
   });
 
   it("TC-3: DB에 있음 → snake_case → camelCase 매핑", async () => {
+    // 메인 조회는 single()로 row 반환, enrichSingleIntensiveDay의 최저/직전 조회는
+    // maybeSingle()로 null(이전 로그 없음) 반환하도록 체인 가능한 mock 구성
+    const chain: any = {
+      eq: vi.fn(() => chain),
+      lt: vi.fn(() => chain),
+      not: vi.fn(() => chain),
+      order: vi.fn(() => chain),
+      limit: vi.fn(() => chain),
+      single: vi.fn().mockResolvedValue({ data: mockDailyLogRow, error: null }),
+      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+    };
     const client = {
       auth: {
         getUser: vi.fn().mockResolvedValue({ data: { user: mockUser } }),
       },
-      from: vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnThis(),
-          single: vi
-            .fn()
-            .mockResolvedValue({ data: mockDailyLogRow, error: null }),
-        }),
-      }),
+      from: vi.fn(() => ({ select: vi.fn(() => chain) })),
     };
     vi.mocked(createClient).mockResolvedValue(client as any);
 
@@ -101,7 +105,9 @@ describe("getDailyLog", () => {
     expect(result!.avgWeight3d).toBe(mockDailyLogRow.avg_weight_3d);
     expect(result!.weightChange).toBe(mockDailyLogRow.weight_change);
     expect(result!.lateSnack).toBe(mockDailyLogRow.late_snack);
-    expect(result!.intensiveDay).toBe(mockDailyLogRow.intensive_day);
+    // intensiveDay는 이제 매핑이 아니라 '이 날짜 이전 최저' 기준 파생값.
+    // 이전 로그가 없으면(lowest=Infinity) false 로 재계산된다.
+    expect(result!.intensiveDay).toBe(false);
   });
 });
 

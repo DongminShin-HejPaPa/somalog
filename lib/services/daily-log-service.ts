@@ -99,42 +99,57 @@ export async function getDailyLog(date: string): Promise<DailyLog | null> {
   if (error || !data) return null;
 
   const log = rowToDailyLog(data as Record<string, unknown>);
+  return enrichSingleIntensiveDay(supabase, user.id, log);
+}
 
-  // 체중이 없는 날은 직전 체중 기준으로 intensiveDay 재계산
-  if (log.weight === null) {
-    const [settings, prevRow, lowestRow] = await Promise.all([
-      getSettings(),
-      supabase
-        .from("daily_logs")
-        .select("weight")
-        .eq("user_id", user.id)
-        .lt("date", date)
-        .not("weight", "is", null)
-        .order("date", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from("daily_logs")
-        .select("weight")
-        .eq("user_id", user.id)
-        .not("weight", "is", null)
-        .order("weight", { ascending: true })
-        .limit(1)
-        .maybeSingle(),
-    ]);
+/**
+ * 단일 로그의 intensiveDay를 '이 날짜 이전의 최저 체중' 기준으로 재계산한다.
+ *
+ * 저장된 intensive_day 는 쓰기 시점의 최저로 굳어 있어, 이후 다른 날 더 낮은 체중이
+ * 입력되면 stale 해진다(예: 오늘 78.8 저장 후 과거 날에 76.8 입력 → 오늘 값은 그대로).
+ * 표시용 단일 조회는 항상 이 함수로 재계산해 enrichIntensiveDay(prefix-min)와 동일한
+ * 결과를 보장한다. 체중이 없는 날은 직전(이전 날) 체중으로 판정한다.
+ */
+async function enrichSingleIntensiveDay(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  log: DailyLog
+): Promise<DailyLog> {
+  const settings = await getSettings();
+  if (!settings.intensiveDayOn) return log;
 
-    if (settings.intensiveDayOn) {
-      const prevWeight = (prevRow.data?.weight as number | null) ?? null;
-      const lowestWeight = (lowestRow.data?.weight as number | null) ?? Infinity;
-      if (prevWeight !== null) {
-        log.intensiveDay = computeIntensiveDay(prevWeight, settings.intensiveDayCriteria, lowestWeight);
-      } else {
-        log.intensiveDay = false;
-      }
-    }
-  }
+  const [{ data: lowestRow }, { data: prevRow }] = await Promise.all([
+    supabase
+      .from("daily_logs")
+      .select("weight")
+      .eq("user_id", userId)
+      .lt("date", log.date)
+      .not("weight", "is", null)
+      .order("weight", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+    log.weight === null
+      ? supabase
+          .from("daily_logs")
+          .select("weight")
+          .eq("user_id", userId)
+          .lt("date", log.date)
+          .not("weight", "is", null)
+          .order("date", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null as { weight: number | null } | null }),
+  ]);
 
-  return log;
+  const lowestWeight = (lowestRow?.weight as number | null) ?? Infinity;
+  const effective = log.weight ?? ((prevRow?.weight as number | null) ?? null);
+  return {
+    ...log,
+    intensiveDay:
+      effective !== null
+        ? computeIntensiveDay(effective, settings.intensiveDayCriteria, lowestWeight)
+        : false,
+  };
 }
 
 export async function getRecentDailyLogs(count: number): Promise<DailyLog[]> {
@@ -725,40 +740,8 @@ export async function getFirstUnclosedLog(): Promise<DailyLog | null> {
   if (error || !data) return null;
 
   const log = rowToDailyLog(data as Record<string, unknown>);
-
-  // 체중이 없는 날은 직전 체중 기준으로 intensiveDay 재계산 (getDailyLog와 동일 로직)
-  if (log.weight === null) {
-    const [settings, prevRow, lowestRow] = await Promise.all([
-      getSettings(),
-      supabase
-        .from("daily_logs")
-        .select("weight")
-        .eq("user_id", user.id)
-        .lt("date", log.date)
-        .not("weight", "is", null)
-        .order("date", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from("daily_logs")
-        .select("weight")
-        .eq("user_id", user.id)
-        .not("weight", "is", null)
-        .order("weight", { ascending: true })
-        .limit(1)
-        .maybeSingle(),
-    ]);
-
-    if (settings.intensiveDayOn) {
-      const prevWeight = (prevRow.data?.weight as number | null) ?? null;
-      const lowestWeight = (lowestRow.data?.weight as number | null) ?? Infinity;
-      log.intensiveDay = prevWeight !== null
-        ? computeIntensiveDay(prevWeight, settings.intensiveDayCriteria, lowestWeight)
-        : false;
-    }
-  }
-
-  return log;
+  // 저장된 intensive_day stale 방지 — 항상 '이 날짜 이전 최저' 기준으로 재계산
+  return enrichSingleIntensiveDay(supabase, user.id, log);
 }
 
 export async function getDailyLogsWithOffset(count: number, offset: number): Promise<DailyLog[]> {

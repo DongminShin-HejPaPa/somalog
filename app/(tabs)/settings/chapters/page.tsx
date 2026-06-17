@@ -37,7 +37,7 @@ async function ChaptersView() {
       {/* 현재 진행 중인 챕터 */}
       {settings.onboardingComplete && settings.dietStartDate && (
         <section>
-          <SectionHeader label="진행 중인 챕터" />
+          <SectionHeader label="진행/유지 중인 챕터" />
           <div className="rounded-2xl border border-navy/15 bg-navy/5 p-4">
             <div className="flex items-center justify-between mb-1">
               <span className="text-sm font-bold text-navy">D+{currentDays}</span>

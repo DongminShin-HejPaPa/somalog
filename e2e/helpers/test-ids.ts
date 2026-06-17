@@ -69,6 +69,9 @@ export const TEST_IDS = {
   HOME_WEIGHT_DISPLAY: "home-weight-display",
   HOME_PROGRESS_BANNER: "home-progress-banner",
 
+  // ── Celebration ───────────────────────────────────────
+  GOAL_CEREMONY: "goal-ceremony",
+
   // ── Log Page ──────────────────────────────────────────
   LOG_LIST: "log-list",
   LOG_ITEM: (date: string) => `log-item-${date}`,

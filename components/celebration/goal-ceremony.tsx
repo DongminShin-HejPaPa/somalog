@@ -97,7 +97,7 @@ export default function GoalCeremony({ snapshot, onClose }: GoalCeremonyProps) {
   }, []);
 
   return (
-    <div className="fixed inset-0 z-[100] bg-gradient-to-br from-[#0c0920] via-navy to-[#0f1f33] text-white flex flex-col overflow-y-auto">
+    <div data-testid="goal-ceremony" className="fixed inset-0 z-[100] bg-gradient-to-br from-[#0c0920] via-navy to-[#0f1f33] text-white flex flex-col overflow-y-auto">
       {step === "celebrate" && (
         <CelebrateAct snapshot={snapshot} onNext={() => setStep("report")} />
       )}

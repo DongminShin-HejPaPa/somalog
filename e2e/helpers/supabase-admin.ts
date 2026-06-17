@@ -68,6 +68,8 @@ export async function clearUserData(userId: string) {
     admin.from("daily_logs").delete().eq("user_id", userId),
     admin.from("weekly_logs").delete().eq("user_id", userId),
     admin.from("settings").delete().eq("user_id", userId),
+    admin.from("achievements").delete().eq("user_id", userId),
+    admin.from("diet_chapters").delete().eq("user_id", userId),
   ]);
 }
 

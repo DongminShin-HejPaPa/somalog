@@ -370,11 +370,14 @@ export async function getJourneyReport(): Promise<JourneyReport | null> {
     (l) => l.dinnerAlcohol === true || l.lateSnackAlcohol === true
   ).length;
 
+  // '세 끼 모두 먹은 날' = 아침·점심·저녁을 모두 실제로 먹은 날.
+  // 미입력(null)·"N"·"SKIP"(안 먹음)은 먹은 끼니로 치지 않는다.
+  const ateMeal = (v: string | null) => v !== null && v !== "N" && v !== "SKIP";
   const anyMealEnteredDays = sorted.filter(
     (l) => l.breakfast !== null || l.lunch !== null || l.dinner !== null
   ).length;
   const allMealsDays = sorted.filter(
-    (l) => l.breakfast !== null && l.lunch !== null && l.dinner !== null
+    (l) => ateMeal(l.breakfast) && ateMeal(l.lunch) && ateMeal(l.dinner)
   ).length;
 
   const daysElapsed =

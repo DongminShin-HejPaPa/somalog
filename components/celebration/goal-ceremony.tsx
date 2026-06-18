@@ -589,7 +589,7 @@ function JourneyShareCard({
     { label: "💧 수분 달성", value: `${report.waterGoalDays}일`, sub: `${report.waterGoalRate}%` },
     { label: "🌙 야식 먹은 날", value: `${report.lateSnackDays}일`, sub: `${report.lateSnackRate}%` },
     { label: "🍺 술 마신 날", value: `${report.alcoholDays}일`, sub: `${report.alcoholRate}%` },
-    { label: "🍽️ 세 끼 모두", value: `${report.allMealsDays}일`, sub: `${report.allMealsRate}%` },
+    { label: "🍽️ 세 끼 모두 먹은 날", value: `${report.allMealsDays}일`, sub: `${report.allMealsRate}%` },
     { label: "📅 기록한 날", value: `${report.recordedDays}일` },
     { label: "📉 일 평균 감량", value: `${report.dailyAvgLoss.toFixed(2)}kg`, sub: "/일" },
     { label: "📉 주 평균 감량", value: `${report.weeklyAvgLoss.toFixed(2)}kg`, sub: "/주" },

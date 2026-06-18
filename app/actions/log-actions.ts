@@ -21,6 +21,7 @@ import { getLowestWeight } from "@/lib/services/stats-service";
 import {
   detectGoalAchievement,
   detectMilestone,
+  detectStreakMilestone,
   getAchievements,
   getJourneyReport,
   markAchievementSeen,
@@ -66,11 +67,16 @@ export async function actionCloseDailyLog(
   const goalEvent = result
     ? await detectGoalAchievement(result).catch(() => null)
     : null;
-  // 목표 달성이 없을 때만 마일스톤(−5/−10kg…) 판정 — 목표 세리머니가 우선
-  const milestoneEvent =
-    result && !goalEvent
-      ? await detectMilestone(result).catch(() => null)
-      : null;
+  // 목표 달성이 없을 때만 마일스톤 판정 — 목표 세리머니가 우선.
+  // 우선순위: 감량 마일스톤(−5/−10kg…) > 연속 기록 마일스톤(7/30/100일…).
+  // 감량 마일스톤이 떴으면 streak 쿼리는 건너뛴다(불필요한 INSERT/노출 방지).
+  let milestoneEvent: import("@/lib/types").MilestoneEvent | null = null;
+  if (result && !goalEvent) {
+    milestoneEvent = await detectMilestone(result).catch(() => null);
+    if (!milestoneEvent) {
+      milestoneEvent = await detectStreakMilestone(result).catch(() => null);
+    }
+  }
   return { log: result, goalEvent, milestoneEvent };
 }
 

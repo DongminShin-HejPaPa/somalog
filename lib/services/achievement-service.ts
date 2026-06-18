@@ -14,6 +14,9 @@ import { getAllDailyLogs } from "./daily-log-service";
 const GOAL_TYPE = "goal_reached";
 const MILESTONE_PREFIX = "milestone_";
 const MILESTONE_STEP = 5; // kg
+const STREAK_PREFIX = "streak_";
+/** 축하할 연속 기록일 마일스톤 (일주일·한달·100·200·1년) */
+const STREAK_MILESTONES = [7, 30, 100, 200, 365];
 
 /**
  * 마일스톤 판정의 순수 로직 (DB 비의존 — 단위 테스트 대상).
@@ -35,6 +38,51 @@ export function decideMilestoneReached(params: {
   if (highestCrossed <= 0) return null;
   const maxReached = reachedMilestones.length ? Math.max(...reachedMilestones) : 0;
   return highestCrossed > maxReached ? highestCrossed : null;
+}
+
+/** 'YYYY-MM-DD'의 하루 전 날짜를 같은 포맷으로 반환 (UTC 기준 — DST 영향 없음) */
+function prevDay(date: string): string {
+  const t = new Date(date + "T00:00:00Z").getTime() - 86_400_000;
+  return new Date(t).toISOString().slice(0, 10);
+}
+
+/**
+ * endDate에서 끝나는 '연속 기록일' 수를 센다 (DB 비의존 — 단위 테스트 대상).
+ * recordedDates: 기록이 존재하는 날짜('YYYY-MM-DD') 목록(순서 무관, endDate 포함 가정).
+ * endDate에 기록이 없으면 0(마감 직후 호출이라 정상 흐름에선 발생하지 않음).
+ */
+export function computeCurrentStreak(
+  recordedDates: string[],
+  endDate: string
+): number {
+  const set = new Set(recordedDates);
+  if (!set.has(endDate)) return 0;
+  let streak = 0;
+  let cursor = endDate;
+  while (set.has(cursor)) {
+    streak++;
+    cursor = prevDay(cursor);
+  }
+  return streak;
+}
+
+/**
+ * 연속 기록 마일스톤 판정의 순수 로직 (DB 비의존 — 단위 테스트 대상).
+ * 현재 연속일이 새 마일스톤(7/30/100…)을 '처음' 넘었을 때 그 일수를 반환.
+ * 이미 축하한 것보다 큰 단위만 인정(백필 등으로 건너뛰어도 가장 높은 것 한 번만).
+ * @returns 새로 도달한 마일스톤 일수 또는 null
+ */
+export function decideStreakMilestone(params: {
+  currentStreak: number;
+  reachedMilestones: number[];
+  milestones?: number[];
+}): number | null {
+  const { currentStreak, reachedMilestones, milestones = STREAK_MILESTONES } = params;
+  const maxReached = reachedMilestones.length ? Math.max(...reachedMilestones) : 0;
+  const candidate = milestones
+    .filter((m) => m <= currentStreak && m > maxReached)
+    .reduce((hi, m) => Math.max(hi, m), 0);
+  return candidate > 0 ? candidate : null;
 }
 
 /**
@@ -183,7 +231,59 @@ export async function detectMilestone(
     type: `${MILESTONE_PREFIX}${milestone}`,
   });
 
-  return { lostKg: milestone };
+  return { kind: "loss", lostKg: milestone };
+}
+
+/**
+ * 마감된 로그 기준으로 새 '연속 기록일' 마일스톤(7/30/100…)에 도달했는지 판정.
+ * 도달 시 achievements에 streak_{N} 1행(UNIQUE) INSERT + 이벤트 반환(작은 토스트용).
+ * 목표 달성·감량 마일스톤이 우선이므로 둘 다 없을 때만 log-actions에서 호출한다.
+ *
+ * 속도: 마감 액션에서만 실행(탭/홈 진입 경로 미접촉). 추가 쿼리는 date 컬럼만 읽는
+ * 인덱스(`daily_logs_user_date_idx`) 커버 쿼리 1개 + 업적 1개로, AI 총평 await에 묻힌다.
+ */
+export async function detectStreakMilestone(
+  closedLog: DailyLog
+): Promise<MilestoneEvent | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const maxThreshold = STREAK_MILESTONES[STREAK_MILESTONES.length - 1];
+
+  const [{ data: achRows }, { data: logRows }] = await Promise.all([
+    supabase
+      .from("achievements")
+      .select("type")
+      .eq("user_id", user.id)
+      .like("type", `${STREAK_PREFIX}%`),
+    supabase
+      .from("daily_logs")
+      .select("date")
+      .eq("user_id", user.id)
+      .lte("date", closedLog.date)
+      .order("date", { ascending: false })
+      .limit(maxThreshold + 1),
+  ]);
+
+  const reachedMilestones = (achRows ?? [])
+    .map((r) => parseInt((r.type as string).slice(STREAK_PREFIX.length), 10))
+    .filter((n) => !Number.isNaN(n));
+
+  const dates = (logRows ?? []).map((r) => r.date as string);
+  const currentStreak = computeCurrentStreak(dates, closedLog.date);
+
+  const milestone = decideStreakMilestone({ currentStreak, reachedMilestones });
+  if (milestone === null) return null;
+
+  await supabase.from("achievements").insert({
+    user_id: user.id,
+    type: `${STREAK_PREFIX}${milestone}`,
+  });
+
+  return { kind: "streak", streakDays: milestone };
 }
 
 async function buildSnapshot(

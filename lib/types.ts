@@ -80,10 +80,14 @@ export interface GoalEvent {
   snapshot: GoalSnapshot;
 }
 
-/** 마일스톤(−5kg/−10kg…) 최초 도달 이벤트 — 작은 토스트 */
-export interface MilestoneEvent {
-  lostKg: number; // 도달한 누적 감량 마일스톤 (5, 10, 15 …)
-}
+/**
+ * 마일스톤 최초 도달 이벤트 — 작은 토스트.
+ * - loss: 누적 감량 5kg 단위(5/10/15 …)
+ * - streak: 연속 기록 N일(7/30/100 …)
+ */
+export type MilestoneEvent =
+  | { kind: "loss"; lostKg: number }
+  | { kind: "streak"; streakDays: number };
 
 /** achievements 테이블 1행 */
 export interface Achievement {

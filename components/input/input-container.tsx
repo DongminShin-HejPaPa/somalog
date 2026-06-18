@@ -300,7 +300,12 @@ export function InputContainer() {
         setGoalToast("🎉 목표 체중 복귀! 다시 잘 버텼어요");
         setTimeout(() => setGoalToast(null), 4000);
       } else if (result.milestoneEvent) {
-        setGoalToast(`🎉 −${result.milestoneEvent.lostKg}kg 달성! 이 흐름 그대로 가요`);
+        const m = result.milestoneEvent;
+        setGoalToast(
+          m.kind === "streak"
+            ? `🔥 ${m.streakDays}일 연속 기록! 꾸준함이 답이에요`
+            : `🎉 −${m.lostKg}kg 달성! 이 흐름 그대로 가요`
+        );
         setTimeout(() => setGoalToast(null), 4000);
       }
 

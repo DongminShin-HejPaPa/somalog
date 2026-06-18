@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   decideGoalEventKind,
   decideMilestoneReached,
+  decideStreakMilestone,
+  computeCurrentStreak,
 } from "@/lib/services/achievement-service";
 
 describe("decideGoalEventKind", () => {
@@ -131,6 +133,94 @@ describe("decideMilestoneReached", () => {
   it("startWeight 0 → null", () => {
     expect(
       decideMilestoneReached({ weight: 70, startWeight: 0, reachedMilestones: [] })
+    ).toBeNull();
+  });
+});
+
+describe("computeCurrentStreak", () => {
+  it("endDate에 기록 없음 → 0", () => {
+    expect(computeCurrentStreak(["2026-06-10"], "2026-06-12")).toBe(0);
+  });
+
+  it("당일만 기록 → 1", () => {
+    expect(computeCurrentStreak(["2026-06-12"], "2026-06-12")).toBe(1);
+  });
+
+  it("연속 3일 → 3", () => {
+    expect(
+      computeCurrentStreak(
+        ["2026-06-10", "2026-06-11", "2026-06-12"],
+        "2026-06-12"
+      )
+    ).toBe(3);
+  });
+
+  it("중간에 하루 빠지면 끊겨서 직전 연속분만 카운트", () => {
+    // 6/9 기록, 6/10 없음, 6/11·6/12 연속 → endDate 기준 2
+    expect(
+      computeCurrentStreak(
+        ["2026-06-09", "2026-06-11", "2026-06-12"],
+        "2026-06-12"
+      )
+    ).toBe(2);
+  });
+
+  it("월 경계를 넘는 연속도 정확히 카운트", () => {
+    expect(
+      computeCurrentStreak(
+        ["2026-05-31", "2026-06-01", "2026-06-02"],
+        "2026-06-02"
+      )
+    ).toBe(3);
+  });
+
+  it("순서가 뒤섞여도 동일 결과 (Set 기반)", () => {
+    expect(
+      computeCurrentStreak(
+        ["2026-06-12", "2026-06-10", "2026-06-11"],
+        "2026-06-12"
+      )
+    ).toBe(3);
+  });
+});
+
+describe("decideStreakMilestone", () => {
+  it("7일 미만 → null", () => {
+    expect(
+      decideStreakMilestone({ currentStreak: 6, reachedMilestones: [] })
+    ).toBeNull();
+  });
+
+  it("정확히 7일 → 7 (경계)", () => {
+    expect(
+      decideStreakMilestone({ currentStreak: 7, reachedMilestones: [] })
+    ).toBe(7);
+  });
+
+  it("8일인데 7은 이미 달성 → null (다음 단위 30 미도달)", () => {
+    expect(
+      decideStreakMilestone({ currentStreak: 8, reachedMilestones: [7] })
+    ).toBeNull();
+  });
+
+  it("30일 + 7만 달성 → 30", () => {
+    expect(
+      decideStreakMilestone({ currentStreak: 30, reachedMilestones: [7] })
+    ).toBe(30);
+  });
+
+  it("백필로 120일 + 이력 없음 → 100 (최고만 인정, 중간 건너뜀)", () => {
+    expect(
+      decideStreakMilestone({ currentStreak: 120, reachedMilestones: [] })
+    ).toBe(100);
+  });
+
+  it("최고 마일스톤(365) 달성 후 더 길어져도 → null", () => {
+    expect(
+      decideStreakMilestone({
+        currentStreak: 400,
+        reachedMilestones: [7, 30, 100, 200, 365],
+      })
     ).toBeNull();
   });
 });

@@ -11,6 +11,7 @@ export interface DailyLog {
   avgWeight3d: number | null;
   weightChange: number | null;
   water: number | null;
+  waterGoal?: number | null; // 그날 적용된 수분 목표(스냅샷) — 리포트 달성 판정에 사용
   exercise: string | null;
   breakfast: string | null;
   lunch: string | null;

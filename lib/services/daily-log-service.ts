@@ -29,6 +29,7 @@ function rowToDailyLog(row: Record<string, unknown>): DailyLog {
     avgWeight3d: (row.avg_weight_3d as number | null) ?? null,
     weightChange: (row.weight_change as number | null) ?? null,
     water: (row.water as number | null) ?? null,
+    waterGoal: (row.water_goal as number | null) ?? null,
     exercise: (row.exercise as string | null) ?? null,
     breakfast: (row.breakfast as string | null) ?? null,
     lunch: (row.lunch as string | null) ?? null,
@@ -58,6 +59,7 @@ function dailyLogToRow(
   if (log.avgWeight3d !== undefined) row.avg_weight_3d = log.avgWeight3d;
   if (log.weightChange !== undefined) row.weight_change = log.weightChange;
   if (log.water !== undefined) row.water = log.water;
+  if (log.waterGoal !== undefined) row.water_goal = log.waterGoal;
   if (log.exercise !== undefined) row.exercise = log.exercise;
   if (log.breakfast !== undefined) row.breakfast = log.breakfast;
   if (log.lunch !== undefined) row.lunch = log.lunch;
@@ -228,6 +230,12 @@ export async function upsertDailyLog(
 
   // 3. day는 항상 계산
   merged.day = computeDay(date, settings.dietStartDate);
+
+  // 수분 목표 스냅샷: 물을 입력한 날은 '그날 적용된 목표'를 함께 저장(추가 쿼리 없음 — settings 재사용).
+  // 이후 설정에서 목표를 바꿔도 과거 행은 흔들리지 않는다.
+  if (merged.water !== null && merged.water !== undefined) {
+    merged.waterGoal = settings.waterGoal;
+  }
 
 
   // 4. DB에서 파생 필드 계산을 위한 최소 데이터만 조회 (100일 전체 스캔 방지)
@@ -545,6 +553,8 @@ export async function loadMockDailyLogs(): Promise<void> {
 
   if (!user) return;
 
+  const settings = await getSettings();
+
   const rows = mockDailyLogs.map((log) => ({
     user_id: user.id,
     date: log.date,
@@ -553,6 +563,7 @@ export async function loadMockDailyLogs(): Promise<void> {
     avg_weight_3d: log.avgWeight3d,
     weight_change: log.weightChange,
     water: log.water,
+    water_goal: log.water != null ? settings.waterGoal : null,
     exercise: log.exercise,
     breakfast: log.breakfast,
     lunch: log.lunch,

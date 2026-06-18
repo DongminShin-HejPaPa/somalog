@@ -349,10 +349,14 @@ export async function getJourneyReport(): Promise<JourneyReport | null> {
     (l) => l.exercise !== null && l.exercise !== "N" && l.exercise !== "SKIP"
   ).length;
 
+  // 수분 목표 달성은 '그날 적용된 목표'(스냅샷)로 판정한다. 미스냅샷(레거시) 행은
+  // 현재 설정값으로 폴백 — 단, 백필 마이그레이션으로 입력일은 모두 스냅샷이 채워져 있다.
   const waterEnteredDays = sorted.filter((l) => l.water !== null).length;
-  const waterGoalDays = sorted.filter(
-    (l) => l.water !== null && settings.waterGoal > 0 && l.water >= settings.waterGoal
-  ).length;
+  const waterGoalDays = sorted.filter((l) => {
+    if (l.water === null) return false;
+    const goal = l.waterGoal ?? settings.waterGoal;
+    return goal > 0 && l.water >= goal;
+  }).length;
 
   const lateSnackEnteredDays = sorted.filter((l) => l.lateSnack !== null).length;
   const lateSnackDays = sorted.filter(

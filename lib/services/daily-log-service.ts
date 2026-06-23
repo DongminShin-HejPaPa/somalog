@@ -755,7 +755,14 @@ export async function getFirstUnclosedLog(): Promise<DailyLog | null> {
   return enrichSingleIntensiveDay(supabase, user.id, log);
 }
 
-export async function getDailyLogsWithOffset(count: number, offset: number): Promise<DailyLog[]> {
+/**
+ * 커서(날짜) 기반 페이지네이션 — cursorDate 보다 이전 날짜를 count개 반환한다.
+ *
+ * 기존 OFFSET(.range) 방식은 버리는 행까지 스캔해 깊은 페이지일수록 느려졌다.
+ * keyset(date < cursor)은 (user_id, date DESC) 인덱스를 그대로 타 페이지 깊이와
+ * 무관하게 일정 속도를 유지한다 — 수년치 "더 보기"에도 동일.
+ */
+export async function getDailyLogsBefore(cursorDate: string, count: number): Promise<DailyLog[]> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -768,8 +775,9 @@ export async function getDailyLogsWithOffset(count: number, offset: number): Pro
       .from("daily_logs")
       .select("*")
       .eq("user_id", user.id)
+      .lt("date", cursorDate)
       .order("date", { ascending: false })
-      .range(offset, offset + count - 1),
+      .limit(count),
     getSettings(),
   ]);
 
@@ -779,10 +787,69 @@ export async function getDailyLogsWithOffset(count: number, offset: number): Pro
   if (!settings.intensiveDayOn) return logs;
 
   // prefix-min 방식: 페이지 범위 안에서 '그 전까지'의 최저 대비 판정한다.
-  // offset > 0인 더 오래된 페이지는 범위 밖 이전 최저를 모르므로 경계 날짜에서
-  // 약간 보수적으로(미발동 쪽) 판정될 수 있으나, 미래 체중이 과거를 소급
-  // 변경하던 버그는 제거된다. 전체 정확값은 graph(getAllDailyLogs)가 보장.
+  // 더 오래된 페이지는 범위 밖 이전 최저를 모르므로 경계 날짜에서 약간 보수적으로
+  // 판정될 수 있으나, 미래 체중이 과거를 소급 변경하던 버그는 없다. 전체 정확값은 graph가 보장.
   return enrichIntensiveDay(logs, settings.intensiveDayCriteria);
+}
+
+/**
+ * 로그 탭 서버 검색/필터 — 전체 기록을 대상으로 조회한다 (커서 페이지네이션).
+ *
+ * 기존엔 클라이언트가 이미 불러온 페이지(최근 30개씩)만 필터링해, 오래된 기록은
+ * "검색 결과 없음"으로 보였다. 여기서는 DB에서 직접 ilike/조건 필터를 걸어
+ * 수년 전 기록도 찾는다. cursorDate 로 "더 보기"를 이어간다.
+ *
+ * intensive 필터는 저장된 intensive_day 컬럼(쓰기 시점 값)을 쓰므로 그래프의
+ * 재계산값과 미세하게 다를 수 있다 — 검색 편의용 근사로 허용.
+ */
+export async function getDailyLogsFiltered(opts: {
+  query?: string;
+  filter?: string | null;
+  cursorDate?: string | null;
+  limit: number;
+}): Promise<DailyLog[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return [];
+
+  let q = supabase.from("daily_logs").select("*").eq("user_id", user.id);
+
+  // 검색어: PostgREST or-필터 구문을 깨뜨리는 문자(`,()*%`)는 제거 후 사용.
+  const term = (opts.query ?? "").trim().replace(/[,()*%]/g, " ").trim();
+  if (term) {
+    const like = `%${term}%`;
+    q = q.or(`breakfast.ilike.${like},lunch.ilike.${like},dinner.ilike.${like}`);
+  }
+
+  switch (opts.filter) {
+    case "unclosed":
+      q = q.eq("closed", false);
+      break;
+    case "exercise":
+      q = q.not("exercise", "is", null).neq("exercise", "N").neq("exercise", "SKIP");
+      break;
+    case "lateSnack":
+      q = q.not("late_snack", "is", null).neq("late_snack", "N").neq("late_snack", "SKIP");
+      break;
+    case "alcohol":
+      q = q.or("dinner_alcohol.eq.true,late_snack_alcohol.eq.true");
+      break;
+    case "intensive":
+      q = q.eq("intensive_day", true);
+      break;
+  }
+
+  if (opts.cursorDate) q = q.lt("date", opts.cursorDate);
+
+  const { data, error } = await q
+    .order("date", { ascending: false })
+    .limit(opts.limit);
+
+  if (error || !data) return [];
+  return data.map((row) => rowToDailyLog(row as Record<string, unknown>));
 }
 
 export async function getDailyLogsTotalCount(): Promise<number> {

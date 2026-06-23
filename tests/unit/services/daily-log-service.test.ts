@@ -26,6 +26,8 @@ import {
   closeDailyLog,
   getWeightSeries,
   getLowestWeightEntry,
+  getDailyLogsBefore,
+  getDailyLogsFiltered,
 } from "@/lib/services/daily-log-service";
 
 beforeEach(() => {
@@ -690,5 +692,120 @@ describe("getLowestWeightEntry", () => {
     vi.mocked(createClient).mockResolvedValue(client as any);
 
     expect(await getLowestWeightEntry()).toEqual({ weight: Infinity, date: "" });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getDailyLogsBefore (keyset 페이지네이션 — Phase 5A)
+// ---------------------------------------------------------------------------
+
+describe("getDailyLogsBefore", () => {
+  it("TC-22: 유저 없음 → []", async () => {
+    const client = {
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: null } }) },
+      from: vi.fn(),
+    };
+    vi.mocked(createClient).mockResolvedValue(client as any);
+
+    expect(await getDailyLogsBefore("2024-02-01", 30)).toEqual([]);
+  });
+
+  it("TC-23: cursorDate 이전 로그를 lt(date) 키셋으로 조회한다", async () => {
+    const ltMock = vi.fn();
+    const chain: any = {
+      eq: vi.fn(() => chain),
+      lt: vi.fn((...args: unknown[]) => {
+        ltMock(...args);
+        return chain;
+      }),
+      order: vi.fn(() => chain),
+      limit: vi.fn().mockResolvedValue({ data: [mockDailyLogRow], error: null }),
+    };
+    const client = {
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: mockUser } }) },
+      from: vi.fn(() => ({ select: vi.fn(() => chain) })),
+    };
+    vi.mocked(createClient).mockResolvedValue(client as any);
+
+    const result = await getDailyLogsBefore("2024-02-01", 30);
+
+    expect(ltMock).toHaveBeenCalledWith("date", "2024-02-01");
+    expect(result).toHaveLength(1);
+    expect(result[0].date).toBe("2024-01-15");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getDailyLogsFiltered (서버 검색/필터 — Phase 4)
+// ---------------------------------------------------------------------------
+
+describe("getDailyLogsFiltered", () => {
+  function makeFilterClient(orSpy?: (s: string) => void) {
+    const chain: any = {
+      eq: vi.fn(() => chain),
+      or: vi.fn((s: string) => {
+        orSpy?.(s);
+        return chain;
+      }),
+      not: vi.fn(() => chain),
+      neq: vi.fn(() => chain),
+      lt: vi.fn(() => chain),
+      order: vi.fn(() => chain),
+      limit: vi.fn().mockResolvedValue({ data: [mockDailyLogRow], error: null }),
+    };
+    return {
+      client: {
+        auth: { getUser: vi.fn().mockResolvedValue({ data: { user: mockUser } }) },
+        from: vi.fn(() => ({ select: vi.fn(() => chain) })),
+      },
+      chain,
+    };
+  }
+
+  it("TC-24: 유저 없음 → []", async () => {
+    const client = {
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: null } }) },
+      from: vi.fn(),
+    };
+    vi.mocked(createClient).mockResolvedValue(client as any);
+
+    expect(await getDailyLogsFiltered({ limit: 30 })).toEqual([]);
+  });
+
+  it("TC-25: 검색어 → 3개 식단 컬럼 ilike or-필터", async () => {
+    let orArg = "";
+    const { client } = makeFilterClient((s) => (orArg = s));
+    vi.mocked(createClient).mockResolvedValue(client as any);
+
+    const result = await getDailyLogsFiltered({ query: "닭가슴살", limit: 30 });
+
+    expect(orArg).toContain("breakfast.ilike.%닭가슴살%");
+    expect(orArg).toContain("lunch.ilike.%닭가슴살%");
+    expect(orArg).toContain("dinner.ilike.%닭가슴살%");
+    expect(result).toHaveLength(1);
+  });
+
+  it("TC-26: 검색어의 or-구문 위험문자(,()*%)는 제거된다", async () => {
+    let orArg = "";
+    const { client } = makeFilterClient((s) => (orArg = s));
+    vi.mocked(createClient).mockResolvedValue(client as any);
+
+    await getDailyLogsFiltered({ query: "닭, 가슴(살)*", limit: 30 });
+
+    expect(orArg).not.toContain(",가슴");
+    expect(orArg).not.toContain("(");
+    expect(orArg).not.toContain(")");
+    expect(orArg).toContain("닭");
+  });
+
+  it("TC-27: exercise 필터 → not/neq 조건 적용", async () => {
+    const { client, chain } = makeFilterClient();
+    vi.mocked(createClient).mockResolvedValue(client as any);
+
+    await getDailyLogsFiltered({ filter: "exercise", limit: 30 });
+
+    expect(chain.not).toHaveBeenCalledWith("exercise", "is", null);
+    expect(chain.neq).toHaveBeenCalledWith("exercise", "N");
+    expect(chain.neq).toHaveBeenCalledWith("exercise", "SKIP");
   });
 });

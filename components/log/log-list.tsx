@@ -14,6 +14,12 @@ interface LogListProps {
   isLoadingMore?: boolean;
   onLoadMore?: () => void;
   onRefresh?: () => Promise<void>;
+  // 검색/필터는 서버 위임 — 상태는 부모(LogContainer)가 소유한다.
+  searchQuery: string;
+  onSearchQueryChange: (q: string) => void;
+  activeFilter: string | null;
+  onActiveFilterChange: (f: string | null) => void;
+  isSearching?: boolean;
 }
 
 function getDayOfWeek(dateStr: string) {
@@ -36,10 +42,6 @@ function fmtLateSnack(v: string | null): string {
 }
 
 function didExercise(v: string | null) {
-  return v !== null && v !== "N" && v !== "SKIP";
-}
-
-function hadLateSnack(v: string | null) {
   return v !== null && v !== "N" && v !== "SKIP";
 }
 
@@ -75,12 +77,15 @@ export function LogList({
   isLoadingMore,
   onLoadMore,
   onRefresh,
+  searchQuery,
+  onSearchQueryChange,
+  activeFilter,
+  onActiveFilterChange,
+  isSearching,
 }: LogListProps) {
   const { settings } = useSettings();
   const [viewMode, setViewMode] = useState<"daily" | "weekly">("daily");
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [activeFilter, setActiveFilter] = useState<string | null>(null);
 
   const filters = [
     { key: "unclosed", label: "마감안한날" },
@@ -90,18 +95,9 @@ export function LogList({
     { key: "alcohol", label: "술마신날" },
   ];
 
-  const filteredLogs = logs.filter((log) => {
-    if (searchQuery) {
-      const meals = [log.breakfast, log.lunch, log.dinner].filter(Boolean).join(" ");
-      if (!meals.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    }
-    if (activeFilter === "unclosed") return log.closed === false;
-    if (activeFilter === "intensive") return settings.intensiveDayOn && log.intensiveDay === true;
-    if (activeFilter === "exercise") return didExercise(log.exercise);
-    if (activeFilter === "lateSnack") return hadLateSnack(log.lateSnack);
-    if (activeFilter === "alcohol") return log.dinnerAlcohol === true || log.lateSnackAlcohol === true;
-    return true;
-  });
+  // 검색/필터는 서버에서 이미 적용된 결과가 내려온다 — 클라이언트 재필터링 없음.
+  const isSearchMode = searchQuery.trim().length > 0 || activeFilter !== null;
+  const displayedLogs = logs;
 
   const hasAlcohol = (log: DailyLog) => log.dinnerAlcohol === true || log.lateSnackAlcohol === true;
 
@@ -114,7 +110,7 @@ export function LogList({
             type="text"
             placeholder="식사 내용 검색"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => onSearchQueryChange(e.target.value)}
             className="w-full pl-9 pr-3 py-2.5 text-sm rounded-lg border border-border bg-secondary focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[44px]"
           />
         </div>
@@ -145,7 +141,7 @@ export function LogList({
             {filters.map((f) => (
               <button
                 key={f.key}
-                onClick={() => setActiveFilter(activeFilter === f.key ? null : f.key)}
+                onClick={() => onActiveFilterChange(activeFilter === f.key ? null : f.key)}
                 className={cn(
                   "px-2.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors",
                   activeFilter === f.key
@@ -162,13 +158,17 @@ export function LogList({
 
       {viewMode === "daily" ? (
         <div className="px-4 space-y-2">
-          {filteredLogs.length === 0 ? (
+          {displayedLogs.length === 0 ? (
             <div className="py-12 text-center text-sm text-muted-foreground">
-              {searchQuery || activeFilter ? "검색 결과가 없어요" : "아직 기록이 없어요. 입력 탭에서 첫 번째 기록을 시작해보세요."}
+              {isSearching
+                ? "검색 중..."
+                : isSearchMode
+                  ? "검색 결과가 없어요"
+                  : "아직 기록이 없어요. 입력 탭에서 첫 번째 기록을 시작해보세요."}
             </div>
           ) : (
             <>
-              {filteredLogs.map((log) => {
+              {displayedLogs.map((log) => {
                 const isExpanded = expandedDate === log.date;
                 return (
                   <div
@@ -291,7 +291,7 @@ export function LogList({
                 );
               })}
 
-              {hasMore && !searchQuery && !activeFilter && (
+              {hasMore && (
                 <button
                   onClick={onLoadMore}
                   disabled={isLoadingMore}

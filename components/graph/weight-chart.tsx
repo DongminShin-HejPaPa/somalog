@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Expand, X, GripHorizontal, Info, Share2 } from "lucide-react";
 import {
   LineChart,
@@ -348,6 +348,8 @@ function fmtCardDate(d: Date): string {
 interface CustomDotProps {
   cx?: number;
   cy?: number;
+  /** 데이터가 많은 구간에서 일반 점(원)을 생략해 SVG 노드 폭증을 막는다. 특수 마커는 유지. */
+  dense?: boolean;
   payload?: {
     date: string;
     weight: number | null;
@@ -356,7 +358,7 @@ interface CustomDotProps {
   };
 }
 
-function CustomDot({ cx, cy, payload }: CustomDotProps) {
+function CustomDot({ cx, cy, payload, dense }: CustomDotProps) {
   if (!cx || !cy || !payload || payload.weight === null) return null;
 
   if (payload.isLowest) {
@@ -383,6 +385,9 @@ function CustomDot({ cx, cy, payload }: CustomDotProps) {
       />
     );
   }
+
+  // 밀집 구간: 역대 최저·급증 같은 특수 마커만 남기고 일반 일별 점은 생략.
+  if (dense) return null;
 
   return (
     <circle
@@ -633,99 +638,153 @@ export function WeightChart({
     );
   }
 
-  const sortedLogs = [...logs].reverse();
+  // ── 차트 파생 데이터 (메모이즈) ──────────────────────────────────────────────
+  // 전체화면·공유·정보시트 토글 등 무관한 상태 변경마다 LOESS(O(n²))를 다시 돌지
+  // 않도록, 비싼 계산은 [logs, period, 목표 관련 props] 가 바뀔 때만 재계산한다.
+  const chart = useMemo(() => {
+    const sortedLogs = [...logs].reverse();
 
-  // 다이어트 시작일부터 현재까지의 총 기간으로 구간 폭을 결정한다.
-  const totalDietDays = Math.max(
-    1,
-    Math.ceil((Date.now() - new Date(startDate).getTime()) / 86400000)
-  );
-  const periodConfig = getPeriodConfig(totalDietDays);
-  const periodLabels: Record<Period, string> = {
-    short: periodConfig.short.label,
-    mid: periodConfig.mid.label,
-    long: periodConfig.long.label,
-    all: "전체",
-  };
-  const periodDays: Record<Period, number> = {
-    short: periodConfig.short.days,
-    mid: periodConfig.mid.days,
-    long: periodConfig.long.days,
-    all: sortedLogs.length,
-  };
-  const displayLogs = sortedLogs.slice(-periodDays[period]);
+    // 다이어트 시작일부터 현재까지의 총 기간으로 구간 폭을 결정한다.
+    const totalDietDays = Math.max(
+      1,
+      Math.ceil((Date.now() - new Date(startDate).getTime()) / 86400000)
+    );
+    const periodConfig = getPeriodConfig(totalDietDays);
+    const periodLabels: Record<Period, string> = {
+      short: periodConfig.short.label,
+      mid: periodConfig.mid.label,
+      long: periodConfig.long.label,
+      all: "전체",
+    };
+    const periodDays: Record<Period, number> = {
+      short: periodConfig.short.days,
+      mid: periodConfig.mid.days,
+      long: periodConfig.long.days,
+      all: sortedLogs.length,
+    };
+    const displayLogs = sortedLogs.slice(-periodDays[period]);
 
-  const chartData = displayLogs.map((log, idx) => {
-    const prevLog = idx > 0 ? displayLogs[idx - 1] : null;
-    const surge =
-      log.weight !== null &&
-      prevLog?.weight !== null &&
-      prevLog?.weight !== undefined &&
-      log.weight - prevLog.weight >= 1.0;
+    const chartData = displayLogs.map((log, idx) => {
+      const prevLog = idx > 0 ? displayLogs[idx - 1] : null;
+      const surge =
+        log.weight !== null &&
+        prevLog?.weight !== null &&
+        prevLog?.weight !== undefined &&
+        log.weight - prevLog.weight >= 1.0;
+
+      return {
+        date: log.date.slice(5),
+        fullDate: log.date,
+        weight: log.weight,
+        isLowest: log.weight !== null && log.weight === lowestWeight,
+        isSurge: surge,
+        isMonday: new Date(log.date).getDay() === 1,
+      };
+    });
+
+    // LOESS 추세 곡선 — 체중.
+    // 점이 많으면 평가 지점을 일정 간격(stride)으로 솎아 O(n²) 폭주를 막는다.
+    // 추세선은 매끄러운 곡선이라 솎은 지점만 계산하고 사이는 connectNulls 로 잇는다.
+    const validPts = chartData
+      .map((d, i) => ({ i, y: d.weight as number }))
+      .filter((p) => chartData[p.i].weight !== null);
+
+    const LOESS_MAX_EVAL = 150;
+    let loessValues: (number | null)[];
+    if (validPts.length >= 3) {
+      const xs = validPts.map((p) => p.i);
+      const ys = validPts.map((p) => p.y);
+      const stride = Math.max(1, Math.ceil(chartData.length / LOESS_MAX_EVAL));
+      if (stride === 1) {
+        loessValues = computeLoess(xs, ys, chartData.map((_, i) => i), 0.8);
+      } else {
+        const evalIdx: number[] = [];
+        for (let i = 0; i < chartData.length; i += stride) evalIdx.push(i);
+        const lastIdx = chartData.length - 1;
+        if (evalIdx[evalIdx.length - 1] !== lastIdx) evalIdx.push(lastIdx);
+        const sampled = computeLoess(xs, ys, evalIdx, 0.8);
+        loessValues = chartData.map(() => null);
+        evalIdx.forEach((idx, k) => {
+          loessValues[idx] = sampled[k];
+        });
+      }
+    } else {
+      loessValues = chartData.map(() => null);
+    }
+
+    const targetEndDate = new Date(startDate);
+    targetEndDate.setMonth(targetEndDate.getMonth() + targetMonths);
+    const totalDays = Math.ceil(
+      (targetEndDate.getTime() - new Date(startDate).getTime()) / 86400000
+    );
+
+    const goalLineData = chartData.map((d) => {
+      const daysSinceStart = Math.ceil(
+        (new Date(d.fullDate).getTime() - new Date(startDate).getTime()) / 86400000
+      );
+      const progress = daysSinceStart / totalDays;
+      return +(startWeight - (startWeight - targetWeight) * progress).toFixed(1);
+    });
+
+    const allWeights = chartData
+      .map((d) => d.weight)
+      .filter((w): w is number => w !== null);
+    const minW = Number((Math.min(...allWeights) - 0.5).toFixed(1));
+    const maxW = Number((Math.max(...allWeights) + 0.5).toFixed(1));
+
+    // y축 범위:
+    //  - 전체(all): 목표 감량선이 모두 보이도록 넓힌다. (목표 체중선은 굳이 보일 필요 없음)
+    //  - 그 외 구간: 체중 그래프 기준으로만 잡는다. 목표선은 잘려도(일부만 보여도) 무방.
+    //    (allowDataOverflow=true 로 목표선이 y축을 강제로 늘리지 못하게 한다.)
+    const isAllPeriod = period === "all";
+    const yDomainMin = isAllPeriod
+      ? Number((Math.min(...allWeights, ...goalLineData) - 0.5).toFixed(1))
+      : minW;
+    const yDomainMax = isAllPeriod
+      ? Number((Math.max(...allWeights, ...goalLineData) + 0.5).toFixed(1))
+      : maxW;
+
+    const allSortedWeights = sortedLogs
+      .map((l) => l.weight)
+      .filter((w): w is number => w !== null);
+    const currentWeight =
+      allSortedWeights.length > 0
+        ? allSortedWeights[allSortedWeights.length - 1]
+        : startWeight;
+
+    const finalChartData = chartData.map((d, i) => ({
+      ...d,
+      loessTrend: loessValues[i] !== null ? Math.round(loessValues[i]! * 10) / 10 : null,
+      goalWeight: goalLineData[i],
+    }));
+
+    // 약 6개월(180일) 넘는 일별 점이 한 화면에 들어오면 일반 점은 생략(특수 마커만).
+    const denseDots = chartData.length > 180;
 
     return {
-      date: log.date.slice(5),
-      fullDate: log.date,
-      weight: log.weight,
-      isLowest: log.weight !== null && log.weight === lowestWeight,
-      isSurge: surge,
-      isMonday: new Date(log.date).getDay() === 1,
+      periodLabels,
+      isAllPeriod,
+      yDomainMin,
+      yDomainMax,
+      currentWeight,
+      finalChartData,
+      denseDots,
     };
-  });
+  }, [logs, period, lowestWeight, startWeight, targetWeight, startDate, targetMonths]);
 
-  // LOESS 추세 곡선 — 체중
-  const validPts = chartData
-    .map((d, i) => ({ i, y: d.weight as number }))
-    .filter((p) => chartData[p.i].weight !== null);
-
-  const loessValues = validPts.length >= 3
-    ? computeLoess(
-        validPts.map((p) => p.i),
-        validPts.map((p) => p.y),
-        chartData.map((_, i) => i),
-        0.8
-      )
-    : chartData.map(() => null);
+  const {
+    periodLabels,
+    isAllPeriod,
+    yDomainMin,
+    yDomainMax,
+    currentWeight,
+    finalChartData,
+    denseDots,
+  } = chart;
 
   const targetEndDate = new Date(startDate);
   targetEndDate.setMonth(targetEndDate.getMonth() + targetMonths);
-  const totalDays = Math.ceil(
-    (targetEndDate.getTime() - new Date(startDate).getTime()) / 86400000
-  );
 
-  const goalLineData = chartData.map((d) => {
-    const daysSinceStart = Math.ceil(
-      (new Date(d.fullDate).getTime() - new Date(startDate).getTime()) / 86400000
-    );
-    const progress = daysSinceStart / totalDays;
-    return +(startWeight - (startWeight - targetWeight) * progress).toFixed(1);
-  });
-
-  const allWeights = chartData
-    .map((d) => d.weight)
-    .filter((w): w is number => w !== null);
-  const minW = Number((Math.min(...allWeights) - 0.5).toFixed(1));
-  const maxW = Number((Math.max(...allWeights) + 0.5).toFixed(1));
-
-  // y축 범위:
-  //  - 전체(all): 목표 감량선이 모두 보이도록 넓힌다. (목표 체중선은 굳이 보일 필요 없음)
-  //  - 그 외 구간: 체중 그래프 기준으로만 잡는다. 목표선은 잘려도(일부만 보여도) 무방.
-  //    (allowDataOverflow=true 로 목표선이 y축을 강제로 늘리지 못하게 한다.)
-  const isAllPeriod = period === "all";
-  const yDomainMin = isAllPeriod
-    ? Number((Math.min(...allWeights, ...goalLineData) - 0.5).toFixed(1))
-    : minW;
-  const yDomainMax = isAllPeriod
-    ? Number((Math.max(...allWeights, ...goalLineData) + 0.5).toFixed(1))
-    : maxW;
-
-  const allSortedWeights = sortedLogs
-    .map((l) => l.weight)
-    .filter((w): w is number => w !== null);
-  const currentWeight =
-    allSortedWeights.length > 0
-      ? allSortedWeights[allSortedWeights.length - 1]
-      : startWeight;
   const remaining = currentWeight - targetWeight;
 
   const daysSoFar = Math.ceil(
@@ -754,11 +813,7 @@ export function WeightChart({
     ? currentWeight * (1 - bodyFatPct / 100)
     : null;
 
-  const finalChartData = chartData.map((d, i) => ({
-    ...d,
-    loessTrend: loessValues[i] !== null ? Math.round(loessValues[i]! * 10) / 10 : null,
-    goalWeight: goalLineData[i],
-  }));
+  // finalChartData / currentWeight / yDomain 등은 위 useMemo(chart)에서 계산됨.
 
   // ── 공유 모드 계산 ──────────────────────────────────────────────────────────
   const shareYTickFormatter = (v: number) => {
@@ -927,7 +982,7 @@ export function WeightChart({
               dataKey="weight"
               stroke="#1e3a5f"
               strokeWidth={2}
-              dot={<CustomDot />}
+              dot={<CustomDot dense={denseDots} />}
               activeDot={{ r: 6 }}
               connectNulls
             />
@@ -1238,7 +1293,7 @@ export function WeightChart({
                     <ReferenceLine y={targetWeight} stroke="#16a34a" strokeWidth={1.5} />
                     <Line type="linear" dataKey="goalWeight" stroke="#86efac" strokeWidth={1.5} strokeDasharray="8 4" dot={false} connectNulls />
                     <Line type="monotone" dataKey="loessTrend" stroke="#f97316" strokeWidth={2} strokeDasharray="6 3" dot={false} connectNulls />
-                    <Line type="monotone" dataKey="weight" stroke="#1e3a5f" strokeWidth={2} dot={<CustomDot />} activeDot={{ r: 6 }} connectNulls />
+                    <Line type="monotone" dataKey="weight" stroke="#1e3a5f" strokeWidth={2} dot={<CustomDot dense={denseDots} />} activeDot={{ r: 6 }} connectNulls />
                   </LineChart>
                 </ResponsiveContainer>
               </div>

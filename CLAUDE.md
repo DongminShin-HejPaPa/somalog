@@ -214,3 +214,11 @@ page.getByTestId(TEST_IDS.CLOSE_BUTTON)
 - **경로 alias**: `@/` → 프로젝트 루트
 - **날짜 포맷**: `YYYY-MM-DD` 문자열 (ISO, 타임존 없음)
 - **에러 처리**: Server Action은 `null` 반환, 서비스 레이어는 예외 throw
+
+---
+
+## Git / 배포 워크플로
+
+> ⚠️ **항상 `main` 브랜치로 푸시한다.** PWA 배포 테스트가 `main` 기준으로 이뤄지므로,
+> 작업 브랜치에서 개발하더라도 최종 푸시는 `main`에 반영한다 (사용자 명시 지시, 영구 적용).
+> fast-forward 가 안 되면 먼저 `origin/main`을 머지한 뒤 푸시한다.

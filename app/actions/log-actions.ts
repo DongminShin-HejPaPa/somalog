@@ -7,7 +7,8 @@ import {
   closeDailyLog,
   reopenDailyLog,
   getRecentDailyLogs,
-  getDailyLogsWithOffset,
+  getDailyLogsBefore,
+  getDailyLogsFiltered,
   getDailyLogsTotalCount,
   getWeightSeries,
   regenerateDailySummary,
@@ -111,9 +112,18 @@ export async function actionGetRecentDailyLogs(
 
 export async function actionGetMoreDailyLogs(
   count: number,
-  offset: number
+  cursorDate: string
 ): Promise<DailyLog[]> {
-  return getDailyLogsWithOffset(count, offset);
+  return getDailyLogsBefore(cursorDate, count);
+}
+
+export async function actionGetFilteredDailyLogs(opts: {
+  query?: string;
+  filter?: string | null;
+  cursorDate?: string | null;
+  limit: number;
+}): Promise<DailyLog[]> {
+  return getDailyLogsFiltered(opts);
 }
 
 export async function actionGetDailyLogsTotalCount(): Promise<number> {

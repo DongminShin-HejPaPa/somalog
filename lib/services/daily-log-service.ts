@@ -793,14 +793,47 @@ export async function getDailyLogsBefore(cursorDate: string, count: number): Pro
 }
 
 /**
+ * 'Hard Reset Mode(intensive)' 날짜 목록을 그래프와 동일한 prefix-min 기준으로
+ * 정확히 계산한다 (date DESC). 무거운 컬럼 없이 date+weight 경량 시리즈만 읽어
+ * enrichIntensiveDay 로 재계산하므로 빠르다. intensive 끄면 빈 배열.
+ */
+async function getIntensiveDateList(): Promise<string[]> {
+  const settings = await getSettings();
+  if (!settings.intensiveDayOn) return [];
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from("daily_logs")
+    .select("date, weight")
+    .eq("user_id", user.id)
+    .order("date", { ascending: false });
+
+  if (error || !data) return [];
+
+  // enrichIntensiveDay 는 date/weight 만 읽으므로 경량 행을 그대로 넘겨도 정확하다.
+  const logs = data.map((r) => ({
+    date: r.date as string,
+    weight: (r.weight as number | null) ?? null,
+  })) as unknown as DailyLog[];
+
+  return enrichIntensiveDay(logs, settings.intensiveDayCriteria)
+    .filter((l) => l.intensiveDay)
+    .map((l) => l.date);
+}
+
+/**
  * 로그 탭 서버 검색/필터 — 전체 기록을 대상으로 조회한다 (커서 페이지네이션).
  *
  * 기존엔 클라이언트가 이미 불러온 페이지(최근 30개씩)만 필터링해, 오래된 기록은
  * "검색 결과 없음"으로 보였다. 여기서는 DB에서 직접 ilike/조건 필터를 걸어
  * 수년 전 기록도 찾는다. cursorDate 로 "더 보기"를 이어간다.
  *
- * intensive 필터는 저장된 intensive_day 컬럼(쓰기 시점 값)을 쓰므로 그래프의
- * 재계산값과 미세하게 다를 수 있다 — 검색 편의용 근사로 허용.
+ * intensive 필터는 그래프와 동일한 prefix-min 으로 정확히 판정한다(경량 시리즈 재계산).
  */
 export async function getDailyLogsFiltered(opts: {
   query?: string;
@@ -815,12 +848,34 @@ export async function getDailyLogsFiltered(opts: {
 
   if (!user) return [];
 
-  let q = supabase.from("daily_logs").select("*").eq("user_id", user.id);
-
   // 검색어: PostgREST or-필터 구문을 깨뜨리는 문자(`,()*%`)는 제거 후 사용.
   const term = (opts.query ?? "").trim().replace(/[,()*%]/g, " ").trim();
+  const like = `%${term}%`;
+
+  // intensive 필터: prefix-min 으로 정확한 날짜 집합을 구해 페이지 단위 .in 으로 조회.
+  // 페이지당 날짜 수가 limit 이하라 .in 비용이 작고, 그래프 판정과 정확히 일치한다.
+  if (opts.filter === "intensive") {
+    let dates = await getIntensiveDateList();
+    if (opts.cursorDate) dates = dates.filter((d) => d < opts.cursorDate!);
+    const pageDates = dates.slice(0, opts.limit);
+    if (pageDates.length === 0) return [];
+
+    let iq = supabase
+      .from("daily_logs")
+      .select("*")
+      .eq("user_id", user.id)
+      .in("date", pageDates);
+    if (term) {
+      iq = iq.or(`breakfast.ilike.${like},lunch.ilike.${like},dinner.ilike.${like}`);
+    }
+    const { data, error } = await iq.order("date", { ascending: false }).limit(opts.limit);
+    if (error || !data) return [];
+    return data.map((row) => rowToDailyLog(row as Record<string, unknown>));
+  }
+
+  let q = supabase.from("daily_logs").select("*").eq("user_id", user.id);
+
   if (term) {
-    const like = `%${term}%`;
     q = q.or(`breakfast.ilike.${like},lunch.ilike.${like},dinner.ilike.${like}`);
   }
 
@@ -836,9 +891,6 @@ export async function getDailyLogsFiltered(opts: {
       break;
     case "alcohol":
       q = q.or("dinner_alcohol.eq.true,late_snack_alcohol.eq.true");
-      break;
-    case "intensive":
-      q = q.eq("intensive_day", true);
       break;
   }
 
@@ -931,7 +983,14 @@ export async function getLowestWeightEntry(): Promise<{
   return { weight: data.weight as number, date: data.date as string };
 }
 
-export async function getAllDailyLogs(): Promise<DailyLog[]> {
+/**
+ * 여정 회고(getJourneyReport) 전용 경량 조회.
+ *
+ * 리포트 집계에 필요한 컬럼만 가져온다 — AI 총평/한줄/메모(feedback·daily_summary·
+ * one_liner·note) 같은 무거운 텍스트와 intensiveDay 재계산은 제외. 세리머니 진입 시
+ * 지연 로드라 탭 속도엔 무관하지만, 페이로드를 줄여 그래프 외 경로도 일관되게 가볍게.
+ */
+export async function getLogsForJourney(): Promise<DailyLog[]> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -939,22 +998,17 @@ export async function getAllDailyLogs(): Promise<DailyLog[]> {
 
   if (!user) return [];
 
-  const [{ data, error }, settings] = await Promise.all([
-    supabase
-      .from("daily_logs")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("date", { ascending: false }),
-    getSettings(),
-  ]);
+  const { data, error } = await supabase
+    .from("daily_logs")
+    .select(
+      "date, weight, exercise, water, water_goal, late_snack, dinner_alcohol, late_snack_alcohol, breakfast, lunch, dinner"
+    )
+    .eq("user_id", user.id)
+    .order("date", { ascending: false });
 
   if (error || !data) return [];
 
-  const logs = data.map((row) => rowToDailyLog(row as Record<string, unknown>));
-  if (!settings.intensiveDayOn) return logs;
-
-  // 전체 히스토리이므로 priorLowest 없이(Infinity) prefix-min만으로 정확히 판정된다.
-  return enrichIntensiveDay(logs, settings.intensiveDayCriteria);
+  return data.map((r) => rowToDailyLog(r as Record<string, unknown>));
 }
 
 /**

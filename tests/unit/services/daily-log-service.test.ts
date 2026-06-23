@@ -808,4 +808,56 @@ describe("getDailyLogsFiltered", () => {
     expect(chain.neq).toHaveBeenCalledWith("exercise", "N");
     expect(chain.neq).toHaveBeenCalledWith("exercise", "SKIP");
   });
+
+  it("TC-28: intensive 필터 → prefix-min으로 정확한 날짜만 .in 조회", async () => {
+    // 15(81)→16(79)→17(80): 17일만 '그 전 최저(79)'보다 높아 intensive.
+    const seriesRows = [
+      { date: "2024-01-17", weight: 80 },
+      { date: "2024-01-16", weight: 79 },
+      { date: "2024-01-15", weight: 81 },
+    ];
+    const inSpy = vi.fn();
+    const seriesChain: any = {
+      eq: vi.fn(() => seriesChain),
+      order: vi.fn().mockResolvedValue({ data: seriesRows, error: null }),
+    };
+    const pageChain: any = {
+      eq: vi.fn(() => pageChain),
+      in: vi.fn((...a: unknown[]) => {
+        inSpy(...a);
+        return pageChain;
+      }),
+      or: vi.fn(() => pageChain),
+      order: vi.fn(() => pageChain),
+      limit: vi.fn().mockResolvedValue({
+        data: [{ ...mockDailyLogRow, date: "2024-01-17" }],
+        error: null,
+      }),
+    };
+    const client = {
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: mockUser } }) },
+      from: vi.fn(() => ({
+        select: vi.fn((cols: string) => (cols === "date, weight" ? seriesChain : pageChain)),
+      })),
+    };
+    vi.mocked(createClient).mockResolvedValue(client as any);
+    // 기본 mockSettings: intensiveDayOn=true, criteria="역대최저"
+
+    const result = await getDailyLogsFiltered({ filter: "intensive", limit: 30 });
+
+    expect(inSpy).toHaveBeenCalledWith("date", ["2024-01-17"]);
+    expect(result).toHaveLength(1);
+    expect(result[0].date).toBe("2024-01-17");
+  });
+
+  it("TC-29: intensiveDayOn=false → intensive 필터는 빈 결과", async () => {
+    vi.mocked(getSettings).mockResolvedValue({ ...mockSettings, intensiveDayOn: false });
+    const client = {
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: mockUser } }) },
+      from: vi.fn(),
+    };
+    vi.mocked(createClient).mockResolvedValue(client as any);
+
+    expect(await getDailyLogsFiltered({ filter: "intensive", limit: 30 })).toEqual([]);
+  });
 });

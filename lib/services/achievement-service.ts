@@ -9,7 +9,7 @@ import type {
   MilestoneEvent,
 } from "@/lib/types";
 import { getSettings } from "./settings-service";
-import { getAllDailyLogs } from "./daily-log-service";
+import { getLogsForJourney } from "./daily-log-service";
 
 const GOAL_TYPE = "goal_reached";
 const MILESTONE_PREFIX = "milestone_";
@@ -330,7 +330,7 @@ export async function getAchievements(): Promise<Achievement[]> {
  * 세리머니 진입 시점에만 호출(지연 로드)되므로 탭 초기 진입 속도에 영향 없음.
  */
 export async function getJourneyReport(): Promise<JourneyReport | null> {
-  const [logs, settings] = await Promise.all([getAllDailyLogs(), getSettings()]);
+  const [logs, settings] = await Promise.all([getLogsForJourney(), getSettings()]);
   const withWeight = logs.filter(
     (l): l is DailyLog & { weight: number } => l.weight !== null
   );

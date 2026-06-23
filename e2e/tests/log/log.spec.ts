@@ -131,3 +131,56 @@ test.describe("Log — 필터 & 검색", () => {
     }
   });
 });
+
+// Phase 4: 검색이 '이미 로드된 페이지'가 아니라 전체 기록을 대상으로 동작하는지.
+// 첫 페이지(최근 30개) 밖의 오래된 기록을 검색으로 찾아낼 수 있어야 한다.
+test.describe("Log — 서버 전체검색", () => {
+  // 최근 35일치 (첫 페이지 30개 초과). 가장 오래된 날(34일 전)에만 고유 키워드.
+  const dates = Array.from({ length: 35 }, (_, i) =>
+    new Date(Date.now() - i * 86400000).toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" })
+  );
+  const oldestDate = dates[34];
+  const UNIQUE = "특별한멸치볶음";
+
+  test.beforeEach(async () => {
+    const email = process.env.TEST_USER_EMAIL!;
+    const userId = await getUserIdByEmail(email);
+    await clearUserData(userId);
+    await seedSettings(userId);
+    await seedDailyLogs(
+      userId,
+      dates.map((date, i) => ({
+        date,
+        day: 35 - i,
+        closed: true,
+        weight: 90 - i * 0.1,
+        breakfast: "오트밀",
+        lunch: "샐러드",
+        dinner: i === 34 ? UNIQUE : "닭가슴살",
+      }))
+    );
+  });
+
+  test.afterEach(async () => {
+    const email = process.env.TEST_USER_EMAIL!;
+    const userId = await getUserIdByEmail(email);
+    await clearUserData(userId);
+  });
+
+  test("첫 페이지 밖(34일 전) 기록도 검색으로 찾는다", async ({ page }) => {
+    await page.goto("/log");
+    await expect(page.getByTestId("log-list")).toBeVisible();
+
+    // 초기에는 최근 30개만 렌더 → 가장 오래된 항목은 보이지 않아야 함
+    await expect(page.getByTestId(`log-item-${oldestDate}`)).toHaveCount(0);
+
+    // 고유 키워드 검색 → 서버 전체검색으로 오래된 항목이 나타남
+    const searchInput = page.getByPlaceholder(/검색/);
+    await searchInput.fill(UNIQUE);
+    await expect(page.getByTestId(`log-item-${oldestDate}`)).toBeVisible();
+
+    // 검색어 지우면 일반 목록으로 복귀 (오래된 항목은 다시 첫 페이지 밖)
+    await searchInput.clear();
+    await expect(page.getByTestId(`log-item-${dates[0]}`)).toBeVisible();
+  });
+});

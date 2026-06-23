@@ -13,10 +13,10 @@ import {
   CartesianGrid,
 } from "recharts";
 import { cn } from "@/lib/utils";
-import type { DailyLog } from "@/lib/types";
+import type { WeightPoint } from "@/lib/types";
 
 interface WeightChartProps {
-  logs: DailyLog[];
+  logs: WeightPoint[];
   startWeight: number;
   targetWeight: number;
   startDate: string;

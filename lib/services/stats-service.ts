@@ -1,18 +1,11 @@
-import type { DailyLog } from "@/lib/types";
 import * as dailyLogService from "./daily-log-service";
 
 export async function getLowestWeight(): Promise<{
   weight: number;
   date: string;
 }> {
-  const logs = await dailyLogService.getRecentDailyLogs(365);
-  const withWeight = logs.filter(
-    (l): l is DailyLog & { weight: number } => l.weight !== null
-  );
-  if (withWeight.length === 0) return { weight: Infinity, date: "" };
-  return withWeight.reduce((min, l) =>
-    l.weight < min.weight ? l : min
-  , withWeight[0]);
+  // 전 기간 최저를 인덱스 1행 조회로 가져온다(기존 최근 365일 한정 버그 + 365행 풀로드 제거).
+  return dailyLogService.getLowestWeightEntry();
 }
 
 export async function getAvgWeight3d(date: string): Promise<number | null> {

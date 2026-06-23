@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import type { DailyLog, DailyLogUpdate } from "@/lib/types";
+import type { DailyLog, DailyLogUpdate, WeightPoint } from "@/lib/types";
 import { formatDate, getWeekRange } from "@/lib/utils/date-utils";
 import {
   computeDay,
@@ -800,6 +800,68 @@ export async function getDailyLogsTotalCount(): Promise<number> {
 
   if (error) return 0;
   return count ?? 0;
+}
+
+/**
+ * 그래프 전용 경량 시리즈 — date + weight 만 조회한다.
+ *
+ * 기존 getAllDailyLogs 는 select("*") 로 AI 총평·식단·메모 등 무거운 컬럼까지
+ * 전부 내려받아, 수년치가 쌓이면 그래프 진입마다 수 MB 를 전송·파싱했다.
+ * 그래프는 실제로 날짜·체중만 쓰므로(별표/급증은 클라이언트 계산, intensiveDay 미사용)
+ * 두 컬럼만 가져와 페이로드를 20~50배 줄인다. 정렬은 기존과 동일하게 date DESC.
+ */
+export async function getWeightSeries(): Promise<WeightPoint[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from("daily_logs")
+    .select("date, weight")
+    .eq("user_id", user.id)
+    .order("date", { ascending: false });
+
+  if (error || !data) return [];
+
+  return data.map((r) => ({
+    date: r.date as string,
+    weight: (r.weight as number | null) ?? null,
+  }));
+}
+
+/**
+ * 전 기간 통틀어 최저 체중 1건을 인덱스 1행 조회로 반환한다.
+ *
+ * 기존 stats-service.getLowestWeight 는 최근 365일만 훑어, 1년 넘게 쓰면
+ * 진짜 역대 최저(365일보다 과거)를 놓치는 정확성 버그가 있었다. 여기서는
+ * weight 오름차순 + date 오름차순(동률이면 더 이른 날) 으로 1행만 가져온다.
+ */
+export async function getLowestWeightEntry(): Promise<{
+  weight: number;
+  date: string;
+}> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { weight: Infinity, date: "" };
+
+  const { data, error } = await supabase
+    .from("daily_logs")
+    .select("date, weight")
+    .eq("user_id", user.id)
+    .not("weight", "is", null)
+    .order("weight", { ascending: true })
+    .order("date", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data || data.weight === null) return { weight: Infinity, date: "" };
+  return { weight: data.weight as number, date: data.date as string };
 }
 
 export async function getAllDailyLogs(): Promise<DailyLog[]> {

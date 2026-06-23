@@ -8,7 +8,7 @@ import { HomeContent } from "./home-content";
 import { formatDate, getDayNumber } from "@/lib/utils/date-utils";
 import { getGreetingMessage } from "@/lib/utils/greeting-messages";
 import { useSettings } from "@/lib/contexts/settings-context";
-import type { DailyLog, GoalEvent } from "@/lib/types";
+import type { DailyLog, GoalEvent, WeightPoint } from "@/lib/types";
 import { logStore } from "@/lib/stores/log-store";
 
 const GoalCeremony = dynamic(
@@ -17,7 +17,7 @@ const GoalCeremony = dynamic(
 );
 
 /** 첫 기록일부터의 누적 일수 — 이전 챕터 존재 시 보조 표시용 (추가 쿼리 없이 캐시된 전체 로그 사용) */
-function computeCumulativeDay(logs: DailyLog[] | null, today: string): number | null {
+function computeCumulativeDay(logs: WeightPoint[] | null, today: string): number | null {
   if (!logs || logs.length === 0) return null;
   let earliest = logs[0].date;
   for (const l of logs) if (l.date < earliest) earliest = l.date;

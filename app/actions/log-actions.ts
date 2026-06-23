@@ -9,7 +9,7 @@ import {
   getRecentDailyLogs,
   getDailyLogsWithOffset,
   getDailyLogsTotalCount,
-  getAllDailyLogs,
+  getWeightSeries,
   regenerateDailySummary,
   fillMissingAndAutoClose,
   closeAllUnclosedExceptToday,
@@ -31,6 +31,7 @@ import type {
   DailyLogUpdate,
   ClearableField,
   WeeklyLog,
+  WeightPoint,
   CloseDailyLogResult,
   Achievement,
   JourneyReport,
@@ -153,8 +154,8 @@ export async function actionGetFirstUnclosedLog(): Promise<DailyLog | null> {
   return getFirstUnclosedLog();
 }
 
-export async function actionGetAllDailyLogs(): Promise<DailyLog[]> {
-  return getAllDailyLogs();
+export async function actionGetWeightSeries(): Promise<WeightPoint[]> {
+  return getWeightSeries();
 }
 
 export async function actionRegenerateDailySummary(date: string): Promise<import("@/lib/types").DailyLog | null> {
@@ -181,7 +182,7 @@ export async function actionGetPrefetchData(
 ): Promise<{
   w?: WeeklyLog[];
   c?: number;
-  all?: DailyLog[];
+  all?: WeightPoint[];
   low?: { weight: number; date: string } | null;
 }> {
   const promises: Promise<any>[] = [];
@@ -195,7 +196,7 @@ export async function actionGetPrefetchData(
   }
   if (fetchGraph) {
     promises.push(
-      getAllDailyLogs().then((d) => (resAll = d)),
+      getWeightSeries().then((d) => (resAll = d)),
       getLowestWeight().then((d) => (resLow = d))
     );
   }

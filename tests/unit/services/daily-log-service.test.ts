@@ -24,6 +24,8 @@ import {
   getRecentDailyLogs,
   upsertDailyLog,
   closeDailyLog,
+  getWeightSeries,
+  getLowestWeightEntry,
 } from "@/lib/services/daily-log-service";
 
 beforeEach(() => {
@@ -578,5 +580,115 @@ describe("closeDailyLog", () => {
     await closeDailyLog("2024-01-21");
 
     expect(vi.mocked(upsertWeeklyLog)).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getWeightSeries (그래프 전용 경량 시리즈 — Phase 2)
+// ---------------------------------------------------------------------------
+
+describe("getWeightSeries", () => {
+  it("TC-16: 유저 없음 → []", async () => {
+    const client = {
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: null } }) },
+      from: vi.fn(),
+    };
+    vi.mocked(createClient).mockResolvedValue(client as any);
+
+    expect(await getWeightSeries()).toEqual([]);
+  });
+
+  it("TC-17: date+weight 만 매핑해 반환 (무거운 컬럼 미포함, null 보존)", async () => {
+    const rows = [
+      { date: "2024-03-01", weight: 79.5 },
+      { date: "2024-02-01", weight: null },
+    ];
+    const orderMock = vi.fn().mockResolvedValue({ data: rows, error: null });
+    const client = {
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: mockUser } }) },
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnThis(),
+          order: orderMock,
+        }),
+      }),
+    };
+    vi.mocked(createClient).mockResolvedValue(client as any);
+
+    const result = await getWeightSeries();
+
+    expect(result).toEqual([
+      { date: "2024-03-01", weight: 79.5 },
+      { date: "2024-02-01", weight: null },
+    ]);
+    // 경량 쿼리: feedback/daily_summary 등 무거운 컬럼은 결과에 존재하지 않아야 함
+    expect(Object.keys(result[0])).toEqual(["date", "weight"]);
+  });
+
+  it("TC-18: 에러 → []", async () => {
+    const client = {
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: mockUser } }) },
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnThis(),
+          order: vi.fn().mockResolvedValue({ data: null, error: { message: "boom" } }),
+        }),
+      }),
+    };
+    vi.mocked(createClient).mockResolvedValue(client as any);
+
+    expect(await getWeightSeries()).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getLowestWeightEntry (전 기간 최저 — Phase 1 정확성 수정)
+// ---------------------------------------------------------------------------
+
+describe("getLowestWeightEntry", () => {
+  it("TC-19: 유저 없음 → {Infinity, ''}", async () => {
+    const client = {
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: null } }) },
+      from: vi.fn(),
+    };
+    vi.mocked(createClient).mockResolvedValue(client as any);
+
+    expect(await getLowestWeightEntry()).toEqual({ weight: Infinity, date: "" });
+  });
+
+  it("TC-20: 최저가 365일보다 과거여도 정확히 반환한다 (회귀 방지)", async () => {
+    // 기존 버그: 최근 365일만 훑어 1년 밖의 진짜 최저를 놓침.
+    const lowestRow = { date: "2023-01-10", weight: 71.2 };
+    const chain: any = {
+      eq: vi.fn(() => chain),
+      not: vi.fn(() => chain),
+      order: vi.fn(() => chain),
+      limit: vi.fn(() => chain),
+      maybeSingle: vi.fn().mockResolvedValue({ data: lowestRow, error: null }),
+    };
+    const client = {
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: mockUser } }) },
+      from: vi.fn(() => ({ select: vi.fn(() => chain) })),
+    };
+    vi.mocked(createClient).mockResolvedValue(client as any);
+
+    expect(await getLowestWeightEntry()).toEqual({ weight: 71.2, date: "2023-01-10" });
+  });
+
+  it("TC-21: 체중 기록이 하나도 없으면 {Infinity, ''}", async () => {
+    const chain: any = {
+      eq: vi.fn(() => chain),
+      not: vi.fn(() => chain),
+      order: vi.fn(() => chain),
+      limit: vi.fn(() => chain),
+      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+    };
+    const client = {
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: mockUser } }) },
+      from: vi.fn(() => ({ select: vi.fn(() => chain) })),
+    };
+    vi.mocked(createClient).mockResolvedValue(client as any);
+
+    expect(await getLowestWeightEntry()).toEqual({ weight: Infinity, date: "" });
   });
 });

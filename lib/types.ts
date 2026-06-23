@@ -37,6 +37,16 @@ export interface WeeklyLog {
   weeklySummary: string;
 }
 
+/**
+ * 그래프 전용 경량 포인트 — date + weight 만 담는다.
+ * 그래프는 전체 기록을 불러오지만 실제로 쓰는 건 날짜·체중 둘뿐이므로,
+ * AI 총평·식단 등 무거운 컬럼까지 통째로 내려받던 페이로드 비대를 막기 위해 사용한다.
+ */
+export interface WeightPoint {
+  date: string;
+  weight: number | null;
+}
+
 export interface Settings {
   coachName: string;
   height: number;

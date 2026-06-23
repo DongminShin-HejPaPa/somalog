@@ -1,6 +1,6 @@
 "use client";
 
-import type { DailyLog, WeeklyLog } from "@/lib/types";
+import type { DailyLog, WeeklyLog, WeightPoint } from "@/lib/types";
 import { perfLog } from "@/lib/utils/perf-log";
 import { formatDate } from "@/lib/utils/date-utils";
 
@@ -17,7 +17,9 @@ const HOME_CACHE_LRU_LIMIT = 3;
 const LOG_CACHE_KEY_PREFIX = "somalog_log_v1:";
 const GRAPH_CACHE_KEY_PREFIX = "somalog_graph_v1:";
 const LOG_CACHE_SCHEMA_VERSION = 1;
-const GRAPH_CACHE_SCHEMA_VERSION = 1;
+// v2: allLogs 를 전체 DailyLog → 경량 WeightPoint(date+weight) 로 축소.
+// 버전 범프로 기존 비대 캐시는 1회 무효화된다.
+const GRAPH_CACHE_SCHEMA_VERSION = 2;
 
 interface HomeCacheRecord {
   userId: string;
@@ -37,7 +39,7 @@ interface LogCacheRecord {
 
 interface GraphCacheRecord {
   userId: string;
-  allLogs: DailyLog[];
+  allLogs: WeightPoint[];
   lowestWeight: { weight: number; date: string } | null;
   cachedAt: number;
   schemaVersion: number;
@@ -61,7 +63,7 @@ class LogStore {
   private recentLogs: DailyLog[] | null = null;
   private weeklyLogs: WeeklyLog[] | null = null;
   private totalCount: number | null = null;
-  private allLogs: DailyLog[] | null = null;
+  private allLogs: WeightPoint[] | null = null;
   private lowestWeight: { weight: number; date: string } | null = null;
   private lowestWeightFetched = false;
   private lastFetchTime = 0;
@@ -85,11 +87,13 @@ class LogStore {
     }
 
     if (this.allLogs) {
+      // allLogs 는 그래프 전용 경량 시리즈 — date+weight 만 보관.
+      const point: WeightPoint = { date: log.date, weight: log.weight };
       const idx = this.allLogs.findIndex((l) => l.date === log.date);
       if (idx !== -1) {
-        this.allLogs[idx] = log;
+        this.allLogs[idx] = point;
       } else {
-        this.allLogs.push(log);
+        this.allLogs.push(point);
         this.allLogs.sort((a, b) => b.date.localeCompare(a.date));
       }
     }
@@ -117,11 +121,12 @@ class LogStore {
     this.lastFetchTime = Date.now();
     if (this.allLogs) {
       for (const log of logs) {
+        const point: WeightPoint = { date: log.date, weight: log.weight };
         const idx = this.allLogs.findIndex((l) => l.date === log.date);
         if (idx !== -1) {
-          this.allLogs[idx] = log;
+          this.allLogs[idx] = point;
         } else {
-          this.allLogs.push(log);
+          this.allLogs.push(point);
         }
       }
       this.allLogs.sort((a, b) => b.date.localeCompare(a.date));
@@ -153,7 +158,7 @@ class LogStore {
     return this.totalCount;
   }
 
-  setAllLogs(logs: DailyLog[]) {
+  setAllLogs(logs: WeightPoint[]) {
     this.allLogs = logs;
     this.persistGraphCacheIfReady();
   }
@@ -384,7 +389,7 @@ class LogStore {
   // ── 그래프 탭 영속 캐시 ────────────────────────────────────────
   saveGraphCache(
     userId: string,
-    allLogs: DailyLog[],
+    allLogs: WeightPoint[],
     lowestWeight: { weight: number; date: string } | null
   ): void {
     if (typeof window === "undefined") return;
@@ -397,14 +402,15 @@ class LogStore {
         schemaVersion: GRAPH_CACHE_SCHEMA_VERSION,
       };
       localStorage.setItem(graphCacheKey(userId), JSON.stringify(record));
-    } catch {
-      // 용량 초과 등 무시
+    } catch (e) {
+      // 용량 초과(QuotaExceededError) 등 — 캐시는 포기하되 '조용한 죽음'은 로그로 가시화.
+      perfLog(`graph cache save failed (${(e as Error)?.name ?? "unknown"}) — len=${allLogs.length}`);
     }
   }
 
   loadGraphCache(
     userId: string
-  ): { allLogs: DailyLog[]; lowestWeight: { weight: number; date: string } | null } | null {
+  ): { allLogs: WeightPoint[]; lowestWeight: { weight: number; date: string } | null } | null {
     if (typeof window === "undefined") return null;
     try {
       const raw = localStorage.getItem(graphCacheKey(userId));

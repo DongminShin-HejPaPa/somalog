@@ -3,11 +3,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSettings } from "@/lib/contexts/settings-context";
 import {
-  actionGetAllDailyLogs,
+  actionGetWeightSeries,
   actionGetLowestWeight,
 } from "@/app/actions/log-actions";
 import { WeightChart } from "./weight-chart";
-import type { DailyLog } from "@/lib/types";
+import type { WeightPoint } from "@/lib/types";
 import { logStore } from "@/lib/stores/log-store";
 
 interface GraphContainerProps {
@@ -19,7 +19,7 @@ export function GraphContainer({ userName, userId }: GraphContainerProps) {
   const { settings, updateSettings } = useSettings();
   // familyTime ChatRoom 패턴: useState 초기화에서 캐시 동기 읽기.
   // 메모리 → localStorage → 빈 상태 순.
-  const [bootCache] = useState<{ allLogs: DailyLog[]; lowest: { weight: number; date: string } } | null>(() => {
+  const [bootCache] = useState<{ allLogs: WeightPoint[]; lowest: { weight: number; date: string } } | null>(() => {
     if (typeof window === "undefined") return null;
     const memAll = logStore.getAllLogs();
     if (memAll && logStore.hasLowestWeight()) {
@@ -42,7 +42,7 @@ export function GraphContainer({ userName, userId }: GraphContainerProps) {
     }
     return null;
   });
-  const [logs, setLogs] = useState<DailyLog[]>(bootCache?.allLogs ?? []);
+  const [logs, setLogs] = useState<WeightPoint[]>(bootCache?.allLogs ?? []);
   const [lowest, setLowest] = useState<{ weight: number; date: string }>(
     bootCache?.lowest ?? { weight: Infinity, date: "" }
   );
@@ -66,7 +66,7 @@ export function GraphContainer({ userName, userId }: GraphContainerProps) {
       logStore.getAllLogs() && logStore.hasLowestWeight() && !logStore.isStale();
     if (hasFreshMemory) return;
 
-    Promise.all([actionGetAllDailyLogs(), actionGetLowestWeight()])
+    Promise.all([actionGetWeightSeries(), actionGetLowestWeight()])
       .then(([freshLogs, freshLowest]) => {
         logStore.setAllLogs(freshLogs);
         logStore.setLowestWeight(freshLowest);

@@ -28,9 +28,9 @@ const mockGenerateText = vi.mocked(generateText);
 // ──────────────────────────────────────────────
 
 describe("buildSystemPrompt()", () => {
-  it("코치 이름이 시스템 프롬프트에 포함된다", () => {
-    const result = buildSystemPrompt({ ...mockSettings, coachName: "소마" });
-    expect(result).toContain("소마");
+  it("코치 이름(Soma)이 시스템 프롬프트에 포함된다", () => {
+    const result = buildSystemPrompt({ ...mockSettings });
+    expect(result).toContain("Soma");
   });
 
   it.each([
@@ -122,12 +122,12 @@ describe("generateAiFeedback()", () => {
     await generateAiFeedback(
       { ...mockDailyLog, weight: 79.5 },
       80.0,
-      { ...mockSettings, coachName: "테스트코치" },
+      { ...mockSettings },
       null
     );
 
     const call = mockGenerateText.mock.calls[0][0];
-    expect(call.system).toContain("테스트코치");
+    expect(call.system).toContain("Soma");
     expect(call.prompt).toContain("79.5kg");
   });
 

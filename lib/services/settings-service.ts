@@ -8,7 +8,6 @@ import { mockSettings } from "@/lib/mock-data-new";
 
 export function createDefaultSettings(): Settings {
   return {
-    coachName: "Soma",
     height: 0,
     currentWeight: 0,
     gender: "남성",
@@ -35,7 +34,6 @@ export function createDefaultSettings(): Settings {
 
 function rowToSettings(row: Record<string, unknown>): Settings {
   return {
-    coachName: (row.coach_name as string) ?? "Soma",
     height: (row.height as number) ?? 0,
     currentWeight: (row.current_weight as number) ?? 0,
     gender: (row.gender as "남성" | "여성") ?? "남성",
@@ -76,7 +74,6 @@ function settingsToRow(
 ): Record<string, unknown> {
   return {
     user_id: userId,
-    coach_name: s.coachName,
     height: s.height,
     current_weight: s.currentWeight,
     gender: s.gender,

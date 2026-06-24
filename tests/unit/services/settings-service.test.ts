@@ -72,7 +72,6 @@ describe("getSettings", () => {
     const result = await getSettings();
 
     expect(result.onboardingComplete).toBe(false);
-    expect(result.coachName).toBe("Soma");
   });
 
   it("TC-2: DB에 레코드 없음 (error 반환) → createDefaultSettings() 반환", async () => {
@@ -96,7 +95,6 @@ describe("getSettings", () => {
 
     const result = await getSettings();
 
-    expect(result.coachName).toBe(mockSettingsRow.coach_name);
     expect(result.dietStartDate).toBe(mockSettingsRow.diet_start_date);
     expect(result.waterGoal).toBe(mockSettingsRow.water_goal);
     expect(result.onboardingComplete).toBe(mockSettingsRow.onboarding_complete);
@@ -120,21 +118,21 @@ describe("updateSettings", () => {
     const mockClient = buildClient({ user: null });
     vi.mocked(createClient).mockResolvedValue(mockClient as any);
 
-    await expect(updateSettings({ coachName: "Test" })).rejects.toThrow();
+    await expect(updateSettings({ targetWeight: 70 })).rejects.toThrow();
   });
 
   it("TC-6: 정상 호출 → 기존 settings에 data merge 후 UPSERT 호출", async () => {
     const mockClient = buildClient({
       singleData: mockSettingsRow,
       singleError: null,
-      upsertSingleData: { ...mockSettingsRow, coach_name: "NewCoach" },
+      upsertSingleData: { ...mockSettingsRow, target_weight: 65 },
       upsertSingleError: null,
     });
     vi.mocked(createClient).mockResolvedValue(mockClient as any);
 
-    const result = await updateSettings({ coachName: "NewCoach" });
+    const result = await updateSettings({ targetWeight: 65 });
 
-    expect(result.coachName).toBe("NewCoach");
+    expect(result.targetWeight).toBe(65);
   });
 
   it("TC-7: upsert 실패 → Error throw", async () => {

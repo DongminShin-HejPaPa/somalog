@@ -52,7 +52,6 @@ function clearCachedSettings(userId: string | null): void {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  coachName: "Soma",
   height: 0,
   currentWeight: 0,
   gender: "남성",

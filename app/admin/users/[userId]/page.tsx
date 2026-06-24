@@ -149,7 +149,6 @@ export default async function AdminUserDetailPage({
         <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">다이어트 설정</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
-            <div><p className="text-muted-foreground text-xs mb-0.5">코치 이름</p><p className="font-medium">{(settings.coach_name as string) || "—"}</p></div>
             <div><p className="text-muted-foreground text-xs mb-0.5">시작일</p><p className="font-medium">{(settings.diet_start_date as string) || "—"}</p></div>
             <div><p className="text-muted-foreground text-xs mb-0.5">시작 체중</p><p className="font-medium">{settings.start_weight ? `${settings.start_weight}kg` : "—"}</p></div>
             <div><p className="text-muted-foreground text-xs mb-0.5">목표 체중</p><p className="font-medium">{settings.target_weight ? `${settings.target_weight}kg` : "—"}</p></div>

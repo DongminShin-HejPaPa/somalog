@@ -9,7 +9,6 @@ export type {
 import type { DailyLog, WeeklyLog, Settings } from "./types";
 
 export const mockSettings: Settings = {
-  coachName: "쏘마데모코치",
   height: 163,
   currentWeight: 64.0,
   gender: "여성",

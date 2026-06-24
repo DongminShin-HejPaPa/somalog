@@ -8,36 +8,27 @@ test.describe("Settings", () => {
     void withSeededData;
   });
 
-  // J5-01: 설정 페이지 기본 표시
-  test("설정 페이지 — 모든 섹션 표시됨", async ({ page }) => {
+  // J5-01: 설정 페이지 기본 표시 — 카테고리 헤더 + 저장/로그아웃
+  test("설정 페이지 — 카테고리 헤더가 표시됨", async ({ page }) => {
     const settings = new SettingsPage(page);
     await settings.goto();
 
-    await expect(page.getByTestId("settings-coach-name")).toBeVisible();
+    await expect(page.getByRole("button", { name: /내 다이어트/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /AI 코치/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /입력 맞춤/ })).toBeVisible();
     await expect(settings.saveButton).toBeVisible();
     await expect(settings.logoutButton).toBeVisible();
   });
 
-  // J5-02: 설정 저장 → 저장 성공
-  test("설정 저장 → 저장 성공", async ({ page }) => {
+  // J5-02: 목표 체중 변경 후 저장 → 새로고침 후 반영
+  test("목표 체중 변경 후 저장 → 설정에 반영됨", async ({ page }) => {
     const settings = new SettingsPage(page);
     await settings.goto();
 
-    await page.getByTestId("settings-coach-name").fill("뉴코치");
-    await settings.saveButton.click();
+    // '내 다이어트' 카테고리는 기본 펼침 → 목표 체중 노출
+    await expect(page.getByTestId("settings-target-weight")).toHaveValue("70", { timeout: 10_000 });
 
-    await expect(page).toHaveURL("/settings");
-  });
-
-  // J5-02: 코치 이름 변경 후 저장 → 새로고침 후 반영
-  test("코치 이름 변경 후 저장 → 설정에 반영됨", async ({ page }) => {
-    const settings = new SettingsPage(page);
-    await settings.goto();
-
-    // 씨드 데이터의 코치 이름 확인 대기
-    await expect(page.getByTestId("settings-coach-name")).toHaveValue("TestCoach", { timeout: 10_000 });
-
-    await page.getByTestId("settings-coach-name").fill("변경된코치");
+    await page.getByTestId("settings-target-weight").fill("65");
     await settings.saveButton.click();
 
     // "저장 완료" 버튼 텍스트로 UI 반응 확인 (클라이언트 타이머 기반)
@@ -47,29 +38,16 @@ test.describe("Settings", () => {
 
     // 페이지 새로고침 후 DB에 반영됐는지 확인
     await page.reload();
-    await expect(page.getByTestId("settings-coach-name")).toHaveValue("변경된코치", { timeout: 10_000 });
+    await expect(page.getByTestId("settings-target-weight")).toHaveValue("65", { timeout: 10_000 });
   });
 
-  // J5-03: 코치 이름 빈칸 저장 시도
-  test("코치 이름 빈칸 → 저장 버튼 비활성 또는 기존 값 유지", async ({ page }) => {
-    const settings = new SettingsPage(page);
-    await settings.goto();
-    await expect(page.getByTestId("settings-coach-name")).toHaveValue("TestCoach", { timeout: 10_000 });
-
-    await page.getByTestId("settings-coach-name").fill("");
-    await settings.saveButton.click();
-
-    // 저장이 안 되거나 기존 값이 유지됨
-    await page.reload();
-    // 빈칸으로 저장되지 않아야 함 (빈 value 또는 이전 값 유지)
-    const value = await page.getByTestId("settings-coach-name").inputValue();
-    expect(value.length).toBeGreaterThanOrEqual(0); // 앱 동작에 따라 확인
-  });
-
-  // J5-07: 루틴 추가 항목
+  // J5-07: 루틴 추가 항목 (AI 코치 카테고리 안 → 먼저 펼치기)
   test("루틴 추가 입력 후 저장 → 새로고침 후 유지됨", async ({ page }) => {
     const settings = new SettingsPage(page);
     await settings.goto();
+
+    // '나의 루틴'은 'AI 코치' 카테고리 안 → 카테고리 펼치기
+    await page.getByRole("button", { name: /AI 코치/ }).click();
 
     // 루틴 추가 버튼 클릭 (있는 경우, 정확한 텍스트로 선택)
     const addButton = page.getByRole("button", { name: /\+ 루틴 추가/ });

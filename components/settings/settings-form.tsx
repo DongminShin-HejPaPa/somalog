@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { useSettings } from "@/lib/contexts/settings-context";
 import type { Settings, CustomFieldDef } from "@/lib/types";
 import Link from "next/link";
-import { LogOut, UserPen, ChevronRight, Trash2, Trophy } from "lucide-react";
+import { LogOut, UserPen, ChevronRight, ChevronDown, Trash2, Trophy, Target, Bot, SlidersHorizontal } from "lucide-react";
 import { serverResetAllData, serverLoadDemoData } from "@/app/actions/data-actions";
 import { actionDeleteCustomField } from "@/app/actions/settings-actions";
 import { mockSettings } from "@/lib/mock-data-new";
@@ -46,6 +46,52 @@ const intensiveCriteria = [
   { value: "1.0kg", label: "최저 +1.0kg 초과 시", desc: "관대한 기준" },
   { value: "직접입력", label: "직접 기준 입력", desc: "" },
 ];
+
+/** 설정을 성격별로 묶는 접이식 카테고리 그룹 (색상 헤더 + 펼치기) */
+function CategoryGroup({
+  title,
+  subtitle,
+  icon,
+  open,
+  onToggle,
+  headerClass,
+  titleClass,
+  iconWrapClass,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  icon: React.ReactNode;
+  open: boolean;
+  onToggle: () => void;
+  headerClass: string;
+  titleClass: string;
+  iconWrapClass: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="border-b-[6px] border-secondary">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className={cn("w-full flex items-center justify-between px-4 py-3.5 transition-colors", headerClass)}
+      >
+        <span className="flex items-center gap-2.5">
+          <span className={cn("w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0", iconWrapClass)}>
+            {icon}
+          </span>
+          <span className="text-left">
+            <span className={cn("block text-sm font-bold", titleClass)}>{title}</span>
+            <span className="block text-[11px] text-muted-foreground">{subtitle}</span>
+          </span>
+        </span>
+        <ChevronDown className={cn("w-5 h-5 text-muted-foreground transition-transform flex-shrink-0", open && "rotate-180")} />
+      </button>
+      {open && <div>{children}</div>}
+    </div>
+  );
+}
 
 function Section({ title, children, highlight }: { title: string; children: React.ReactNode; highlight?: boolean }) {
   return (
@@ -271,6 +317,14 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
   const [showNewChapter, setShowNewChapter] = useState(false);
 
+  // 카테고리 펼침 상태 — 기본은 "내 다이어트"만 열림. 딥링크 진입 시 해당 카테고리 자동 오픈.
+  const [openCats, setOpenCats] = useState<Record<string, boolean>>({
+    diet: true,
+    ai: false,
+    input: false,
+  });
+  const toggleCat = (k: string) => setOpenCats((s) => ({ ...s, [k]: !s[k] }));
+
   useEffect(() => {
     actionGetRecentDailyLogs(30).then((logs) => {
       const mostRecent = logs.find((l) => l.weight !== null);
@@ -284,11 +338,13 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
       setIsAddingCustomField(true);
       setIsFromDirectLink(true);
       setBlinkOn(true);
+      setOpenCats((s) => ({ ...s, input: true })); // 맞춤 입력은 '입력 맞춤' 카테고리 안
     }
     // 그래프 탭 생년월일 입력 유도 링크에서 직접 진입
     if (searchParams.get("highlightBirthDate") === "true") {
       setIsBirthDateFromDirectLink(true);
       setBirthDateBlinkOn(true);
+      setOpenCats((s) => ({ ...s, diet: true })); // 생년월일은 '내 다이어트' 카테고리 안
     }
     // 세레머니 "새 목표 설정하기" 등에서 새 챕터 모달 자동 오픈
     if (searchParams.get("newChapter") === "1") {
@@ -502,15 +558,16 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
         <ChevronRight className="w-4 h-4 text-muted-foreground" />
       </Link>
 
-      <Section title="코치 이름">
-        <InputField
-          label="이름"
-          value={form.coachName}
-          onChange={(v) => handleChange("coachName", v)}
-          testId="settings-coach-name"
-        />
-        <p className="text-xs text-muted-foreground mt-1">최대 10자</p>
-      </Section>
+      <CategoryGroup
+        title="내 다이어트"
+        subtitle="신체 정보 · 목표 · 모드 · 수분"
+        icon={<Target className="w-4 h-4 text-navy" />}
+        open={openCats.diet}
+        onToggle={() => toggleCat("diet")}
+        headerClass="bg-navy/5 active:bg-navy/10"
+        titleClass="text-navy"
+        iconWrapClass="bg-navy/10"
+      >
 
       <Section title="신체 정보">
         <InputField
@@ -644,6 +701,7 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
           suffix="kg"
           inputMode="decimal"
           onChange={(v) => handleChange("targetWeight", Number(v) || 0)}
+          testId="settings-target-weight"
         />
         {form.startWeight > 0 && form.targetWeight > 0 && form.targetWeight >= form.startWeight && (
           <p className="text-xs text-red-500 pb-1">목표 체중이 시작 체중 이상입니다</p>
@@ -739,6 +797,19 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
           )}
         </p>
       </Section>
+
+      </CategoryGroup>
+
+      <CategoryGroup
+        title="AI 코치"
+        subtitle="코치 스타일 · 루틴 · Hard Reset Mode"
+        icon={<Bot className="w-4 h-4 text-violet-600" />}
+        open={openCats.ai}
+        onToggle={() => toggleCat("ai")}
+        headerClass="bg-violet-50 active:bg-violet-100"
+        titleClass="text-violet-700"
+        iconWrapClass="bg-violet-100"
+      >
 
       <Section title="나의 루틴">
         <InputField
@@ -897,6 +968,19 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
           10개 초과 시 조언 품질이 저하될 수 있어요
         </p>
       </Section>
+
+      </CategoryGroup>
+
+      <CategoryGroup
+        title="입력 맞춤"
+        subtitle="매일 추적할 나만의 항목"
+        icon={<SlidersHorizontal className="w-4 h-4 text-emerald-600" />}
+        open={openCats.input}
+        onToggle={() => toggleCat("input")}
+        headerClass="bg-emerald-50 active:bg-emerald-100"
+        titleClass="text-emerald-700"
+        iconWrapClass="bg-emerald-100"
+      >
 
       {/* 맞춤 입력 */}
       <Section title="맞춤 입력" highlight={blinkOn}>
@@ -1067,6 +1151,8 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
           </div>
         )}
       </Section>
+
+      </CategoryGroup>
 
       {/* 저장 버튼 */}
       <div className="px-4 py-4 border-b border-border">

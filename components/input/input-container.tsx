@@ -528,7 +528,6 @@ export function InputContainer() {
 
       <FeedbackArea
         feedback={currentLog.feedback}
-        coachName={settings.coachName}
       />
 
       {closeNavMessage && (

@@ -97,7 +97,6 @@ export function HomeContent({ todayLog, recentLogs, cumulativeDay, onCloseToday,
 
       {(dailySummary || oneLiner) && (
         <CoachOneLiner
-          coachName={settings.coachName}
           dailySummary={dailySummary}
           oneLiner={oneLiner}
           badgeText={badgeText}

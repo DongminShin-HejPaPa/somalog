@@ -6,7 +6,6 @@ export const MOCK_USER_ID = "test-user-uuid-1234";
 
 /** 테스트용 Settings (camelCase) */
 export const mockSettings: Settings = {
-  coachName: "Soma",
   height: 170,
   currentWeight: 80,
   gender: "남성",
@@ -33,7 +32,6 @@ export const mockSettings: Settings = {
 /** 테스트용 Settings DB row (snake_case) */
 export const mockSettingsRow: Record<string, unknown> = {
   user_id: MOCK_USER_ID,
-  coach_name: "Soma",
   height: 170,
   current_weight: 80,
   gender: "남성",

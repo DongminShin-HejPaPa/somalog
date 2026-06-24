@@ -211,7 +211,6 @@ export async function generateAiOneLiner(
 
 export function buildSystemPrompt(settings: Settings, intensiveDay?: boolean): string {
   return fillPrompt(COACH_SYSTEM_PROMPT, {
-    coach_name: settings.coachName,
     coach_style: COACH_STYLE_MAP[settings.coachStylePreset] ?? "오늘 행동 중심으로",
     style_extra: buildStyleExtra(settings.coachStyleExtra),
     routine_section: buildRoutineSection(settings),

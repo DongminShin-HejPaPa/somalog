@@ -9,6 +9,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
+  ReferenceLine,
 } from "recharts";
 import type { DailyEventPoint } from "@/lib/types";
 import { computeCumulativeRate, didOccur, type MetricKey } from "@/lib/utils/metric-trend";
@@ -21,6 +22,9 @@ const META: Record<MetricKey, { label: string; color: string }> = {
   lateSnack: { label: "야식", color: "#d97706" },
   alcohol: { label: "술", color: "#b91c1c" },
 };
+
+// 평균선은 3개 차트 공통 색(중립 회색)으로 통일
+const AVG_COLOR = "#94a3b8";
 
 interface MetricDotProps {
   cx?: number;
@@ -73,7 +77,7 @@ export function MetricTrendChart({
 }) {
   const meta = META[metric];
 
-  const { data, occurrences, totalDays, yDomain } = useMemo(() => {
+  const { data, occurrences, totalDays, yDomain, avg } = useMemo(() => {
     const points = computeCumulativeRate(series, metric, startDate).map((p) => ({
       date: p.date.slice(5),
       pct: p.pct,
@@ -85,8 +89,14 @@ export function MetricTrendChart({
     const lastDate = series.length > 0 ? series[series.length - 1].date : null;
     const total = effStart && lastDate ? getDayNumber(lastDate, effStart) : occ;
 
-    // y축: 실제 범위를 10% 단위로 올림/내림, 최소 범위 10 보장
+    // 평균선: 누적 비율 포인트들의 산술 평균(%)
     const pcts = points.map((p) => p.pct);
+    const mean =
+      pcts.length > 0
+        ? Math.round(pcts.reduce((s, v) => s + v, 0) / pcts.length)
+        : 0;
+
+    // y축: 실제 범위를 10% 단위로 올림/내림, 최소 범위 10 보장
     const rawMin = pcts.length > 0 ? Math.min(...pcts) : 0;
     const rawMax = pcts.length > 0 ? Math.max(...pcts) : 100;
     let yMin = Math.max(0, Math.floor(rawMin / 10) * 10);
@@ -96,7 +106,13 @@ export function MetricTrendChart({
       yMax = Math.min(100, yMax + 10);
     }
 
-    return { data: points, occurrences: occ, totalDays: total, yDomain: [yMin, yMax] as [number, number] };
+    return {
+      data: points,
+      occurrences: occ,
+      totalDays: total,
+      yDomain: [yMin, yMax] as [number, number],
+      avg: mean,
+    };
   }, [series, metric, startDate]);
 
   if (data.length === 0) return null;
@@ -110,11 +126,20 @@ export function MetricTrendChart({
         <p className="text-xs font-semibold text-foreground">
           {meta.label}한 날 누적 비율
         </p>
-        <p className="text-xs text-muted-foreground">
-          전체 {totalDays}일 중{" "}
-          <span className="font-bold" style={{ color: meta.color }}>{occurrences}일</span>{" "}
-          {meta.label}
-        </p>
+        <div className="flex items-center gap-2">
+          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+            <span
+              className="inline-block w-3 border-t-2 border-dashed"
+              style={{ borderColor: AVG_COLOR }}
+            />
+            평균 {avg}%
+          </span>
+          <p className="text-xs text-muted-foreground">
+            전체 {totalDays}일 중{" "}
+            <span className="font-bold" style={{ color: meta.color }}>{occurrences}일</span>{" "}
+            {meta.label}
+          </p>
+        </div>
       </div>
       <div className="h-[160px] w-full">
         <ResponsiveContainer width="100%" height="100%">
@@ -139,6 +164,12 @@ export function MetricTrendChart({
             <Tooltip
               contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" }}
               formatter={(v: number) => [`${v}%`, `${meta.label} 누적 비율`]}
+            />
+            <ReferenceLine
+              y={avg}
+              stroke={AVG_COLOR}
+              strokeDasharray="4 4"
+              strokeWidth={1.5}
             />
             <Line
               type="monotone"

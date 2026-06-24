@@ -3,6 +3,7 @@
 import { SettingsProvider } from "@/lib/contexts/settings-context";
 import { ChapterScopeProvider } from "@/lib/contexts/chapter-scope-context";
 import { NoticePopup } from "@/components/notices/notice-popup";
+import { MonthlyBragPopup } from "@/components/brag/monthly-brag-popup";
 import type { Settings } from "@/lib/types";
 
 interface TabsProvidersProps {
@@ -21,6 +22,8 @@ export function TabsProviders({ children, initialSettings, userId }: TabsProvide
             (tabs)/layout 의 getSettings await 를 제거해도 (initialSettings=null)
             공지 기능이 살아있도록 prop 의존 제거. */}
         <NoticePopup />
+        {/* 월간 자랑 권유 팝업. 현 챕터 시작일 기준 "한달 째 되는 날"마다 등장. */}
+        <MonthlyBragPopup userId={userId} />
       </ChapterScopeProvider>
     </SettingsProvider>
   );

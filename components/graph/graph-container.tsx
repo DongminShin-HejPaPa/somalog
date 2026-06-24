@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useSettings } from "@/lib/contexts/settings-context";
 import { useChapterScope } from "@/lib/contexts/chapter-scope-context";
 import { actionGetWeightSeries } from "@/app/actions/log-actions";
@@ -16,6 +17,18 @@ interface GraphContainerProps {
 export function GraphContainer({ userName, userId }: GraphContainerProps) {
   const { settings, updateSettings } = useSettings();
   const { selectedScope } = useChapterScope();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  // 월간 자랑 팝업에서 ?share=1 로 진입하면 공유 시트를 자동으로 연다.
+  // 한 번 소비한 뒤 쿼리를 제거해 새로고침 시 재발동되지 않게 한다.
+  const [autoShare, setAutoShare] = useState(false);
+  useEffect(() => {
+    if (searchParams.get("share") === "1") {
+      setAutoShare(true);
+      router.replace("/graph", { scroll: false });
+    }
+  }, [searchParams, router]);
 
   // familyTime ChatRoom 패턴: useState 초기화에서 캐시 동기 읽기.
   // 메모리 → localStorage → 빈 상태 순. 전체 시리즈를 한 번만 로드해 두고,
@@ -91,6 +104,7 @@ export function GraphContainer({ userName, userId }: GraphContainerProps) {
       activityLevel={settings.activityLevel}
       onActivityLevelChange={handleActivityLevelChange}
       userName={userName}
+      autoShare={autoShare}
     />
   );
 }

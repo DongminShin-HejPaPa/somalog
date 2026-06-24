@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { GraphContainer } from "@/components/graph/graph-container";
 import { ChapterPicker } from "@/components/chapter/chapter-picker";
 import { getAuthUser } from "@/lib/supabase/server";
@@ -11,7 +12,10 @@ export default async function GraphPage() {
         <h1 className="text-lg font-bold flex-shrink-0">체중 그래프</h1>
         <ChapterPicker />
       </header>
-      <GraphContainer userName={userName} userId={user?.id ?? null} />
+      {/* GraphContainer 가 useSearchParams(?share=1) 를 사용하므로 Suspense 로 감싼다. */}
+      <Suspense>
+        <GraphContainer userName={userName} userId={user?.id ?? null} />
+      </Suspense>
     </div>
   );
 }

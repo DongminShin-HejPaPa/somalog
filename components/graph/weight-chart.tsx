@@ -30,6 +30,7 @@ interface WeightChartProps {
   activityLevel: number;
   onActivityLevelChange: (level: number) => void;
   userName: string;
+  autoShare?: boolean; // 월간 자랑 팝업에서 진입 시 공유 시트 자동 열기
 }
 
 // ── 건강 지표 계산 헬퍼 ──────────────────────────────────────────────────────
@@ -504,6 +505,7 @@ export function WeightChart({
   activityLevel,
   onActivityLevelChange,
   userName,
+  autoShare = false,
 }: WeightChartProps) {
   const [period, setPeriod] = useState<Period>("all");
   const containerRef = useRef<HTMLDivElement>(null);
@@ -534,6 +536,11 @@ export function WeightChart({
   useEffect(() => {
     if (!isFullscreen) setLegendPos({ x: 0, y: 0 });
   }, [isFullscreen]);
+
+  // 월간 자랑 팝업의 '자랑하러 가기'로 진입(?share=1)하면 공유 시트를 자동으로 연다.
+  useEffect(() => {
+    if (autoShare) setIsSharePreview(true);
+  }, [autoShare]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {

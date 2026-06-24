@@ -2,10 +2,9 @@ import { MessageCircle } from "lucide-react";
 
 interface FeedbackAreaProps {
   feedback: string | null;
-  coachName: string;
 }
 
-export function FeedbackArea({ feedback, coachName }: FeedbackAreaProps) {
+export function FeedbackArea({ feedback }: FeedbackAreaProps) {
   if (!feedback) return null;
 
   return (
@@ -15,7 +14,7 @@ export function FeedbackArea({ feedback, coachName }: FeedbackAreaProps) {
           <MessageCircle className="w-3 h-3 text-white" />
         </div>
         <div>
-          <p className="text-xs font-medium text-navy mb-0.5">{coachName}의 한마디</p>
+          <p className="text-xs font-medium text-navy mb-0.5">Soma의 한마디</p>
           <p className="text-sm leading-relaxed">{feedback}</p>
         </div>
       </div>

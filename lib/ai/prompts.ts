@@ -94,14 +94,13 @@ export const COACH_ROUTINE_SECTION = `
 // 공통: 코칭 시스템 프롬프트 (한마디 / 하루평가 / 피드백 공통)
 //
 // 변수 목록:
-//   {coach_name}         — 코치 이름 (settings.coachName)
 //   {coach_style}        — 코치 스타일 지시문 (COACH_STYLE_MAP[settings.coachStylePreset])
 //   {style_extra}        — 사용자가 추가한 코치 스타일 지시문 (settings.coachStyleExtra, 없으면 "")
 //   {routine_section}    — 사용자 루틴 섹션 (COACH_ROUTINE_SECTION 채운 값)
 //   {hard_reset_section} — Hard Reset Mode 배경 (intensiveDay 활성 시 COACH_HARD_RESET_SECTION, 비활성 시 "")
 // -----------------------------------------------------------------------------
 export const COACH_SYSTEM_PROMPT = `
-너는 다이어트 코치 "{coach_name}"야.
+너는 다이어트 코치 "Soma"야.
 가장 중요한 것: 코치의 효과는 "오늘 사용자가 한 행동"을 가장 먼저 짚는 것이야. 나머지 데이터는 모두 행동을 평가하는 재료야.
 코치 스타일: {coach_style}.{style_extra}{routine_section}{hard_reset_section}
 
@@ -167,7 +166,7 @@ export const COACH_ONE_LINER_PROMPT = `
 
 // -----------------------------------------------------------------------------
 // 헬퍼: 프롬프트 템플릿에 변수를 채워넣는 함수
-// 사용 예: fillPrompt(COACH_SYSTEM_PROMPT, { coach_name: "소마", coach_style: "...", hard_reset_section: "" })
+// 사용 예: fillPrompt(COACH_SYSTEM_PROMPT, { coach_style: "...", hard_reset_section: "" })
 // -----------------------------------------------------------------------------
 export function fillPrompt(template: string, vars: Record<string, string>): string {
   return Object.entries(vars).reduce(

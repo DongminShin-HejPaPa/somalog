@@ -303,7 +303,6 @@ async function buildSnapshot(
     finalWeight: log.weight as number,
     daysElapsed: log.day,
     recordedDays: count ?? 0,
-    coachName: settings.coachName,
   };
 }
 

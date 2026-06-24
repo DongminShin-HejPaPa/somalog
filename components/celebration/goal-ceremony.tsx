@@ -171,7 +171,7 @@ function CelebrateAct({
         {/* 감성 카드 */}
         <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 mb-8 text-left border border-white/10">
           <p className="text-base font-bold text-white mb-1">
-            {snapshot.coachName}와 함께 해냈어요! 🎉
+            Soma와 함께 해냈어요! 🎉
           </p>
           <p className="text-sm leading-relaxed text-white/85">
             {snapshot.startWeight}kg에서 시작해 {snapshot.daysElapsed}일 동안{" "}
@@ -273,7 +273,7 @@ function ReportAct({
         await navigator.share({
           files: [file1, file2],
           title: "목표 달성! 🏆",
-          text: `${snapshot.coachName}와 함께 ${totalLoss}kg 감량 달성! SomaLog로 같이 도전해볼래?`,
+          text: `Soma와 함께 ${totalLoss}kg 감량 달성! SomaLog로 같이 도전해볼래?`,
           url: "https://somalog.vercel.app",
         });
         setSavedToast("공유 완료! 🎉 사진첩에 저장했다면 거기서 확인할 수 있어요");
@@ -565,7 +565,7 @@ function CelebrationShareCard({
         {cell("기록한 날", `${snapshot.recordedDays}`, "일")}
       </div>
       <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 16, padding: "14px 18px", marginBottom: 28, width: "100%", boxSizing: "border-box", textAlign: "left" }}>
-        <p style={{ fontSize: 14, fontWeight: 700, color: "#fff", margin: "0 0 4px" }}>{snapshot.coachName}와 함께 해냈어요! 🎉</p>
+        <p style={{ fontSize: 14, fontWeight: 700, color: "#fff", margin: "0 0 4px" }}>Soma와 함께 해냈어요! 🎉</p>
         <p style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", lineHeight: 1.6, margin: 0 }}>
           {snapshot.startWeight}kg에서 시작해 {snapshot.daysElapsed}일 동안 <strong style={{ color: SHARE_YELLOW }}>{totalLoss}kg</strong>를 빼냈어요.
         </p>

@@ -60,7 +60,6 @@ export interface WeightPoint {
 }
 
 export interface Settings {
-  coachName: string;
   height: number;
   currentWeight: number;
   gender: "남성" | "여성";
@@ -94,7 +93,6 @@ export interface GoalSnapshot {
   finalWeight: number;   // 달성한 날의 체중
   daysElapsed: number;   // D+N
   recordedDays: number;  // 기록한 날 수
-  coachName: string;
 }
 
 /** 마감 직후 클라이언트에 전달되는 목표 달성 이벤트 */

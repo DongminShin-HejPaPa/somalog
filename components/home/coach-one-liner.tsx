@@ -5,7 +5,6 @@ import { MessageCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface CoachOneLinerProps {
-  coachName: string;
   /** dailySummary(긴 총평)를 우선으로, 없으면 oneLiner(짧은 한마디) 사용 */
   dailySummary?: string | null;
   oneLiner?: string | null;
@@ -13,7 +12,6 @@ interface CoachOneLinerProps {
 }
 
 export function CoachOneLiner({
-  coachName,
   dailySummary,
   oneLiner,
   badgeText,
@@ -37,7 +35,7 @@ export function CoachOneLiner({
           <MessageCircle className="w-4 h-4 text-white" />
         </div>
         <div className="flex items-center gap-2 flex-1">
-          <span className="text-sm font-semibold">{coachName}의 하루평가</span>
+          <span className="text-sm font-semibold">Soma의 하루평가</span>
           {badgeText && (
             <span className="text-xs text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">
               {badgeText}
@@ -50,7 +48,7 @@ export function CoachOneLiner({
       <p
         className={cn(
           "text-sm text-foreground leading-relaxed whitespace-pre-line transition-all duration-300",
-          canExpand && !expanded && "line-clamp-2"
+          canExpand && !expanded && "line-clamp-[8]"
         )}
       >
         {text}

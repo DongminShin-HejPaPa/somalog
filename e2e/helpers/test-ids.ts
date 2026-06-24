@@ -20,7 +20,6 @@ export const TEST_IDS = {
   // ── Onboarding ───────────────────────────────────────
   ONBOARDING_PROGRESS: "onboarding-progress",
   ONBOARDING_STEP_INDICATOR: "onboarding-step-indicator",
-  ONBOARDING_COACH_NAME: "onboarding-coach-name",
   ONBOARDING_NEXT: "onboarding-next",
   ONBOARDING_COMPLETE: "onboarding-complete",
 
@@ -80,7 +79,7 @@ export const TEST_IDS = {
   GRAPH_WEIGHT_CHART: "graph-weight-chart",
 
   // ── Settings Page ─────────────────────────────────────
-  SETTINGS_COACH_NAME: "settings-coach-name",
+  SETTINGS_TARGET_WEIGHT: "settings-target-weight",
   SETTINGS_SAVE: "settings-save",
   SETTINGS_RESET: "settings-reset",
   SETTINGS_DEMO: "settings-demo",

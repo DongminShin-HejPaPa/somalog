@@ -31,8 +31,7 @@ interface StepConfig {
 }
 
 const steps: StepConfig[] = [
-  { id: 1, message: "안녕? 나는 오늘부터 너의 다이어트 코치로 일하게 될 Soma야. 앞으로 매일 같이 기록하고, 분석하고, 가끔은 따끔하게 말할 수도 있어. 혹시 나를 다른 이름으로 부르고 싶어?" },
-  { id: 2, message: "기본 정보부터 알아야겠어. 키랑 지금 몸무게, 그리고 성별 알려줄 수 있어? 이거 알아야 수분 목표도 딱 맞게 잡아줄 수 있거든." },
+  { id: 2, message: "안녕? 나는 오늘부터 너의 다이어트 코치로 일하게 될 Soma야. 앞으로 매일 같이 기록하고, 분석하고, 가끔은 따끔하게 말할 수도 있어. 먼저 기본 정보부터! 키랑 지금 몸무게, 그리고 성별 알려줄 수 있어? 이거 알아야 수분 목표도 딱 맞게 잡아줄 수 있거든." },
   { id: 3, message: "좋아! 그럼 목표부터 잡아보자. 최종 목표 체중을 먼저 알려줘. 그리고 어떤 방식으로 다이어트 할지 골라봐." },
   { id: 4, message: "하루 수분 목표야. 신체 정보 기반으로 계산한 권장량을 적어뒀어. 어떻게 할래?" },
   { id: 5, message: "내가 맥락에 맞는 말을 하려면 네 루틴을 알아야 해. 몸무게는 보통 언제 재? 기본값은 아침 기상 직후인데, 이대로 할까?" },
@@ -47,10 +46,7 @@ export function OnboardingFlow() {
 
   const [currentStep, setCurrentStep] = useState(0);
 
-  // Step 1
-  const [coachName, setCoachName] = useState("");
-
-  // Step 2
+  // Step 2: 신체 정보
   const [height, setHeight] = useState("178");
   const [weight, setWeight] = useState("93.5");
   const [gender, setGender] = useState<"남성" | "여성">("남성");
@@ -161,7 +157,6 @@ export function OnboardingFlow() {
     const weightNum = Number(weight) || 0;
 
     await initializeSettings({
-      coachName: coachName || "Soma",
       height: Number(height) || 0,
       currentWeight: weightNum,
       gender,
@@ -202,7 +197,6 @@ export function OnboardingFlow() {
     // 지금까지 입력한 값을 반영하고, 나머지는 기본값 사용
     const weightNum = Number(weight) || 0;
     await initializeSettings({
-      coachName: coachName || "Soma",
       height: Number(height) || 0,
       currentWeight: weightNum,
       gender,
@@ -285,27 +279,6 @@ export function OnboardingFlow() {
         </div>
 
         <div className="ml-[52px]">
-          {/* Step 1: 코치 이름 */}
-          {step.id === 1 && (
-            <div className="space-y-3">
-              <input
-                type="text"
-                placeholder="코치 이름 (최대 10자)"
-                value={coachName}
-                onChange={(e) => setCoachName(e.target.value)}
-                maxLength={10}
-                data-testid="onboarding-coach-name"
-                className="w-full px-4 py-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[48px]"
-              />
-              <button
-                onClick={nextStep}
-                className="w-full py-3 rounded-xl bg-secondary text-sm font-medium text-foreground min-h-[48px]"
-              >
-                그냥 Soma로 할게
-              </button>
-            </div>
-          )}
-
           {/* Step 2: 신체 정보 */}
           {step.id === 2 && (
             <div className="space-y-3">

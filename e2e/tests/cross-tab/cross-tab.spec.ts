@@ -83,7 +83,7 @@ test.describe("Cross-tab 일관성 (J10)", () => {
     const settings = new SettingsPage(page);
 
     await settings.goto();
-    await expect(page.getByTestId("settings-coach-name")).toHaveValue("TestCoach", { timeout: 10_000 });
+    await expect(page.getByTestId("settings-target-weight")).toHaveValue("70", { timeout: 10_000 });
 
     // 다른 탭 방문 후 복귀
     await page.goto("/input");
@@ -91,6 +91,6 @@ test.describe("Cross-tab 일관성 (J10)", () => {
     await settings.goto();
 
     // 설정값 유지 확인
-    await expect(page.getByTestId("settings-coach-name")).toHaveValue("TestCoach", { timeout: 10_000 });
+    await expect(page.getByTestId("settings-target-weight")).toHaveValue("70", { timeout: 10_000 });
   });
 });

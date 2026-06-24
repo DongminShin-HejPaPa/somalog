@@ -91,7 +91,6 @@ export type Database = {
       }
       settings: {
         Row: {
-          coach_name: string
           coach_style_extra: string[]
           coach_style_preset: string
           created_at: string
@@ -115,7 +114,6 @@ export type Database = {
           water_goal: number
         }
         Insert: {
-          coach_name?: string
           coach_style_extra?: string[]
           coach_style_preset?: string
           created_at?: string
@@ -139,7 +137,6 @@ export type Database = {
           water_goal?: number
         }
         Update: {
-          coach_name?: string
           coach_style_extra?: string[]
           coach_style_preset?: string
           created_at?: string

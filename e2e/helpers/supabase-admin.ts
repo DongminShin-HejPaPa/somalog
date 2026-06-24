@@ -81,7 +81,6 @@ export async function seedSettings(
   const admin = getAdminClient();
   const defaults = {
     user_id: userId,
-    coach_name: "TestCoach",
     height: 175,
     current_weight: 80,
     gender: "남성",

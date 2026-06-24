@@ -1,15 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Search, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { DailyLog, WeeklyLog } from "@/lib/types";
+import type { DailyLog } from "@/lib/types";
 import { actionRegenerateDailySummary } from "@/app/actions/log-actions";
 import { useSettings } from "@/lib/contexts/settings-context";
 
 interface LogListProps {
   logs: DailyLog[];
-  weeklyLogs: WeeklyLog[];
   hasMore?: boolean;
   isLoadingMore?: boolean;
   onLoadMore?: () => void;
@@ -20,7 +19,17 @@ interface LogListProps {
   activeFilter: string | null;
   onActiveFilterChange: (f: string | null) => void;
   isSearching?: boolean;
+  // 운동/야식/술 필터 활성 시 일별 로그 위에 표시할 누적평균 미니차트.
+  metricChart?: ReactNode;
 }
+
+// 운동/야식/술 — 미니차트가 붙는 필터들.
+const FILTERS = [
+  { key: "unclosed", label: "마감안한날" },
+  { key: "exercise", label: "운동한 날" },
+  { key: "lateSnack", label: "야식먹은날" },
+  { key: "alcohol", label: "술마신날" },
+];
 
 function getDayOfWeek(dateStr: string) {
   const days = ["일", "월", "화", "수", "목", "금", "토"];
@@ -72,7 +81,6 @@ function RegenerateButton({ date, onRefresh }: { date: string; onRefresh?: () =>
 
 export function LogList({
   logs,
-  weeklyLogs,
   hasMore,
   isLoadingMore,
   onLoadMore,
@@ -82,22 +90,13 @@ export function LogList({
   activeFilter,
   onActiveFilterChange,
   isSearching,
+  metricChart,
 }: LogListProps) {
   const { settings } = useSettings();
-  const [viewMode, setViewMode] = useState<"daily" | "weekly">("daily");
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
-
-  const filters = [
-    { key: "unclosed", label: "마감안한날" },
-    ...(settings.intensiveDayOn ? [{ key: "intensive", label: "Hard Reset Mode" }] : []),
-    { key: "exercise", label: "운동한 날" },
-    { key: "lateSnack", label: "야식먹은날" },
-    { key: "alcohol", label: "술마신날" },
-  ];
 
   // 검색/필터는 서버에서 이미 적용된 결과가 내려온다 — 클라이언트 재필터링 없음.
   const isSearchMode = searchQuery.trim().length > 0 || activeFilter !== null;
-  const displayedLogs = logs;
 
   const hasAlcohol = (log: DailyLog) => log.dinnerAlcohol === true || log.lateSnackAlcohol === true;
 
@@ -115,236 +114,167 @@ export function LogList({
           />
         </div>
 
-        <div className="flex items-center gap-2 mb-3">
-          <div className="flex gap-1 bg-secondary rounded-lg p-0.5">
+        <div className="flex gap-1.5 overflow-x-auto">
+          {FILTERS.map((f) => (
             <button
-              onClick={() => setViewMode("daily")}
+              key={f.key}
+              onClick={() => onActiveFilterChange(activeFilter === f.key ? null : f.key)}
               className={cn(
-                "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-                viewMode === "daily" ? "bg-white shadow-sm text-foreground" : "text-muted-foreground"
+                "px-2.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors",
+                activeFilter === f.key
+                  ? "bg-navy text-white"
+                  : "bg-secondary text-muted-foreground border border-border"
               )}
             >
-              일별
+              {f.label}
             </button>
-            <button
-              onClick={() => setViewMode("weekly")}
-              className={cn(
-                "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-                viewMode === "weekly" ? "bg-white shadow-sm text-foreground" : "text-muted-foreground"
-              )}
-            >
-              주별
-            </button>
-          </div>
-
-          <div className="flex gap-1.5 overflow-x-auto">
-            {filters.map((f) => (
-              <button
-                key={f.key}
-                onClick={() => onActiveFilterChange(activeFilter === f.key ? null : f.key)}
-                className={cn(
-                  "px-2.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors",
-                  activeFilter === f.key
-                    ? "bg-navy text-white"
-                    : "bg-secondary text-muted-foreground border border-border"
-                )}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
+          ))}
         </div>
       </div>
 
-      {viewMode === "daily" ? (
-        <div className="px-4 space-y-2">
-          {displayedLogs.length === 0 ? (
-            <div className="py-12 text-center text-sm text-muted-foreground">
-              {isSearching
-                ? "검색 중..."
-                : isSearchMode
-                  ? "검색 결과가 없어요"
-                  : "아직 기록이 없어요. 입력 탭에서 첫 번째 기록을 시작해보세요."}
-            </div>
-          ) : (
-            <>
-              {displayedLogs.map((log) => {
-                const isExpanded = expandedDate === log.date;
-                return (
-                  <div
-                    key={log.date}
-                    data-testid={`log-item-${log.date}`}
-                    className="border border-border rounded-xl overflow-hidden"
+      {/* 운동/야식/술 필터 시 일별 로그 바로 위에 누적평균 추세 */}
+      {metricChart && <div className="px-4 mb-2">{metricChart}</div>}
+
+      <div className="px-4 space-y-2">
+        {logs.length === 0 ? (
+          <div className="py-12 text-center text-sm text-muted-foreground">
+            {isSearching
+              ? "불러오는 중..."
+              : isSearchMode
+                ? "조건에 맞는 기록이 없어요"
+                : "아직 기록이 없어요. 입력 탭에서 첫 번째 기록을 시작해보세요."}
+          </div>
+        ) : (
+          <>
+            {logs.map((log) => {
+              const isExpanded = expandedDate === log.date;
+              return (
+                <div
+                  key={log.date}
+                  data-testid={`log-item-${log.date}`}
+                  className="border border-border rounded-xl overflow-hidden"
+                >
+                  <button
+                    onClick={() => setExpandedDate(isExpanded ? null : log.date)}
+                    className="w-full flex items-center justify-between px-4 py-3 min-h-[52px] text-left"
                   >
-                    <button
-                      onClick={() => setExpandedDate(isExpanded ? null : log.date)}
-                      className="w-full flex items-center justify-between px-4 py-3 min-h-[52px] text-left"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="text-sm">
-                          <span className="font-semibold">
-                            {log.date.slice(5)} {getDayOfWeek(log.date)}
-                          </span>
-                          <span className="text-muted-foreground ml-1.5 text-xs">
-                            D+{log.day}
-                          </span>
+                    <div className="flex items-center gap-3">
+                      <div className="text-sm">
+                        <span className="font-semibold">
+                          {log.date.slice(5)} {getDayOfWeek(log.date)}
+                        </span>
+                        <span className="text-muted-foreground ml-1.5 text-xs">
+                          D+{log.day}
+                        </span>
+                      </div>
+                      {!log.closed && (
+                        <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <span>{log.weight ? `${log.weight}kg` : ""}</span>
+                      <span>{didExercise(log.exercise) ? "운동" : ""}</span>
+                      {hasAlcohol(log) && <span>🍺</span>}
+                      {isExpanded ? (
+                        <ChevronUp className="w-4 h-4" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4" />
+                      )}
+                    </div>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="border-t border-border px-4 py-3 bg-secondary/30">
+                      <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm mb-3">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">체중</span>
+                          <span>{log.weight ?? ""} kg</span>
                         </div>
-                        {!log.closed && (
-                          <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">3일 평균</span>
+                          <span>{log.avgWeight3d ?? ""} kg</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">수분</span>
+                          <span>{log.water ? `${log.water}L` : ""}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">운동</span>
+                          <span>{fmtExercise(log.exercise)}</span>
+                        </div>
+                        {hasAlcohol(log) && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">술</span>
+                            <span>Y</span>
+                          </div>
                         )}
                       </div>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <span>{log.weight ? `${log.weight}kg` : ""}</span>
-                        <span>{didExercise(log.exercise) ? "운동" : ""}</span>
-                        {hasAlcohol(log) && <span>🍺</span>}
-                        {isExpanded ? (
-                          <ChevronUp className="w-4 h-4" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4" />
-                        )}
-                      </div>
-                    </button>
 
-                    {isExpanded && (
-                      <div className="border-t border-border px-4 py-3 bg-secondary/30">
-                        <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm mb-3">
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">체중</span>
-                            <span>{log.weight ?? ""} kg</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">3일 평균</span>
-                            <span>{log.avgWeight3d ?? ""} kg</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">수분</span>
-                            <span>{log.water ? `${log.water}L` : ""}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">운동</span>
-                            <span>{fmtExercise(log.exercise)}</span>
-                          </div>
-                          {hasAlcohol(log) && (
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">술</span>
-                              <span>Y</span>
-                            </div>
-                          )}
-                          {settings.intensiveDayOn && log.intensiveDay && (
-                            <div className="col-span-2 flex items-center gap-1.5 mt-1">
-                              <span className="w-2 h-2 rounded-full bg-coral inline-block flex-shrink-0" />
-                              <span className="text-xs font-semibold text-coral">Hard Reset Mode</span>
-                            </div>
-                          )}
+                      <div className="space-y-1 text-sm mb-3">
+                        <div className="flex gap-2">
+                          <span className="text-muted-foreground w-8 flex-shrink-0">아침</span>
+                          <span>{log.breakfast ?? ""}</span>
                         </div>
-
-                        <div className="space-y-1 text-sm mb-3">
+                        <div className="flex gap-2">
+                          <span className="text-muted-foreground w-8 flex-shrink-0">점심</span>
+                          <span>{log.lunch ?? ""}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <span className="text-muted-foreground w-8 flex-shrink-0">저녁</span>
+                          <span>
+                            {log.dinner ?? ""}
+                            {log.dinnerAlcohol ? " 🍺" : ""}
+                          </span>
+                        </div>
+                        {log.lateSnack && (
                           <div className="flex gap-2">
-                            <span className="text-muted-foreground w-8 flex-shrink-0">아침</span>
-                            <span>{log.breakfast ?? ""}</span>
-                          </div>
-                          <div className="flex gap-2">
-                            <span className="text-muted-foreground w-8 flex-shrink-0">점심</span>
-                            <span>{log.lunch ?? ""}</span>
-                          </div>
-                          <div className="flex gap-2">
-                            <span className="text-muted-foreground w-8 flex-shrink-0">저녁</span>
+                            <span className="text-muted-foreground w-8 flex-shrink-0">야식</span>
                             <span>
-                              {log.dinner ?? ""}
-                              {log.dinnerAlcohol ? " 🍺" : ""}
+                              {fmtLateSnack(log.lateSnack)}
+                              {log.lateSnackAlcohol ? " 🍺" : ""}
                             </span>
                           </div>
-                          {log.lateSnack && (
-                            <div className="flex gap-2">
-                              <span className="text-muted-foreground w-8 flex-shrink-0">야식</span>
-                              <span>
-                                {fmtLateSnack(log.lateSnack)}
-                                {log.lateSnackAlcohol ? " 🍺" : ""}
-                              </span>
-                            </div>
-                          )}
-                          {settings.customField && log.customFieldValue != null && (
-                            <div className="flex gap-2">
-                              <span className="text-muted-foreground flex-shrink-0" style={{ width: "2rem" }}>
-                                {settings.customField.name.slice(0, 2)}
-                              </span>
-                              <span>{log.customFieldValue}</span>
-                            </div>
-                          )}
-                        </div>
-
-                        {log.closed && log.dailySummary && (
-                          <div className="mt-2">
-                            <p className="text-xs font-medium text-navy mb-1">{settings.coachName}의 하루평가</p>
-                            <p className="text-sm leading-relaxed text-muted-foreground">
-                              {log.dailySummary}
-                            </p>
+                        )}
+                        {settings.customField && log.customFieldValue != null && (
+                          <div className="flex gap-2">
+                            <span className="text-muted-foreground flex-shrink-0" style={{ width: "2rem" }}>
+                              {settings.customField.name.slice(0, 2)}
+                            </span>
+                            <span>{log.customFieldValue}</span>
                           </div>
                         )}
-
-                        {log.closed && (
-                          <RegenerateButton date={log.date} onRefresh={onRefresh} />
-                        )}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
 
-              {hasMore && (
-                <button
-                  onClick={onLoadMore}
-                  disabled={isLoadingMore}
-                  className="w-full py-3 text-sm text-navy font-medium border border-border rounded-xl bg-secondary hover:bg-secondary/80 transition-colors disabled:opacity-50"
-                >
-                  {isLoadingMore ? "불러오는 중..." : "이전 기록 더 보기"}
-                </button>
-              )}
-            </>
-          )}
-        </div>
-      ) : (
-        <div className="px-4">
-          {weeklyLogs.length === 0 ? (
-            <div className="py-12 text-center text-sm text-muted-foreground">
-              아직 주간 기록이 없어요
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {weeklyLogs.map((wl) => (
-                <div key={wl.weekStart} className="border border-border rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <p className="text-sm font-semibold">
-                        {wl.weekStart.slice(5)} ~ {wl.weekEnd.slice(5)}
-                      </p>
-                      <p className="text-xs text-muted-foreground">주간 요약</p>
+                      {log.closed && log.dailySummary && (
+                        <div className="mt-2">
+                          <p className="text-xs font-medium text-navy mb-1">{settings.coachName}의 하루평가</p>
+                          <p className="text-sm leading-relaxed text-muted-foreground">
+                            {log.dailySummary}
+                          </p>
+                        </div>
+                      )}
+
+                      {log.closed && (
+                        <RegenerateButton date={log.date} onRefresh={onRefresh} />
+                      )}
                     </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-3 mb-4">
-                    <div className="text-center p-2 bg-secondary rounded-lg">
-                      <p className="text-lg font-bold">{wl.avgWeight}</p>
-                      <p className="text-xs text-muted-foreground">평균 체중</p>
-                    </div>
-                    <div className="text-center p-2 bg-secondary rounded-lg">
-                      <p className="text-lg font-bold">{wl.exerciseDays}</p>
-                      <p className="text-xs text-muted-foreground">운동일수</p>
-                    </div>
-                    <div className="text-center p-2 bg-secondary rounded-lg">
-                      <p className="text-lg font-bold">{wl.lateSnackCount}</p>
-                      <p className="text-xs text-muted-foreground">야식횟수</p>
-                    </div>
-                  </div>
-                  <div className="p-3 bg-secondary/50 rounded-lg">
-                    <p className="text-xs font-medium text-muted-foreground mb-1">주간 총평</p>
-                    <p className="text-sm leading-relaxed">{wl.weeklySummary}</p>
-                  </div>
+                  )}
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+              );
+            })}
+
+            {hasMore && (
+              <button
+                onClick={onLoadMore}
+                disabled={isLoadingMore}
+                className="w-full py-3 text-sm text-navy font-medium border border-border rounded-xl bg-secondary hover:bg-secondary/80 transition-colors disabled:opacity-50"
+              >
+                {isLoadingMore ? "불러오는 중..." : "이전 기록 더 보기"}
+              </button>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

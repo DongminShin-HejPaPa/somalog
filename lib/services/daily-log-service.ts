@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import type { DailyLog, DailyLogUpdate, WeightPoint } from "@/lib/types";
+import type { DailyLog, DailyLogUpdate, WeightPoint, DailyEventPoint } from "@/lib/types";
 import { formatDate, getWeekRange } from "@/lib/utils/date-utils";
 import {
   computeDay,
@@ -839,6 +839,8 @@ export async function getDailyLogsFiltered(opts: {
   query?: string;
   filter?: string | null;
   cursorDate?: string | null;
+  rangeStart?: string | null;
+  rangeEnd?: string | null;
   limit: number;
 }): Promise<DailyLog[]> {
   const supabase = await createClient();
@@ -851,11 +853,14 @@ export async function getDailyLogsFiltered(opts: {
   // 검색어: PostgREST or-필터 구문을 깨뜨리는 문자(`,()*%`)는 제거 후 사용.
   const term = (opts.query ?? "").trim().replace(/[,()*%]/g, " ").trim();
   const like = `%${term}%`;
+  const { rangeStart, rangeEnd } = opts;
 
   // intensive 필터: prefix-min 으로 정확한 날짜 집합을 구해 페이지 단위 .in 으로 조회.
   // 페이지당 날짜 수가 limit 이하라 .in 비용이 작고, 그래프 판정과 정확히 일치한다.
   if (opts.filter === "intensive") {
     let dates = await getIntensiveDateList();
+    if (rangeStart) dates = dates.filter((d) => d >= rangeStart);
+    if (rangeEnd) dates = dates.filter((d) => d <= rangeEnd);
     if (opts.cursorDate) dates = dates.filter((d) => d < opts.cursorDate!);
     const pageDates = dates.slice(0, opts.limit);
     if (pageDates.length === 0) return [];
@@ -894,6 +899,9 @@ export async function getDailyLogsFiltered(opts: {
       break;
   }
 
+  // 스코프(챕터) 범위 — inclusive. 커서는 그 안에서 더 과거로 이어간다.
+  if (rangeStart) q = q.gte("date", rangeStart);
+  if (rangeEnd) q = q.lte("date", rangeEnd);
   if (opts.cursorDate) q = q.lt("date", opts.cursorDate);
 
   const { data, error } = await q
@@ -902,6 +910,42 @@ export async function getDailyLogsFiltered(opts: {
 
   if (error || !data) return [];
   return data.map((row) => rowToDailyLog(row as Record<string, unknown>));
+}
+
+/**
+ * 누적평균 미니차트(운동/야식/술)용 경량 이벤트 시리즈 — 스코프 범위 내 전체.
+ * 발생 판정에 필요한 컬럼만(date/exercise/late_snack/술 플래그) 날짜 오름차순으로.
+ * 무거운 텍스트·체중 등은 제외해 페이로드가 작다. 이벤트 필터 활성 시에만 lazy 호출.
+ */
+export async function getEventSeries(
+  rangeStart: string | null,
+  rangeEnd: string | null
+): Promise<DailyEventPoint[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return [];
+
+  let q = supabase
+    .from("daily_logs")
+    .select("date, exercise, late_snack, dinner_alcohol, late_snack_alcohol")
+    .eq("user_id", user.id);
+
+  if (rangeStart) q = q.gte("date", rangeStart);
+  if (rangeEnd) q = q.lte("date", rangeEnd);
+
+  const { data, error } = await q.order("date", { ascending: true });
+  if (error || !data) return [];
+
+  return data.map((r) => ({
+    date: r.date as string,
+    exercise: (r.exercise as string | null) ?? null,
+    lateSnack: (r.late_snack as string | null) ?? null,
+    dinnerAlcohol: (r.dinner_alcohol as boolean | null) ?? null,
+    lateSnackAlcohol: (r.late_snack_alcohol as boolean | null) ?? null,
+  }));
 }
 
 export async function getDailyLogsTotalCount(): Promise<number> {

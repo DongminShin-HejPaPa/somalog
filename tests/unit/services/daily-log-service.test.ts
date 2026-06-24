@@ -28,6 +28,7 @@ import {
   getLowestWeightEntry,
   getDailyLogsBefore,
   getDailyLogsFiltered,
+  getEventSeries,
 } from "@/lib/services/daily-log-service";
 
 beforeEach(() => {
@@ -750,6 +751,8 @@ describe("getDailyLogsFiltered", () => {
       not: vi.fn(() => chain),
       neq: vi.fn(() => chain),
       lt: vi.fn(() => chain),
+      gte: vi.fn(() => chain),
+      lte: vi.fn(() => chain),
       order: vi.fn(() => chain),
       limit: vi.fn().mockResolvedValue({ data: [mockDailyLogRow], error: null }),
     };
@@ -859,5 +862,80 @@ describe("getDailyLogsFiltered", () => {
     vi.mocked(createClient).mockResolvedValue(client as any);
 
     expect(await getDailyLogsFiltered({ filter: "intensive", limit: 30 })).toEqual([]);
+  });
+
+  it("TC-30: rangeStart/rangeEnd → gte/lte 로 챕터 범위 제한", async () => {
+    const { client, chain } = makeFilterClient();
+    vi.mocked(createClient).mockResolvedValue(client as any);
+
+    await getDailyLogsFiltered({
+      rangeStart: "2024-01-01",
+      rangeEnd: "2024-01-31",
+      limit: 30,
+    });
+
+    expect(chain.gte).toHaveBeenCalledWith("date", "2024-01-01");
+    expect(chain.lte).toHaveBeenCalledWith("date", "2024-01-31");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getEventSeries (미니차트용 경량 이벤트 시리즈)
+// ---------------------------------------------------------------------------
+
+describe("getEventSeries", () => {
+  it("TC-31: 유저 없음 → []", async () => {
+    const client = {
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: null } }) },
+      from: vi.fn(),
+    };
+    vi.mocked(createClient).mockResolvedValue(client as any);
+
+    expect(await getEventSeries(null, null)).toEqual([]);
+  });
+
+  it("TC-32: 범위 gte/lte 적용 + snake→camel 매핑(오름차순)", async () => {
+    const gteSpy = vi.fn();
+    const lteSpy = vi.fn();
+    const rows = [
+      {
+        date: "2024-01-01",
+        exercise: "Y",
+        late_snack: "N",
+        dinner_alcohol: true,
+        late_snack_alcohol: null,
+      },
+    ];
+    const chain: any = {
+      eq: vi.fn(() => chain),
+      gte: vi.fn((...a: unknown[]) => {
+        gteSpy(...a);
+        return chain;
+      }),
+      lte: vi.fn((...a: unknown[]) => {
+        lteSpy(...a);
+        return chain;
+      }),
+      order: vi.fn().mockResolvedValue({ data: rows, error: null }),
+    };
+    const client = {
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: mockUser } }) },
+      from: vi.fn(() => ({ select: vi.fn(() => chain) })),
+    };
+    vi.mocked(createClient).mockResolvedValue(client as any);
+
+    const result = await getEventSeries("2024-01-01", "2024-01-31");
+
+    expect(gteSpy).toHaveBeenCalledWith("date", "2024-01-01");
+    expect(lteSpy).toHaveBeenCalledWith("date", "2024-01-31");
+    expect(result).toEqual([
+      {
+        date: "2024-01-01",
+        exercise: "Y",
+        lateSnack: "N",
+        dinnerAlcohol: true,
+        lateSnackAlcohol: null,
+      },
+    ]);
   });
 });

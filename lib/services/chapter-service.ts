@@ -1,8 +1,15 @@
 import { createClient } from "@/lib/supabase/server";
-import type { DietChapter, Settings, StartNewChapterInput } from "@/lib/types";
+import type { DietChapter, Settings, StartNewChapterInput, ChapterScope } from "@/lib/types";
 import { getSettings, updateSettings } from "./settings-service";
 import { deleteGoalAchievement } from "./achievement-service";
 import { formatDate } from "@/lib/utils/date-utils";
+
+/** YYYY-MM-DD 에 개월 수를 더한 날짜(YYYY-MM-DD) */
+function addMonths(date: string, months: number): string {
+  const d = new Date(date + "T00:00:00");
+  d.setMonth(d.getMonth() + months);
+  return formatDate(d);
+}
 
 function mapChapter(row: Record<string, unknown>): DietChapter {
   return {
@@ -43,6 +50,70 @@ export async function getChapters(): Promise<DietChapter[]> {
 
   if (error) throw error;
   return (data ?? []).map(mapChapter);
+}
+
+/**
+ * 기록·그래프 탭 드롭다운용 스코프 목록을 만든다.
+ * 순서: 전체 → 진행/유지 중 → 종료 챕터(최신순). 추가 무거운 쿼리 없이
+ * settings + getChapters 만으로 구성한다(목록은 가볍게, 데이터 필터는 각 탭에서).
+ */
+export async function getChapterScopes(): Promise<ChapterScope[]> {
+  const [settings, chapters] = await Promise.all([getSettings(), getChapters()]);
+
+  const startDate = settings.dietStartDate || formatDate(new Date());
+  const currentTargetEnd = addMonths(startDate, settings.targetMonths || 12);
+
+  const current: ChapterScope = {
+    id: "current",
+    label: settings.mode === "maintaining" ? "유지 중인 챕터" : "진행 중인 챕터",
+    status: "current",
+    rangeStart: startDate,
+    rangeEnd: null,
+    startDate: startDate,
+    startWeight: settings.startWeight,
+    targetWeight: settings.targetWeight,
+    targetEndDate: currentTargetEnd,
+    isOngoing: true,
+    displayStart: startDate,
+    displayEnd: null,
+  };
+
+  const ended: ChapterScope[] = chapters.map((c) => ({
+    id: c.id,
+    label: c.achieved ? "🏆 목표 달성 챕터" : "지난 도전",
+    status: c.achieved ? "achieved" : "attempt",
+    rangeStart: c.startDate,
+    rangeEnd: c.endDate,
+    startDate: c.startDate,
+    startWeight: c.startWeight,
+    targetWeight: c.targetWeight,
+    targetEndDate: c.endDate,
+    isOngoing: false,
+    displayStart: c.startDate,
+    displayEnd: c.endDate,
+  }));
+
+  // 전체: 데이터 무제한, 목표선 기준은 현재 진행 중 챕터. 표시 시작일은 최초 챕터 시작.
+  const earliestStart = [startDate, ...chapters.map((c) => c.startDate)]
+    .filter(Boolean)
+    .sort()[0] ?? startDate;
+
+  const all: ChapterScope = {
+    id: "all",
+    label: "전체 기간",
+    status: "all",
+    rangeStart: null,
+    rangeEnd: null,
+    startDate: startDate,
+    startWeight: settings.startWeight,
+    targetWeight: settings.targetWeight,
+    targetEndDate: currentTargetEnd,
+    isOngoing: true,
+    displayStart: earliestStart,
+    displayEnd: null,
+  };
+
+  return [all, current, ...ended];
 }
 
 /**

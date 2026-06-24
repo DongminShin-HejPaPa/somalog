@@ -38,6 +38,18 @@ export interface WeeklyLog {
 }
 
 /**
+ * 누적평균 미니차트(운동/야식/술)용 경량 이벤트 포인트.
+ * 무거운 컬럼 없이 발생 여부 판정에 필요한 필드만 담는다.
+ */
+export interface DailyEventPoint {
+  date: string;
+  exercise: string | null;
+  lateSnack: string | null;
+  dinnerAlcohol: boolean | null;
+  lateSnackAlcohol: boolean | null;
+}
+
+/**
  * 그래프 전용 경량 포인트 — date + weight 만 담는다.
  * 그래프는 전체 기록을 불러오지만 실제로 쓰는 건 날짜·체중 둘뿐이므로,
  * AI 총평·식단 등 무거운 컬럼까지 통째로 내려받던 페이로드 비대를 막기 위해 사용한다.
@@ -155,6 +167,33 @@ export interface StartNewChapterInput {
   startWeight: number;           // 새 챕터 시작 체중 (보통 현재 체중)
   dietPreset: Settings["dietPreset"]; // 감량 속도 프리셋
   targetMonths: number;          // 목표 기간(개월) — 종료일 추정 기준
+}
+
+/**
+ * 기록·그래프 탭에서 선택 가능한 '구간(스코프)'.
+ * - 전체(all): 데이터 범위 무제한, 목표선 기준은 현재 설정.
+ * - 진행 중(current): 현재 settings 기반, 오늘까지 진행.
+ * - 종료 챕터(achieved/attempt): diet_chapters 1행, [startDate, endDate] 고정.
+ *
+ * rangeStart/rangeEnd = 데이터 필터 경계(inclusive, null=무제한/오늘).
+ * startDate/startWeight/targetWeight/targetEndDate = 목표선·지표 카드 기준.
+ * isOngoing = 진행 중(미래 예상 달성일 표시 허용).
+ */
+export type ChapterScopeStatus = "all" | "current" | "achieved" | "attempt";
+
+export interface ChapterScope {
+  id: string;            // "all" | "current" | diet_chapters.id
+  label: string;
+  status: ChapterScopeStatus;
+  rangeStart: string | null;
+  rangeEnd: string | null;
+  startDate: string;
+  startWeight: number;
+  targetWeight: number;
+  targetEndDate: string; // YYYY-MM-DD (목표선 종료 기준)
+  isOngoing: boolean;
+  displayStart: string;       // 드롭다운 표시용 시작일
+  displayEnd: string | null;  // null = "진행 중"
 }
 
 export interface Notice {

@@ -9,6 +9,7 @@ import {
   getRecentDailyLogs,
   getDailyLogsBefore,
   getDailyLogsFiltered,
+  getEventSeries,
   getDailyLogsTotalCount,
   getWeightSeries,
   regenerateDailySummary,
@@ -121,9 +122,18 @@ export async function actionGetFilteredDailyLogs(opts: {
   query?: string;
   filter?: string | null;
   cursorDate?: string | null;
+  rangeStart?: string | null;
+  rangeEnd?: string | null;
   limit: number;
 }): Promise<DailyLog[]> {
   return getDailyLogsFiltered(opts);
+}
+
+export async function actionGetEventSeries(
+  rangeStart: string | null,
+  rangeEnd: string | null
+): Promise<import("@/lib/types").DailyEventPoint[]> {
+  return getEventSeries(rangeStart, rangeEnd);
 }
 
 export async function actionGetDailyLogsTotalCount(): Promise<number> {

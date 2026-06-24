@@ -1,8 +1,16 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { startNewChapter, getChapters } from "@/lib/services/chapter-service";
-import type { DietChapter, Settings, StartNewChapterInput } from "@/lib/types";
+import { startNewChapter, getChapters, getChapterScopes } from "@/lib/services/chapter-service";
+import type { DietChapter, Settings, StartNewChapterInput, ChapterScope } from "@/lib/types";
+
+export async function actionGetChapterScopes(): Promise<ChapterScope[]> {
+  try {
+    return await getChapterScopes();
+  } catch {
+    return [];
+  }
+}
 
 export async function actionStartNewChapter(
   input: StartNewChapterInput

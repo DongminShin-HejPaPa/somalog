@@ -119,16 +119,20 @@ test.describe("Log — 필터 & 검색", () => {
     }
   });
 
-  // J8-04: 주별 뷰 전환
-  test("'주별' 탭 전환 → 주간 뷰 표시", async ({ page }) => {
+});
+
+test.describe("Log — 챕터 드롭다운", () => {
+  test.beforeEach(async ({ withSeededData }) => {
+    void withSeededData;
+  });
+
+  // 제목 우측 챕터 선택 드롭다운이 보이고, 열면 '전체 기간' 옵션이 나온다
+  test("챕터 드롭다운 표시 + 전체 옵션", async ({ page }) => {
     await page.goto("/log");
-    const weekTab = page.getByRole("tab", { name: "주별" }).or(page.getByRole("button", { name: "주별" }));
-    if (await weekTab.isVisible()) {
-      await weekTab.click();
-      await expect(
-        page.getByTestId("weekly-view").or(page.getByText(/주간/))
-      ).toBeVisible({ timeout: 5_000 });
-    }
+    const trigger = page.getByTestId("chapter-picker-trigger");
+    await expect(trigger).toBeVisible();
+    await trigger.click();
+    await expect(page.getByTestId("chapter-option-all")).toBeVisible();
   });
 });
 

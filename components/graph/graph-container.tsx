@@ -1,11 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSettings } from "@/lib/contexts/settings-context";
-import {
-  actionGetWeightSeries,
-  actionGetLowestWeight,
-} from "@/app/actions/log-actions";
+import { useChapterScope } from "@/lib/contexts/chapter-scope-context";
+import { actionGetWeightSeries } from "@/app/actions/log-actions";
 import { WeightChart } from "./weight-chart";
 import type { WeightPoint } from "@/lib/types";
 import { logStore } from "@/lib/stores/log-store";
@@ -17,35 +15,23 @@ interface GraphContainerProps {
 
 export function GraphContainer({ userName, userId }: GraphContainerProps) {
   const { settings, updateSettings } = useSettings();
+  const { selectedScope } = useChapterScope();
+
   // familyTime ChatRoom 패턴: useState 초기화에서 캐시 동기 읽기.
-  // 메모리 → localStorage → 빈 상태 순.
-  const [bootCache] = useState<{ allLogs: WeightPoint[]; lowest: { weight: number; date: string } } | null>(() => {
-    if (typeof window === "undefined") return null;
+  // 메모리 → localStorage → 빈 상태 순. 전체 시리즈를 한 번만 로드해 두고,
+  // 챕터 스코프는 클라이언트에서 슬라이스만 한다(추가 네트워크 0 → 전환 즉시).
+  const [bootLogs] = useState<WeightPoint[]>(() => {
+    if (typeof window === "undefined") return [];
     const memAll = logStore.getAllLogs();
-    if (memAll && logStore.hasLowestWeight()) {
-      return {
-        allLogs: memAll,
-        lowest: logStore.getLowestWeight() ?? { weight: Infinity, date: "" },
-      };
-    }
-    if (!userId) return null;
+    if (memAll) return memAll;
+    if (!userId) return [];
     try {
-      const fromLs = logStore.loadGraphCache(userId);
-      if (fromLs) {
-        return {
-          allLogs: fromLs.allLogs,
-          lowest: fromLs.lowestWeight ?? { weight: Infinity, date: "" },
-        };
-      }
+      return logStore.loadGraphCache(userId)?.allLogs ?? [];
     } catch {
-      // 무시
+      return [];
     }
-    return null;
   });
-  const [logs, setLogs] = useState<WeightPoint[]>(bootCache?.allLogs ?? []);
-  const [lowest, setLowest] = useState<{ weight: number; date: string }>(
-    bootCache?.lowest ?? { weight: Infinity, date: "" }
-  );
+  const [logs, setLogs] = useState<WeightPoint[]>(bootLogs);
 
   const handleActivityLevelChange = useCallback(
     (level: number) => updateSettings({ activityLevel: level }),
@@ -53,38 +39,52 @@ export function GraphContainer({ userName, userId }: GraphContainerProps) {
   );
 
   useEffect(() => {
-    // bootCache 를 메모리 logStore 에도 즉시 주입
-    if (bootCache) {
-      logStore.setAllLogs(bootCache.allLogs);
-      if (bootCache.lowest.weight !== Infinity) {
-        logStore.setLowestWeight(bootCache.lowest);
-      }
-    }
+    if (bootLogs.length > 0) logStore.setAllLogs(bootLogs);
 
     // 백그라운드 최신화. memory fresh 면 생략.
-    const hasFreshMemory =
-      logStore.getAllLogs() && logStore.hasLowestWeight() && !logStore.isStale();
+    const hasFreshMemory = logStore.getAllLogs() && !logStore.isStale();
     if (hasFreshMemory) return;
 
-    Promise.all([actionGetWeightSeries(), actionGetLowestWeight()])
-      .then(([freshLogs, freshLowest]) => {
+    actionGetWeightSeries()
+      .then((freshLogs) => {
         logStore.setAllLogs(freshLogs);
-        logStore.setLowestWeight(freshLowest);
         setLogs(freshLogs);
-        setLowest(freshLowest);
       })
       .catch(() => {});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 선택 챕터 범위로 시리즈를 슬라이스 (전체면 그대로).
+  const scopedLogs = useMemo(() => {
+    const { rangeStart, rangeEnd } = selectedScope;
+    if (rangeStart == null && rangeEnd == null) return logs;
+    return logs.filter(
+      (l) =>
+        (rangeStart == null || l.date >= rangeStart) &&
+        (rangeEnd == null || l.date <= rangeEnd)
+    );
+  }, [logs, selectedScope]);
+
+  // 스코프 내 최저 체중 (그래프 별표·'역대 최저' 카드 기준).
+  const scopedLowest = useMemo(() => {
+    let best = { weight: Infinity, date: "" };
+    for (const l of scopedLogs) {
+      if (l.weight != null && l.weight < best.weight) {
+        best = { weight: l.weight, date: l.date };
+      }
+    }
+    return best;
+  }, [scopedLogs]);
+
   return (
     <WeightChart
-      logs={logs}
-      startWeight={settings.startWeight}
-      targetWeight={settings.targetWeight}
-      startDate={settings.dietStartDate}
-      targetMonths={settings.targetMonths}
-      lowestWeight={lowest.weight}
-      lowestWeightDate={lowest.date}
+      logs={scopedLogs}
+      startWeight={selectedScope.startWeight}
+      targetWeight={selectedScope.targetWeight}
+      startDate={selectedScope.startDate}
+      targetEndDate={selectedScope.targetEndDate}
+      isOngoing={selectedScope.isOngoing}
+      lowestWeight={scopedLowest.weight}
+      lowestWeightDate={scopedLowest.date}
       height={settings.height}
       gender={settings.gender}
       birthDate={settings.birthDate}

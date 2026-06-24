@@ -17,10 +17,10 @@ import { getDayNumber } from "@/lib/utils/date-utils";
 
 export type { MetricKey };
 
-const META: Record<MetricKey, { label: string; color: string }> = {
-  exercise: { label: "운동", color: "#1e3a5f" },
-  lateSnack: { label: "야식", color: "#d97706" },
-  alcohol: { label: "술", color: "#b91c1c" },
+const META: Record<MetricKey, { label: string; color: string; verb: string }> = {
+  exercise: { label: "운동", color: "#1e3a5f", verb: "한" },
+  lateSnack: { label: "야식", color: "#d97706", verb: "먹은" },
+  alcohol: { label: "술", color: "#b91c1c", verb: "마신" },
 };
 
 // 평균선은 3개 차트 공통 색(중립 회색)으로 통일
@@ -124,7 +124,7 @@ export function MetricTrendChart({
     <div className="mb-3 px-1">
       <div className="flex items-baseline justify-between mb-1.5">
         <p className="text-xs font-semibold text-foreground">
-          {meta.label}한 날 누적 비율
+          {meta.label}{meta.verb} 날 누적 비율
         </p>
         <div className="flex items-center gap-2">
           <span className="flex items-center gap-1 text-xs text-muted-foreground">

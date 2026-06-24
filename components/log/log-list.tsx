@@ -245,6 +245,13 @@ export function LogList({
                         )}
                       </div>
 
+                      {settings.intensiveDayOn && log.intensiveDay && (
+                        <div className="col-span-2 flex items-center gap-1.5 mt-1 mb-2">
+                          <span className="w-2 h-2 rounded-full bg-coral inline-block flex-shrink-0" />
+                          <span className="text-xs font-semibold text-coral">Hard Reset Mode</span>
+                        </div>
+                      )}
+
                       {log.closed && log.dailySummary && (
                         <div className="mt-2">
                           <p className="text-xs font-medium text-navy mb-1">{settings.coachName}의 하루평가</p>

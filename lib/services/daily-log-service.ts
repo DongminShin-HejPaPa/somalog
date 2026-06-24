@@ -421,6 +421,7 @@ export async function closeDailyLog(date: string, existingLog?: DailyLog): Promi
   const closedLog = rowToDailyLog(upserted as Record<string, unknown>);
 
   // 2. 일요일(0)이면 WeeklyLog 자동 생성
+  // 주간 보기 UI는 삭제됐으나 weekly_logs 데이터 생성 로직은 일단 그대로 남겨둔다.
   const dayOfWeek = new Date(date + "T00:00:00").getDay();
   if (dayOfWeek === 0) {
     const { weekStart, weekEnd } = getWeekRange(date);

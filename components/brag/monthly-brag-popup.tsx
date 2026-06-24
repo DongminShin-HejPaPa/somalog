@@ -60,7 +60,9 @@ export function MonthlyBragPopup({ userId }: { userId: string | null }) {
     const lastSeen = stored.startDate === startDate ? stored.milestone : 0;
     if (reached > lastSeen) {
       setMilestone(reached);
-      setDismissed(false);
+      // setDismissed(false) 를 호출하지 않는다.
+      // dismissed 는 false(초기값) → true(닫기) 방향으로만 바뀐다.
+      // 이 effect 가 재실행돼도 이미 닫힌 팝업이 다시 열리지 않는다.
     }
   }, [isLoaded, settings.onboardingComplete, startDate, userId]);
 

@@ -45,6 +45,10 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
   const [activeLog, setActiveLog] = useState<DailyLog | null>(bootCache?.activeLog ?? null);
   const [recentLogs, setRecentLogs] = useState<DailyLog[]>(bootCache?.recentLogs ?? []);
   const [greeting, setGreeting] = useState<string | null>(null);
+  // 그리팅 선택 시드: 마운트당 1회 고정. 캐시→fresh 데이터 갱신으로 effect 가
+  // 재실행돼도 같은 시드로 같은 메시지를 뽑아, 1초 뒤 메시지가 바뀌는 깜빡임을 막는다.
+  // (탭을 다시 방문하면 새 마운트 → 새 시드 → 메시지 다양성은 유지)
+  const [greetingSeed] = useState(() => Math.random());
   const [isClosingDay, setIsClosingDay] = useState(false);
   const [goalEvent, setGoalEvent] = useState<GoalEvent | null>(null);
   const [goalToast, setGoalToast] = useState<string | null>(null);
@@ -125,9 +129,9 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
   // 인사말: 필요한 데이터가 준비될 때마다 갱신
   useEffect(() => {
     if (initialDisplayName && settings.onboardingComplete) {
-      setGreeting(getGreetingMessage(initialDisplayName, activeLog, recentLogs, settings));
+      setGreeting(getGreetingMessage(initialDisplayName, activeLog, recentLogs, settings, greetingSeed));
     }
-  }, [initialDisplayName, activeLog, recentLogs, settings]);
+  }, [initialDisplayName, activeLog, recentLogs, settings, greetingSeed]);
 
   const handleCloseDay = async () => {
     if (!activeLog || activeLog.closed || isClosingDay) return;

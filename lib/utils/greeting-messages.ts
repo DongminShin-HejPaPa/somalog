@@ -112,12 +112,16 @@ const rules: GreetingRule[] = [
   // ── 시간대 ──
   {
     condition: (ctx) => getHour(ctx.now) >= 5 && getHour(ctx.now) < 9,
-    messages: (ctx) => [
-      `${ctx.name}님, 좋은 아침이에요! 오늘도 힘차게 시작해봐요 🌅`,
-      `${ctx.name}님, 아침부터 앱 켜셨네요! 이 부지런함이 다이어트 성공의 비결이에요`,
-      `일찍 일어난 ${ctx.name}님! 오늘 체중 측정 잊지 마세요 ⚖️`,
-      `${ctx.name}님, 좋은 아침! 오늘도 어제의 나보다 0.1kg 가볍게 살아봐요`,
-    ],
+    messages: (ctx) => {
+      const weightDone = isLogToday(ctx) && ctx.todayLog?.weight != null;
+      return [
+        `${ctx.name}님, 좋은 아침이에요! 오늘도 힘차게 시작해봐요 🌅`,
+        `${ctx.name}님, 아침부터 앱 켜셨네요! 이 부지런함이 다이어트 성공의 비결이에요`,
+        // 체중 측정 권유는 아직 오늘 체중을 입력 안 했을 때만
+        ...(weightDone ? [] : [`일찍 일어난 ${ctx.name}님! 오늘 체중 측정 잊지 마세요 ⚖️`]),
+        `${ctx.name}님, 좋은 아침! 오늘도 어제의 나보다 0.1kg 가볍게 살아봐요`,
+      ];
+    },
   },
   {
     condition: (ctx) => getHour(ctx.now) >= 9 && getHour(ctx.now) < 12,
@@ -129,11 +133,17 @@ const rules: GreetingRule[] = [
   },
   {
     condition: (ctx) => getHour(ctx.now) >= 12 && getHour(ctx.now) < 14,
-    messages: (ctx) => [
-      `${ctx.name}님, 점심 맛있게 드셨나요? 식단 기록 잊지 마세요 🍱`,
-      `점심시간이에요, ${ctx.name}님! 야식 대신 점심으로 든든하게 채우세요`,
-      `${ctx.name}님, 오후도 파이팅이에요! 🌟`,
-    ],
+    messages: (ctx) => {
+      const lunchDone = isLogToday(ctx) && !!ctx.todayLog?.lunch;
+      return [
+        // 식단 기록 권유는 아직 오늘 점심을 입력 안 했을 때만
+        lunchDone
+          ? `${ctx.name}님, 점심 맛있게 드셨나요? 오후도 파이팅이에요 🍱`
+          : `${ctx.name}님, 점심 맛있게 드셨나요? 식단 기록 잊지 마세요 🍱`,
+        `점심시간이에요, ${ctx.name}님! 야식 대신 점심으로 든든하게 채우세요`,
+        `${ctx.name}님, 오후도 파이팅이에요! 🌟`,
+      ];
+    },
   },
   {
     condition: (ctx) => getHour(ctx.now) >= 14 && getHour(ctx.now) < 18,
@@ -145,11 +155,17 @@ const rules: GreetingRule[] = [
   },
   {
     condition: (ctx) => getHour(ctx.now) >= 18 && getHour(ctx.now) < 21,
-    messages: (ctx) => [
-      `${ctx.name}님, 오늘 하루는 어떠셨나요? 저녁 식단도 기록해두세요 🌙`,
-      `퇴근 후의 ${ctx.name}님, 수고 많으셨어요! 야식은 오늘도 참아봐요 💪`,
-      `${ctx.name}님, 저녁이에요! 오늘 목표 달성까지 얼마나 남았는지 확인해볼까요?`,
-    ],
+    messages: (ctx) => {
+      const dinnerDone = isLogToday(ctx) && !!ctx.todayLog?.dinner;
+      return [
+        // 저녁 기록 권유는 아직 오늘 저녁을 입력 안 했을 때만
+        ...(dinnerDone
+          ? []
+          : [`${ctx.name}님, 오늘 하루는 어떠셨나요? 저녁 식단도 기록해두세요 🌙`]),
+        `퇴근 후의 ${ctx.name}님, 수고 많으셨어요! 야식은 오늘도 참아봐요 💪`,
+        `${ctx.name}님, 저녁이에요! 오늘 목표 달성까지 얼마나 남았는지 확인해볼까요?`,
+      ];
+    },
   },
   {
     condition: (ctx) => getHour(ctx.now) >= 21 && getHour(ctx.now) < 24,
@@ -383,12 +399,12 @@ const rules: GreetingRule[] = [
     },
   },
 
-  // ── Hard Reset Day ──
+  // ── Hard Reset Mode ──
   {
     condition: (ctx) => isLogToday(ctx) && ctx.todayLog?.intensiveDay === true,
     messages: (ctx) => [
-      `${ctx.name}님, 오늘은 Hard Reset Day예요! 식단 관리가 핵심이에요 🔥`,
-      `Hard Reset 발동! ${ctx.name}님, 오늘만 잘 버티면 돼요 💪`,
+      `${ctx.name}님, 오늘은 Hard Reset Mode예요! 식단 관리가 핵심이에요 🔥`,
+      `Hard Reset Mode 발동! ${ctx.name}님, 오늘만 잘 버티면 돼요 💪`,
     ],
   },
 
@@ -453,7 +469,10 @@ export function getGreetingMessage(
   name: string,
   todayLog: DailyLog | null,
   recentLogs: DailyLog[],
-  settings: Settings
+  settings: Settings,
+  // [0,1) 시드. 같은 마운트 내 재계산 시 동일 시드를 넘기면 같은 메시지를 뽑아
+  // 깜빡임(캐시→fresh 갱신 때 메시지가 바뀌는 현상)을 막는다. 생략 시 매번 랜덤.
+  seed?: number
 ): string {
   const ctx: GreetingContext = { name, todayLog, recentLogs, settings, now: new Date() };
 
@@ -478,6 +497,8 @@ export function getGreetingMessage(
 
   if (candidates.length === 0) return `${name}님, 안녕하세요!`;
 
-  // 랜덤 선택
-  return candidates[Math.floor(Math.random() * candidates.length)];
+  // 시드가 있으면 결정적 선택(같은 마운트 내 재계산 시 동일 메시지 → 깜빡임 방지),
+  // 없으면 기존처럼 랜덤.
+  const r = seed != null ? seed : Math.random();
+  return candidates[Math.floor(r * candidates.length) % candidates.length];
 }

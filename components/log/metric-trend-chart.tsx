@@ -11,7 +11,8 @@ import {
   CartesianGrid,
 } from "recharts";
 import type { DailyEventPoint } from "@/lib/types";
-import { computeCumulativeRate, type MetricKey } from "@/lib/utils/metric-trend";
+import { computeCumulativeRate, didOccur, type MetricKey } from "@/lib/utils/metric-trend";
+import { getDayNumber } from "@/lib/utils/date-utils";
 
 export type { MetricKey };
 
@@ -72,19 +73,35 @@ export function MetricTrendChart({
 }) {
   const meta = META[metric];
 
-  const data = useMemo(
-    () =>
-      computeCumulativeRate(series, metric, startDate).map((p) => ({
-        date: p.date.slice(5),
-        pct: p.pct,
-      })),
-    [series, metric, startDate]
-  );
+  const { data, occurrences, totalDays, yDomain } = useMemo(() => {
+    const points = computeCumulativeRate(series, metric, startDate).map((p) => ({
+      date: p.date.slice(5),
+      pct: p.pct,
+    }));
+
+    const occ = series.filter((p) => didOccur(metric, p)).length;
+
+    const effStart = startDate ?? (series.length > 0 ? series[0].date : null);
+    const lastDate = series.length > 0 ? series[series.length - 1].date : null;
+    const total = effStart && lastDate ? getDayNumber(lastDate, effStart) : occ;
+
+    // y축: 실제 범위를 10% 단위로 올림/내림, 최소 범위 10 보장
+    const pcts = points.map((p) => p.pct);
+    const rawMin = pcts.length > 0 ? Math.min(...pcts) : 0;
+    const rawMax = pcts.length > 0 ? Math.max(...pcts) : 100;
+    let yMin = Math.max(0, Math.floor(rawMin / 10) * 10);
+    let yMax = Math.min(100, Math.ceil(rawMax / 10) * 10);
+    if (yMin === yMax) {
+      yMin = Math.max(0, yMin - 10);
+      yMax = Math.min(100, yMax + 10);
+    }
+
+    return { data: points, occurrences: occ, totalDays: total, yDomain: [yMin, yMax] as [number, number] };
+  }, [series, metric, startDate]);
 
   if (data.length === 0) return null;
 
   const lastIndex = data.length - 1;
-  const lastPct = data[lastIndex].pct;
   const dense = data.length > 180;
 
   return (
@@ -94,7 +111,9 @@ export function MetricTrendChart({
           {meta.label}한 날 누적 비율
         </p>
         <p className="text-xs text-muted-foreground">
-          현재 <span className="font-bold" style={{ color: meta.color }}>{lastPct}%</span>
+          전체 {totalDays}일 중{" "}
+          <span className="font-bold" style={{ color: meta.color }}>{occurrences}일</span>{" "}
+          {meta.label}
         </p>
       </div>
       <div className="h-[160px] w-full">
@@ -110,7 +129,7 @@ export function MetricTrendChart({
               minTickGap={24}
             />
             <YAxis
-              domain={[0, 100]}
+              domain={yDomain}
               tick={{ fontSize: 10 }}
               tickLine={false}
               axisLine={false}

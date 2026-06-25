@@ -738,8 +738,8 @@ export function WeightChart({
     const allWeights = chartData
       .map((d) => d.weight)
       .filter((w): w is number => w !== null);
-    const minW = Number((Math.min(...allWeights) - 0.5).toFixed(1));
-    const maxW = Number((Math.max(...allWeights) + 0.5).toFixed(1));
+    const minW = Math.floor(Math.min(...allWeights));
+    const maxW = Math.ceil(Math.max(...allWeights));
 
     // y축 범위:
     //  - 전체(all): 목표 감량선이 모두 보이도록 넓힌다. (목표 체중선은 굳이 보일 필요 없음)
@@ -747,10 +747,10 @@ export function WeightChart({
     //    (allowDataOverflow=true 로 목표선이 y축을 강제로 늘리지 못하게 한다.)
     const isAllPeriod = period === "all";
     const yDomainMin = isAllPeriod
-      ? Number((Math.min(...allWeights, ...goalLineData) - 0.5).toFixed(1))
+      ? Math.floor(Math.min(...allWeights, ...goalLineData))
       : minW;
     const yDomainMax = isAllPeriod
-      ? Number((Math.max(...allWeights, ...goalLineData) + 0.5).toFixed(1))
+      ? Math.ceil(Math.max(...allWeights, ...goalLineData))
       : maxW;
 
     const allSortedWeights = sortedLogs
@@ -805,6 +805,10 @@ export function WeightChart({
     isOngoing && remaining > 0 && dailyRate > 0 ? Math.ceil(remaining / dailyRate) : null;
   const estimatedDate = daysToGoal
     ? new Date(Date.now() + daysToGoal * 86400000)
+    : null;
+
+  const daysEarlyVsTarget = estimatedDate
+    ? Math.round((targetEndDate.getTime() - estimatedDate.getTime()) / 86400000)
     : null;
 
   // ── 건강 지표 계산 ──────────────────────────────────────────────────────────
@@ -1015,9 +1019,16 @@ export function WeightChart({
               <p className="text-xs text-muted-foreground">{fmtCardDate(targetEndDate)}</p>
             </div>
             <div className="p-3 bg-secondary rounded-xl">
-              <p className="text-xs text-muted-foreground">역대 최저</p>
+              <p className="text-xs text-muted-foreground">역대 최저 (현재)</p>
               <p className="text-lg font-bold">{lowestWeight} kg</p>
-              <p className="text-xs text-muted-foreground">{fmtCardDate(new Date(lowestWeightDate + "T00:00:00"))}</p>
+              {currentWeight <= lowestWeight ? (
+                <p className="text-xs text-emerald-500 font-medium">현재 최저점!</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  현재 {currentWeight} kg{" "}
+                  <span className="text-amber-500 font-medium">+{(currentWeight - lowestWeight).toFixed(1)} kg</span>
+                </p>
+              )}
             </div>
             <div className="p-3 bg-secondary rounded-xl">
               {remaining > 0 ? (
@@ -1025,7 +1036,14 @@ export function WeightChart({
                   <p className="text-xs text-muted-foreground">목표까지</p>
                   <p className="text-lg font-bold">{remaining.toFixed(1)} kg</p>
                   {estimatedDate && (
-                    <p className="text-xs text-muted-foreground">예상 {fmtCardDate(estimatedDate)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      예상 {fmtCardDate(estimatedDate)}
+                      {daysEarlyVsTarget !== null && daysEarlyVsTarget !== 0 && (
+                        <span className={cn("ml-1 font-medium", daysEarlyVsTarget > 0 ? "text-emerald-500" : "text-amber-500")}>
+                          ({daysEarlyVsTarget > 0 ? `-${daysEarlyVsTarget}일` : `+${Math.abs(daysEarlyVsTarget)}일`})
+                        </span>
+                      )}
+                    </p>
                   )}
                 </>
               ) : (

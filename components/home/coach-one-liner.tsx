@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { MessageCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -17,12 +17,19 @@ export function CoachOneLiner({
   badgeText,
 }: CoachOneLinerProps) {
   const [expanded, setExpanded] = useState(false);
+  const textRef = useRef<HTMLParagraphElement>(null);
+  const [needsExpand, setNeedsExpand] = useState(false);
 
   const text = dailySummary || oneLiner;
-  if (!text) return null;
-
-  // dailySummary가 있을 때만 더보기 기능 활성화
   const canExpand = !!dailySummary;
+
+  useEffect(() => {
+    if (!canExpand || !textRef.current || !text) return;
+    const el = textRef.current;
+    setNeedsExpand(el.scrollHeight > el.clientHeight);
+  }, [canExpand, text]);
+
+  if (!text) return null;
 
   return (
     <div
@@ -46,6 +53,7 @@ export function CoachOneLiner({
 
       {/* 본문 */}
       <p
+        ref={textRef}
         className={cn(
           "text-sm text-foreground leading-relaxed whitespace-pre-line transition-all duration-300",
           canExpand && !expanded && "line-clamp-[8]"
@@ -54,8 +62,8 @@ export function CoachOneLiner({
         {text}
       </p>
 
-      {/* 더보기 / 접기 버튼 */}
-      {canExpand && (
+      {/* 더보기 / 접기 버튼 — 실제로 잘릴 때만 표시 */}
+      {canExpand && needsExpand && (
         <button
           onClick={() => setExpanded((prev) => !prev)}
           className="mt-2 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"

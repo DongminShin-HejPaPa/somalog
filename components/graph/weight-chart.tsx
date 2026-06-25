@@ -1020,15 +1020,19 @@ export function WeightChart({
             </div>
             <div className="p-3 bg-secondary rounded-xl">
               <p className="text-xs text-muted-foreground">역대 최저 (현재)</p>
-              <p className="text-lg font-bold">{lowestWeight} kg</p>
-              {currentWeight <= lowestWeight ? (
-                <p className="text-xs text-emerald-500 font-medium">현재 최저점!</p>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  현재 {currentWeight} kg{" "}
-                  <span className="text-amber-500 font-medium">+{(currentWeight - lowestWeight).toFixed(1)} kg</span>
-                </p>
-              )}
+              <p className="text-lg font-bold">
+                {lowestWeight} kg
+                {currentWeight > lowestWeight ? (
+                  <span className="text-xs font-normal text-muted-foreground ml-1">
+                    ({currentWeight} kg,{" "}
+                    <span className="text-amber-500 font-medium">+{(currentWeight - lowestWeight).toFixed(1)} kg</span>
+                    )
+                  </span>
+                ) : (
+                  <span className="text-xs font-normal text-emerald-500 ml-1">현재 최저점!</span>
+                )}
+              </p>
+              <p className="text-xs text-muted-foreground">{fmtCardDate(new Date(lowestWeightDate + "T00:00:00"))}</p>
             </div>
             <div className="p-3 bg-secondary rounded-xl">
               {remaining > 0 ? (

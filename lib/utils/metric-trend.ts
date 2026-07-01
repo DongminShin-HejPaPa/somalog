@@ -14,13 +14,15 @@ export function didOccur(metric: MetricKey, p: DailyEventPoint): boolean {
 /**
  * 해당 날짜에 지표를 '기록'했는지 판정.
  * - 운동/야식: 값이 있으면(했음/안했음 모두) 기록으로 인정
- * - 술: 저녁 또는 야식을 저장한 날에만 술 플래그가 채워지므로,
- *   둘 중 하나라도 non-null 이면 그날 술 여부를 기록한 것으로 인정
+ * - 술: 저녁 또는 야식을 기록한 날을 기록일로 인정.
+ *   (술 여부는 저녁·야식 입력에 딸린 토글이며, 안 마신 날은 플래그가
+ *    NULL 로 남아 술 플래그만으론 '기록했으나 안 마신 날'을 구분할 수 없다.
+ *    그래서 저녁/야식 기록 유무로 분모를 센다.)
  */
 export function didRecord(metric: MetricKey, p: DailyEventPoint): boolean {
   if (metric === "exercise") return p.exercise !== null;
   if (metric === "lateSnack") return p.lateSnack !== null;
-  return p.dinnerAlcohol !== null || p.lateSnackAlcohol !== null;
+  return p.hasDinner || p.lateSnack !== null;
 }
 
 export interface CumulativePoint {

@@ -6,6 +6,7 @@ function pt(date: string, over: Partial<DailyEventPoint> = {}): DailyEventPoint 
   return {
     date,
     exercise: null,
+    hasDinner: false,
     lateSnack: null,
     dinnerAlcohol: null,
     lateSnackAlcohol: null,
@@ -49,11 +50,12 @@ describe("computeCumulativeRate", () => {
     ]);
   });
 
-  it("술: 저녁/야식 술 플래그가 non-null 인 날만 기록으로 센다", () => {
-    // 1/1 저녁 술O(기록·발생), 1/2 야식 술X=false(기록·미발생), 1/3 미기록(null)
+  it("술: 저녁/야식을 기록한 날을 분모로, 술 플래그 true 를 분자로", () => {
+    // 1/1 저녁 기록·술O, 1/2 저녁 기록·술 안 마심(플래그 NULL), 1/3 저녁·야식 모두 미기록
+    // → 안 마신 1/2 도 분모에 포함되어야 한다(과거 직접 입력분 대응)
     const series = [
-      pt("2024-01-01", { dinnerAlcohol: true }),
-      pt("2024-01-02", { lateSnackAlcohol: false }),
+      pt("2024-01-01", { hasDinner: true, dinnerAlcohol: true }),
+      pt("2024-01-02", { hasDinner: true }),
       pt("2024-01-03"),
     ];
     const r = computeCumulativeRate(series, "alcohol");
@@ -61,6 +63,13 @@ describe("computeCumulativeRate", () => {
       { date: "2024-01-01", pct: 100 },
       { date: "2024-01-02", pct: 50 },
       { date: "2024-01-03", pct: null },
+    ]);
+  });
+
+  it("술: 저녁 없이 야식만 기록해도 기록일로 센다", () => {
+    const series = [pt("2024-01-01", { lateSnack: "라면", lateSnackAlcohol: true })];
+    expect(computeCumulativeRate(series, "alcohol")).toEqual([
+      { date: "2024-01-01", pct: 100 },
     ]);
   });
 });
@@ -83,9 +92,9 @@ describe("didRecord", () => {
     expect(didRecord("lateSnack", pt("d", { lateSnack: null }))).toBe(false);
   });
 
-  it("술: 저녁 또는 야식 술 플래그가 non-null 이면 기록", () => {
-    expect(didRecord("alcohol", pt("d", { dinnerAlcohol: false }))).toBe(true);
-    expect(didRecord("alcohol", pt("d", { lateSnackAlcohol: true }))).toBe(true);
+  it("술: 저녁 또는 야식을 기록했으면 기록(술 플래그 NULL 이어도)", () => {
+    expect(didRecord("alcohol", pt("d", { hasDinner: true }))).toBe(true);
+    expect(didRecord("alcohol", pt("d", { lateSnack: "N" }))).toBe(true);
     expect(didRecord("alcohol", pt("d"))).toBe(false);
   });
 });

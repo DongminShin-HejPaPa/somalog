@@ -901,6 +901,7 @@ describe("getEventSeries", () => {
       {
         date: "2024-01-01",
         exercise: "Y",
+        dinner: "김치찌개",
         late_snack: "N",
         dinner_alcohol: true,
         late_snack_alcohol: null,
@@ -932,6 +933,7 @@ describe("getEventSeries", () => {
       {
         date: "2024-01-01",
         exercise: "Y",
+        hasDinner: true,
         lateSnack: "N",
         dinnerAlcohol: true,
         lateSnackAlcohol: null,

@@ -12,8 +12,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import type { DailyEventPoint } from "@/lib/types";
-import { computeCumulativeRate, didOccur, type MetricKey } from "@/lib/utils/metric-trend";
-import { getDayNumber } from "@/lib/utils/date-utils";
+import { computeCumulativeRate, didOccur, didRecord, type MetricKey } from "@/lib/utils/metric-trend";
 
 export type { MetricKey };
 
@@ -62,35 +61,37 @@ function MetricDot({ cx, cy, index, value, lastIndex, dense, color }: MetricDotP
 }
 
 /**
- * 누적 발생 평균(%) 추세 — 챕터 시작일부터 각 날짜까지의
- * (발생일 수 ÷ 경과 달력일수) × 100. 마지막 점 위에 현재 % 표시.
+ * 누적 발생 평균(%) 추세 — 그 항목을 '기록한 날'만 분모로 센다.
+ * 각 기록일까지의 (발생일 수 ÷ 기록일 수) × 100. 마지막(가장 최근 기록) 점 위에 현재 % 표시.
+ * 평균선·y축·요약 문구 모두 기록한 날 기준으로 계산한다.
  * 체중 그래프와 동일한 라인차트 UI로 통일감 유지.
  */
 export function MetricTrendChart({
   series,
   metric,
-  startDate,
 }: {
   series: DailyEventPoint[];
   metric: MetricKey;
-  startDate: string | null;
 }) {
   const meta = META[metric];
 
-  const { data, occurrences, totalDays, yDomain, avg } = useMemo(() => {
-    const points = computeCumulativeRate(series, metric, startDate).map((p) => ({
+  const { data, occurrences, totalDays, yDomain, avg, lastIndex } = useMemo(() => {
+    const points = computeCumulativeRate(series, metric).map((p) => ({
       date: p.date.slice(5),
       pct: p.pct,
     }));
 
+    // 발생/기록 모두 기록한 날 기준
     const occ = series.filter((p) => didOccur(metric, p)).length;
+    const recorded = series.filter((p) => didRecord(metric, p)).length;
 
-    const effStart = startDate ?? (series.length > 0 ? series[0].date : null);
-    const lastDate = series.length > 0 ? series[series.length - 1].date : null;
-    const total = effStart && lastDate ? getDayNumber(lastDate, effStart) : occ;
+    // 실제로 찍히는(기록된) 점들만 평균·y축·마지막 라벨에 반영
+    const pcts = points
+      .map((p) => p.pct)
+      .filter((v): v is number => v !== null);
+    const lastIdx = points.reduce((acc, p, i) => (p.pct !== null ? i : acc), -1);
 
     // 평균선: 누적 비율 포인트들의 산술 평균(%)
-    const pcts = points.map((p) => p.pct);
     const mean =
       pcts.length > 0
         ? Math.round(pcts.reduce((s, v) => s + v, 0) / pcts.length)
@@ -109,15 +110,15 @@ export function MetricTrendChart({
     return {
       data: points,
       occurrences: occ,
-      totalDays: total,
+      totalDays: recorded,
       yDomain: [yMin, yMax] as [number, number],
       avg: mean,
+      lastIndex: lastIdx,
     };
-  }, [series, metric, startDate]);
+  }, [series, metric]);
 
-  if (data.length === 0) return null;
+  if (data.length === 0 || lastIndex < 0) return null;
 
-  const lastIndex = data.length - 1;
   const dense = data.length > 180;
 
   return (
@@ -135,7 +136,7 @@ export function MetricTrendChart({
             평균 {avg}%
           </span>
           <p className="text-xs text-muted-foreground">
-            전체 {totalDays}일 중{" "}
+            기록한 {totalDays}일 중{" "}
             <span className="font-bold" style={{ color: meta.color }}>{occurrences}일</span>{" "}
             {meta.label}
           </p>

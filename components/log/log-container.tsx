@@ -165,9 +165,9 @@ export function LogContainer({ userId }: LogContainerProps) {
   const metricChart = useMemo(() => {
     if (!metricFilter || !eventSeries || eventSeries.length === 0) return null;
     return (
-      <MetricTrendChart series={eventSeries} metric={metricFilter} startDate={rangeStart} />
+      <MetricTrendChart series={eventSeries} metric={metricFilter} />
     );
-  }, [metricFilter, eventSeries, rangeStart]);
+  }, [metricFilter, eventSeries]);
 
   return (
     <LogList

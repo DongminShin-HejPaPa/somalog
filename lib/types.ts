@@ -44,6 +44,7 @@ export interface WeeklyLog {
 export interface DailyEventPoint {
   date: string;
   exercise: string | null;
+  hasDinner: boolean;         // 저녁 기록 여부(술 '기록일' 판정용) — 본문 텍스트는 싣지 않아 페이로드 최소화
   lateSnack: string | null;
   dinnerAlcohol: boolean | null;
   lateSnackAlcohol: boolean | null;

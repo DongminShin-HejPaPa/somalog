@@ -931,7 +931,7 @@ export async function getEventSeries(
 
   let q = supabase
     .from("daily_logs")
-    .select("date, exercise, late_snack, dinner_alcohol, late_snack_alcohol")
+    .select("date, exercise, dinner, late_snack, dinner_alcohol, late_snack_alcohol")
     .eq("user_id", user.id);
 
   if (rangeStart) q = q.gte("date", rangeStart);
@@ -943,6 +943,8 @@ export async function getEventSeries(
   return data.map((r) => ({
     date: r.date as string,
     exercise: (r.exercise as string | null) ?? null,
+    // 저녁 본문은 싣지 않고 '기록 여부'만 — 술 기록일 판정에 필요한 최소 정보.
+    hasDinner: ((r.dinner as string | null) ?? null) != null,
     lateSnack: (r.late_snack as string | null) ?? null,
     dinnerAlcohol: (r.dinner_alcohol as boolean | null) ?? null,
     lateSnackAlcohol: (r.late_snack_alcohol as boolean | null) ?? null,

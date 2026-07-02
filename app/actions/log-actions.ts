@@ -24,6 +24,11 @@ import {
   detectGoalAchievement,
   detectMilestone,
   detectStreakMilestone,
+  detectNewLow,
+  detectEta,
+  detectWeeklyLoss,
+  detectAnniversary,
+  detectBirthday,
   getAchievements,
   getJourneyReport,
   markAchievementSeen,
@@ -71,13 +76,24 @@ export async function actionCloseDailyLog(
     ? await detectGoalAchievement(result).catch(() => null)
     : null;
   // 목표 달성이 없을 때만 마일스톤 판정 — 목표 세리머니가 우선.
-  // 우선순위: 감량 마일스톤(−5/−10kg…) > 연속 기록 마일스톤(7/30/100일…).
-  // 감량 마일스톤이 떴으면 streak 쿼리는 건너뛴다(불필요한 INSERT/노출 방지).
+  // 마감당 하나만 노출(다중 토스트 방지). 우선순위(위 → 아래)로 먼저 걸리는 하나만 취하고
+  // 뒤 판정은 건너뛴다(불필요한 쿼리/INSERT/노출 방지). 모두 마감 액션에서만 실행(핫패스 미접촉).
+  //   주년 > 생일 > D-day 예측(30/14/7) > 감량(−5kg) > N주 연속 감량 > 역대 최저 > 연속 기록(10일)
   let milestoneEvent: import("@/lib/types").MilestoneEvent | null = null;
   if (result && !goalEvent) {
-    milestoneEvent = await detectMilestone(result).catch(() => null);
-    if (!milestoneEvent) {
-      milestoneEvent = await detectStreakMilestone(result).catch(() => null);
+    const closed = result;
+    const detectors = [
+      detectAnniversary,
+      detectBirthday,
+      detectEta,
+      detectMilestone,
+      detectWeeklyLoss,
+      detectNewLow,
+      detectStreakMilestone,
+    ];
+    for (const detect of detectors) {
+      milestoneEvent = await detect(closed).catch(() => null);
+      if (milestoneEvent) break;
     }
   }
   return { log: result, goalEvent, milestoneEvent };

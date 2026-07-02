@@ -13,6 +13,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import { cn } from "@/lib/utils";
+import { projectGoalEta } from "@/lib/utils/goal-projection";
 import type { WeightPoint } from "@/lib/types";
 
 interface WeightChartProps {
@@ -798,14 +799,17 @@ export function WeightChart({
   const daysSoFar = Math.ceil(
     (Date.now() - new Date(startDate).getTime()) / 86400000
   );
-  const dailyRate = daysSoFar > 0 ? (startWeight - currentWeight) / daysSoFar : 0;
-  // 이미 목표 도달/초과(remaining ≤ 0)면 투영하지 않음 — 과거 날짜가 '예상 달성일'로 뜨는 것 방지.
+  // 예상 도달일은 D-day 예측 이벤트와 동일한 순수함수(projectGoalEta)로 계산 — 단일 소스.
   // 종료된 챕터(과거)는 미래 예상 달성일이 의미 없으므로 진행 중(isOngoing)일 때만 투영.
-  const daysToGoal =
-    isOngoing && remaining > 0 && dailyRate > 0 ? Math.ceil(remaining / dailyRate) : null;
-  const estimatedDate = daysToGoal
-    ? new Date(Date.now() + daysToGoal * 86400000)
-    : null;
+  const { daysToGoal: projectedDays, estimatedAtMs } = projectGoalEta({
+    startWeight,
+    currentWeight,
+    targetWeight,
+    startDate,
+  });
+  const daysToGoal = isOngoing ? projectedDays : null;
+  const estimatedDate =
+    isOngoing && estimatedAtMs !== null ? new Date(estimatedAtMs) : null;
 
   const daysEarlyVsTarget = estimatedDate
     ? Math.round((targetEndDate.getTime() - estimatedDate.getTime()) / 86400000)

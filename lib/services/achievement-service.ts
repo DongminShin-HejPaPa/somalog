@@ -10,13 +10,31 @@ import type {
 } from "@/lib/types";
 import { getSettings } from "./settings-service";
 import { getLogsForJourney } from "./daily-log-service";
+import { getWeeklyLogs } from "./weekly-log-service";
+import { projectGoalEta } from "@/lib/utils/goal-projection";
 
 const GOAL_TYPE = "goal_reached";
 const MILESTONE_PREFIX = "milestone_";
 const MILESTONE_STEP = 5; // kg
 const STREAK_PREFIX = "streak_";
-/** 축하할 연속 기록일 마일스톤 (일주일·한달·100·200·1년) */
-const STREAK_MILESTONES = [7, 30, 100, 200, 365];
+/** 연속 기록 마일스톤 간격 — 10일 단위(10/20/30 …) */
+const STREAK_STEP = 10;
+/** 연속일 계산용으로 마감일에서 거슬러 읽을 최대 날짜 수(장기 스트릭 커버) */
+const STREAK_FETCH_CAP = 400;
+
+const ETA_PREFIX = "eta_";
+/** D-day 예측 임계(일) — 예상 잔여일이 이 값 이하로 처음 진입하면 이벤트 */
+const ETA_THRESHOLDS = [30, 14, 7];
+
+const WEEKLYLOSS_PREFIX = "weeklyloss_";
+/** N주 연속 감량 마일스톤 */
+const WEEKLYLOSS_MILESTONES = [2, 4, 8, 12];
+
+const ANNIVERSARY_PREFIX = "anniversary_";
+/** 다이어트 N주년 간격(일) */
+const YEAR_DAYS = 365;
+
+const BIRTHDAY_PREFIX = "birthday_";
 
 /**
  * 마일스톤 판정의 순수 로직 (DB 비의존 — 단위 테스트 대상).
@@ -68,21 +86,121 @@ export function computeCurrentStreak(
 
 /**
  * 연속 기록 마일스톤 판정의 순수 로직 (DB 비의존 — 단위 테스트 대상).
- * 현재 연속일이 새 마일스톤(7/30/100…)을 '처음' 넘었을 때 그 일수를 반환.
+ * 현재 연속일이 새 10일 단위(10/20/30…)를 '처음' 넘었을 때 그 일수를 반환.
  * 이미 축하한 것보다 큰 단위만 인정(백필 등으로 건너뛰어도 가장 높은 것 한 번만).
  * @returns 새로 도달한 마일스톤 일수 또는 null
  */
 export function decideStreakMilestone(params: {
   currentStreak: number;
   reachedMilestones: number[];
+  step?: number;
+}): number | null {
+  const { currentStreak, reachedMilestones, step = STREAK_STEP } = params;
+  if (currentStreak < step) return null;
+  const highest = Math.floor(currentStreak / step) * step; // 예: 23일 → 20
+  const maxReached = reachedMilestones.length ? Math.max(...reachedMilestones) : 0;
+  return highest > maxReached ? highest : null;
+}
+
+/**
+ * 역대 최저 체중 '갱신 순간' 판정 (DB 비의존 — 단위 테스트 대상).
+ * 오늘 체중이 오늘 이전까지의 역대 최저보다 낮으면(weight < prevMin) 갱신으로 본다.
+ * 하강 구간엔 매일 축하가 뜬다(의도된 동작 — 최저 경신마다 격려).
+ * 최초 기록(prevMin === null)은 비교 대상이 없어 갱신으로 치지 않는다.
+ * @returns 갱신이면 true
+ */
+export function decideNewLow(params: {
+  weight: number | null;
+  prevMin: number | null; // 오늘 이전까지의 역대 최저
+}): boolean {
+  const { weight, prevMin } = params;
+  if (weight === null || prevMin === null) return false;
+  return weight < prevMin;
+}
+
+/**
+ * D-day 예측 임계 진입 판정 (DB 비의존 — 단위 테스트 대상).
+ * 예상 잔여일이 아직 축하 안 한 임계(30/14/7) 이하로 처음 진입하면 그중 가장 큰 값을 반환한다.
+ * (큰 값부터 순서대로 30→14→7 이 자연스럽게 나오도록. 한 번에 여러 임계를 건너뛰면 큰 것부터 한 단계씩.)
+ * @returns 새로 도달한 임계(일) 또는 null
+ */
+export function decideEtaMilestone(params: {
+  daysToGoal: number | null;
+  reachedThresholds: number[];
+  thresholds?: number[];
+}): number | null {
+  const { daysToGoal, reachedThresholds, thresholds = ETA_THRESHOLDS } = params;
+  if (daysToGoal === null) return null;
+  const eligible = thresholds.filter(
+    (t) => daysToGoal <= t && !reachedThresholds.includes(t)
+  );
+  return eligible.length ? Math.max(...eligible) : null;
+}
+
+/**
+ * 주평균 체중 배열(최신순)에서 '연속 감량 주' 수를 센다 (DB 비의존 — 단위 테스트 대상).
+ * 최신 주가 직전 주보다 낮으면 감량으로 보고, 감소가 깨질 때까지 센다.
+ * 예) [70,71,72,73] (최신 70) → 3주 연속 감량.
+ */
+export function computeConsecutiveLossWeeks(avgWeightsNewestFirst: number[]): number {
+  let weeks = 0;
+  for (let i = 0; i < avgWeightsNewestFirst.length - 1; i++) {
+    if (avgWeightsNewestFirst[i] < avgWeightsNewestFirst[i + 1]) weeks++;
+    else break;
+  }
+  return weeks;
+}
+
+/**
+ * N주 연속 감량 마일스톤 판정 (DB 비의존 — 단위 테스트 대상).
+ * 현재 연속 감량 주 수가 새 마일스톤(2/4/8/12)을 처음 넘으면 그중 가장 큰 값을 반환.
+ * @returns 새로 도달한 마일스톤(주) 또는 null
+ */
+export function decideWeeklyLossMilestone(params: {
+  consecutiveLossWeeks: number;
+  reachedMilestones: number[];
   milestones?: number[];
 }): number | null {
-  const { currentStreak, reachedMilestones, milestones = STREAK_MILESTONES } = params;
+  const { consecutiveLossWeeks, reachedMilestones, milestones = WEEKLYLOSS_MILESTONES } = params;
   const maxReached = reachedMilestones.length ? Math.max(...reachedMilestones) : 0;
   const candidate = milestones
-    .filter((m) => m <= currentStreak && m > maxReached)
+    .filter((m) => m <= consecutiveLossWeeks && m > maxReached)
     .reduce((hi, m) => Math.max(hi, m), 0);
   return candidate > 0 ? candidate : null;
+}
+
+/**
+ * 다이어트 N주년 판정 (DB 비의존 — 단위 테스트 대상).
+ * 경과일이 365일 배수(1주년=365, 2주년=730…)에 처음 도달하면 그 연차를 반환.
+ * @returns 새로 맞은 주년(1,2,3…) 또는 null
+ */
+export function decideAnniversary(params: {
+  elapsedDays: number;
+  reachedYears: number[];
+}): number | null {
+  const { elapsedDays, reachedYears } = params;
+  const year = Math.floor(elapsedDays / YEAR_DAYS);
+  if (year < 1) return null;
+  const maxReached = reachedYears.length ? Math.max(...reachedYears) : 0;
+  return year > maxReached ? year : null;
+}
+
+/**
+ * 생일 판정 (DB 비의존 — 단위 테스트 대상).
+ * 마감일(today)의 월-일이 생일과 같고, 그 해에 아직 축하 안 했으면 해당 연도를 반환.
+ * @returns 축하할 연도(YYYY) 또는 null
+ */
+export function decideBirthday(params: {
+  today: string; // YYYY-MM-DD (마감일)
+  birthDate: string | null; // YYYY-MM-DD
+  reachedYears: number[]; // 이미 축하한 연도 목록
+}): number | null {
+  const { today, birthDate, reachedYears } = params;
+  if (!birthDate) return null;
+  if (today.slice(5) !== birthDate.slice(5)) return null;
+  const year = parseInt(today.slice(0, 4), 10);
+  if (Number.isNaN(year) || reachedYears.includes(year)) return null;
+  return year;
 }
 
 /**
@@ -251,8 +369,6 @@ export async function detectStreakMilestone(
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const maxThreshold = STREAK_MILESTONES[STREAK_MILESTONES.length - 1];
-
   const [{ data: achRows }, { data: logRows }] = await Promise.all([
     supabase
       .from("achievements")
@@ -265,7 +381,7 @@ export async function detectStreakMilestone(
       .eq("user_id", user.id)
       .lte("date", closedLog.date)
       .order("date", { ascending: false })
-      .limit(maxThreshold + 1),
+      .limit(STREAK_FETCH_CAP + 1),
   ]);
 
   const reachedMilestones = (achRows ?? [])
@@ -284,6 +400,223 @@ export async function detectStreakMilestone(
   });
 
   return { kind: "streak", streakDays: milestone };
+}
+
+/**
+ * 역대 최저 체중 '갱신 순간' 판정 — 오늘 체중이 이전까지의 역대 최저보다 낮으면 축하.
+ * 하강 구간엔 매일 뜬다(의도). 반복 가능하므로 DB 미저장.
+ * 오늘 이전까지의 역대 최저 1행(weight 인덱스 커버)만 읽는다.
+ */
+export async function detectNewLow(
+  closedLog: DailyLog
+): Promise<MilestoneEvent | null> {
+  if (closedLog.weight === null) return null;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: minRow } = await supabase
+    .from("daily_logs")
+    .select("weight")
+    .eq("user_id", user.id)
+    .lt("date", closedLog.date)
+    .not("weight", "is", null)
+    .order("weight", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  const isNewLow = decideNewLow({
+    weight: closedLog.weight,
+    prevMin: (minRow?.weight as number | null) ?? null,
+  });
+  if (!isNewLow) return null;
+
+  return { kind: "lowest", weight: closedLog.weight };
+}
+
+/**
+ * D-day 예측 임계(30/14/7일) 진입 판정. 그래프 카드와 동일한 projectGoalEta 로직 사용.
+ * 도달 시 achievements 에 eta_{n} 1행(UNIQUE) INSERT + 이벤트 반환.
+ */
+export async function detectEta(
+  closedLog: DailyLog
+): Promise<MilestoneEvent | null> {
+  if (closedLog.weight === null) return null;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const settings = await getSettings();
+  if (!settings.targetWeight || settings.targetWeight <= 0) return null;
+  if (!settings.startWeight || settings.startWeight <= 0) return null;
+  if (!settings.dietStartDate) return null;
+  if (closedLog.weight <= settings.targetWeight) return null; // 이미 목표 도달
+
+  const { daysToGoal } = projectGoalEta({
+    startWeight: settings.startWeight,
+    currentWeight: closedLog.weight,
+    targetWeight: settings.targetWeight,
+    startDate: settings.dietStartDate,
+    nowMs: new Date(closedLog.date + "T00:00:00").getTime(),
+  });
+
+  const { data: rows } = await supabase
+    .from("achievements")
+    .select("type")
+    .eq("user_id", user.id)
+    .like("type", `${ETA_PREFIX}%`);
+
+  const reachedThresholds = (rows ?? [])
+    .map((r) => parseInt((r.type as string).slice(ETA_PREFIX.length), 10))
+    .filter((n) => !Number.isNaN(n));
+
+  const threshold = decideEtaMilestone({ daysToGoal, reachedThresholds });
+  if (threshold === null) return null;
+
+  await supabase.from("achievements").insert({
+    user_id: user.id,
+    type: `${ETA_PREFIX}${threshold}`,
+  });
+
+  return { kind: "eta", etaDays: threshold };
+}
+
+/**
+ * N주 연속 감량(2/4/8/12주) 판정. 주간 로그의 주평균 체중으로 연속 감량 주 수를 센다.
+ * 도달 시 weeklyloss_{n} 1행(UNIQUE) INSERT + 이벤트 반환.
+ */
+export async function detectWeeklyLoss(
+  _closedLog: DailyLog
+): Promise<MilestoneEvent | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const maxMilestone = WEEKLYLOSS_MILESTONES[WEEKLYLOSS_MILESTONES.length - 1];
+  const [weeklyLogs, { data: rows }] = await Promise.all([
+    getWeeklyLogs(maxMilestone + 2), // 연속 판정에 필요한 만큼만
+    supabase
+      .from("achievements")
+      .select("type")
+      .eq("user_id", user.id)
+      .like("type", `${WEEKLYLOSS_PREFIX}%`),
+  ]);
+
+  const avgWeightsNewestFirst = weeklyLogs
+    .map((w) => w.avgWeight)
+    .filter((n): n is number => typeof n === "number" && n > 0);
+  const consecutiveLossWeeks = computeConsecutiveLossWeeks(avgWeightsNewestFirst);
+
+  const reachedMilestones = (rows ?? [])
+    .map((r) => parseInt((r.type as string).slice(WEEKLYLOSS_PREFIX.length), 10))
+    .filter((n) => !Number.isNaN(n));
+
+  const milestone = decideWeeklyLossMilestone({
+    consecutiveLossWeeks,
+    reachedMilestones,
+  });
+  if (milestone === null) return null;
+
+  await supabase.from("achievements").insert({
+    user_id: user.id,
+    type: `${WEEKLYLOSS_PREFIX}${milestone}`,
+  });
+
+  return { kind: "weeklyLoss", weeks: milestone };
+}
+
+/**
+ * 다이어트 N주년(경과일 365 배수) 판정. 도달 시 anniversary_{days} 1행 INSERT + 이벤트.
+ */
+export async function detectAnniversary(
+  closedLog: DailyLog
+): Promise<MilestoneEvent | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const settings = await getSettings();
+  if (!settings.dietStartDate) return null;
+
+  const elapsedDays =
+    Math.floor(
+      (new Date(closedLog.date + "T00:00:00").getTime() -
+        new Date(settings.dietStartDate + "T00:00:00").getTime()) /
+        86_400_000
+    ) + 1;
+
+  const { data: rows } = await supabase
+    .from("achievements")
+    .select("type")
+    .eq("user_id", user.id)
+    .like("type", `${ANNIVERSARY_PREFIX}%`);
+
+  const reachedYears = (rows ?? [])
+    .map((r) => parseInt((r.type as string).slice(ANNIVERSARY_PREFIX.length), 10))
+    .filter((n) => !Number.isNaN(n))
+    .map((days) => Math.round(days / YEAR_DAYS));
+
+  const year = decideAnniversary({ elapsedDays, reachedYears });
+  if (year === null) return null;
+
+  const days = year * YEAR_DAYS;
+  await supabase.from("achievements").insert({
+    user_id: user.id,
+    type: `${ANNIVERSARY_PREFIX}${days}`,
+  });
+
+  return { kind: "anniversary", years: year, days };
+}
+
+/**
+ * 생일 판정 — 마감일 월-일이 settings.birthDate 와 같으면(그 해 최초) 축하.
+ * 도달 시 birthday_{YYYY} 1행 INSERT + 이벤트.
+ */
+export async function detectBirthday(
+  closedLog: DailyLog
+): Promise<MilestoneEvent | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const settings = await getSettings();
+  if (!settings.birthDate) return null;
+
+  const { data: rows } = await supabase
+    .from("achievements")
+    .select("type")
+    .eq("user_id", user.id)
+    .like("type", `${BIRTHDAY_PREFIX}%`);
+
+  const reachedYears = (rows ?? [])
+    .map((r) => parseInt((r.type as string).slice(BIRTHDAY_PREFIX.length), 10))
+    .filter((n) => !Number.isNaN(n));
+
+  const year = decideBirthday({
+    today: closedLog.date,
+    birthDate: settings.birthDate,
+    reachedYears,
+  });
+  if (year === null) return null;
+
+  await supabase.from("achievements").insert({
+    user_id: user.id,
+    type: `${BIRTHDAY_PREFIX}${year}`,
+  });
+
+  return { kind: "birthday" };
 }
 
 async function buildSnapshot(

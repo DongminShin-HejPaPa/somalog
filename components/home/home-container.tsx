@@ -7,6 +7,7 @@ import { actionGetDailyLog, actionGetRecentDailyLogs, actionCloseDailyLog, actio
 import { HomeContent } from "./home-content";
 import { formatDate, getDayNumber } from "@/lib/utils/date-utils";
 import { getGreetingMessage } from "@/lib/utils/greeting-messages";
+import { milestoneToastMessage } from "@/lib/utils/milestone-toast";
 import { useSettings } from "@/lib/contexts/settings-context";
 import type { DailyLog, GoalEvent, WeightPoint } from "@/lib/types";
 import { logStore } from "@/lib/stores/log-store";
@@ -145,12 +146,7 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
         setGoalToast("🎉 목표 체중 복귀! 다시 잘 버텼어요");
         setTimeout(() => setGoalToast(null), 4000);
       } else if (closeResult.milestoneEvent) {
-        const m = closeResult.milestoneEvent;
-        setGoalToast(
-          m.kind === "streak"
-            ? `🔥 ${m.streakDays}일 연속 기록! 꾸준함이 답이에요`
-            : `🎉 −${m.lostKg}kg 달성! 이 흐름 그대로 가요`
-        );
+        setGoalToast(milestoneToastMessage(closeResult.milestoneEvent));
         setTimeout(() => setGoalToast(null), 4000);
       }
 

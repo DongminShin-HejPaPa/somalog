@@ -4,6 +4,12 @@ import {
   decideMilestoneReached,
   decideStreakMilestone,
   computeCurrentStreak,
+  decideNewLow,
+  decideEtaMilestone,
+  computeConsecutiveLossWeeks,
+  decideWeeklyLossMilestone,
+  decideAnniversary,
+  decideBirthday,
 } from "@/lib/services/achievement-service";
 
 describe("decideGoalEventKind", () => {
@@ -184,43 +190,203 @@ describe("computeCurrentStreak", () => {
   });
 });
 
-describe("decideStreakMilestone", () => {
-  it("7일 미만 → null", () => {
+describe("decideStreakMilestone (10일 단위)", () => {
+  it("10일 미만 → null", () => {
     expect(
-      decideStreakMilestone({ currentStreak: 6, reachedMilestones: [] })
+      decideStreakMilestone({ currentStreak: 9, reachedMilestones: [] })
     ).toBeNull();
   });
 
-  it("정확히 7일 → 7 (경계)", () => {
+  it("정확히 10일 → 10 (경계)", () => {
     expect(
-      decideStreakMilestone({ currentStreak: 7, reachedMilestones: [] })
-    ).toBe(7);
+      decideStreakMilestone({ currentStreak: 10, reachedMilestones: [] })
+    ).toBe(10);
   });
 
-  it("8일인데 7은 이미 달성 → null (다음 단위 30 미도달)", () => {
+  it("14일 → 10 (10단위 내림)", () => {
     expect(
-      decideStreakMilestone({ currentStreak: 8, reachedMilestones: [7] })
+      decideStreakMilestone({ currentStreak: 14, reachedMilestones: [] })
+    ).toBe(10);
+  });
+
+  it("15일인데 10은 이미 달성 → null (다음 단위 20 미도달)", () => {
+    expect(
+      decideStreakMilestone({ currentStreak: 15, reachedMilestones: [10] })
     ).toBeNull();
   });
 
-  it("30일 + 7만 달성 → 30", () => {
+  it("20일 + 10만 달성 → 20", () => {
     expect(
-      decideStreakMilestone({ currentStreak: 30, reachedMilestones: [7] })
+      decideStreakMilestone({ currentStreak: 20, reachedMilestones: [10] })
+    ).toBe(20);
+  });
+
+  it("백필로 47일 + 이력 없음 → 40 (최고만 인정, 중간 건너뜀)", () => {
+    expect(
+      decideStreakMilestone({ currentStreak: 47, reachedMilestones: [] })
+    ).toBe(40);
+  });
+
+  it("이미 40 달성 + 45일 → null (다음 50 미도달)", () => {
+    expect(
+      decideStreakMilestone({ currentStreak: 45, reachedMilestones: [10, 20, 30, 40] })
+    ).toBeNull();
+  });
+});
+
+describe("decideNewLow", () => {
+  it("역대 최저보다 낮음 → true (최저 경신마다 축하)", () => {
+    expect(decideNewLow({ weight: 79, prevMin: 80 })).toBe(true);
+  });
+
+  it("하강 구간(직전이 곧 최저)에도 매일 true (의도된 동작)", () => {
+    // 어제가 최저 80이고 오늘 79 → 여전히 갱신으로 축하
+    expect(decideNewLow({ weight: 79, prevMin: 80 })).toBe(true);
+  });
+
+  it("역대 최저와 같음(경계) → false", () => {
+    expect(decideNewLow({ weight: 80, prevMin: 80 })).toBe(false);
+  });
+
+  it("최저 위에 머무름 → false", () => {
+    expect(decideNewLow({ weight: 81, prevMin: 80 })).toBe(false);
+  });
+
+  it("체중 또는 이전 최저가 null → false (최초 기록은 갱신 아님)", () => {
+    expect(decideNewLow({ weight: null, prevMin: 80 })).toBe(false);
+    expect(decideNewLow({ weight: 79, prevMin: null })).toBe(false);
+  });
+});
+
+describe("decideEtaMilestone", () => {
+  it("예상 잔여일 null(투영 불가) → null", () => {
+    expect(
+      decideEtaMilestone({ daysToGoal: null, reachedThresholds: [] })
+    ).toBeNull();
+  });
+
+  it("40일 → null (30 임계 미진입)", () => {
+    expect(
+      decideEtaMilestone({ daysToGoal: 40, reachedThresholds: [] })
+    ).toBeNull();
+  });
+
+  it("25일 → 30 (30 임계 첫 진입)", () => {
+    expect(
+      decideEtaMilestone({ daysToGoal: 25, reachedThresholds: [] })
     ).toBe(30);
   });
 
-  it("백필로 120일 + 이력 없음 → 100 (최고만 인정, 중간 건너뜀)", () => {
+  it("10일 + 30 이미 축하 → 14 (다음 임계)", () => {
     expect(
-      decideStreakMilestone({ currentStreak: 120, reachedMilestones: [] })
-    ).toBe(100);
+      decideEtaMilestone({ daysToGoal: 10, reachedThresholds: [30] })
+    ).toBe(14);
   });
 
-  it("최고 마일스톤(365) 달성 후 더 길어져도 → null", () => {
+  it("한 번에 5일로 급락 + 이력 없음 → 30 (큰 것부터 한 단계씩)", () => {
     expect(
-      decideStreakMilestone({
-        currentStreak: 400,
-        reachedMilestones: [7, 30, 100, 200, 365],
-      })
+      decideEtaMilestone({ daysToGoal: 5, reachedThresholds: [] })
+    ).toBe(30);
+  });
+
+  it("5일 + 30·14 이미 축하 → 7 (마지막 임계)", () => {
+    expect(
+      decideEtaMilestone({ daysToGoal: 5, reachedThresholds: [30, 14] })
+    ).toBe(7);
+  });
+
+  it("모든 임계 축하 완료 → null", () => {
+    expect(
+      decideEtaMilestone({ daysToGoal: 3, reachedThresholds: [30, 14, 7] })
+    ).toBeNull();
+  });
+});
+
+describe("computeConsecutiveLossWeeks", () => {
+  it("연속 3주 감량(최신순) → 3", () => {
+    expect(computeConsecutiveLossWeeks([70, 71, 72, 73])).toBe(3);
+  });
+
+  it("최신 주가 증가 → 0", () => {
+    expect(computeConsecutiveLossWeeks([72, 71, 70])).toBe(0);
+  });
+
+  it("2주 감량 후 정체로 끊김 → 2", () => {
+    expect(computeConsecutiveLossWeeks([70, 71, 72, 72, 73])).toBe(2);
+  });
+
+  it("데이터 1개 이하 → 0", () => {
+    expect(computeConsecutiveLossWeeks([70])).toBe(0);
+    expect(computeConsecutiveLossWeeks([])).toBe(0);
+  });
+});
+
+describe("decideWeeklyLossMilestone", () => {
+  it("2주 미만 → null", () => {
+    expect(
+      decideWeeklyLossMilestone({ consecutiveLossWeeks: 1, reachedMilestones: [] })
+    ).toBeNull();
+  });
+
+  it("정확히 2주 → 2", () => {
+    expect(
+      decideWeeklyLossMilestone({ consecutiveLossWeeks: 2, reachedMilestones: [] })
+    ).toBe(2);
+  });
+
+  it("5주 + 2·4 달성 → null (다음 8 미도달)", () => {
+    expect(
+      decideWeeklyLossMilestone({ consecutiveLossWeeks: 5, reachedMilestones: [2, 4] })
+    ).toBeNull();
+  });
+
+  it("9주 + 2·4 달성 → 8", () => {
+    expect(
+      decideWeeklyLossMilestone({ consecutiveLossWeeks: 9, reachedMilestones: [2, 4] })
+    ).toBe(8);
+  });
+});
+
+describe("decideAnniversary", () => {
+  it("364일 → null", () => {
+    expect(decideAnniversary({ elapsedDays: 364, reachedYears: [] })).toBeNull();
+  });
+
+  it("365일 → 1 (1주년)", () => {
+    expect(decideAnniversary({ elapsedDays: 365, reachedYears: [] })).toBe(1);
+  });
+
+  it("400일 + 1주년 이미 축하 → null", () => {
+    expect(decideAnniversary({ elapsedDays: 400, reachedYears: [1] })).toBeNull();
+  });
+
+  it("730일 + 1주년만 축하 → 2 (2주년)", () => {
+    expect(decideAnniversary({ elapsedDays: 730, reachedYears: [1] })).toBe(2);
+  });
+});
+
+describe("decideBirthday", () => {
+  it("생일 미설정 → null", () => {
+    expect(
+      decideBirthday({ today: "2026-07-02", birthDate: null, reachedYears: [] })
+    ).toBeNull();
+  });
+
+  it("월-일 불일치 → null", () => {
+    expect(
+      decideBirthday({ today: "2026-07-02", birthDate: "1990-08-15", reachedYears: [] })
+    ).toBeNull();
+  });
+
+  it("월-일 일치(연도 무관) → 해당 연도", () => {
+    expect(
+      decideBirthday({ today: "2026-08-15", birthDate: "1990-08-15", reachedYears: [] })
+    ).toBe(2026);
+  });
+
+  it("올해 이미 축하 → null", () => {
+    expect(
+      decideBirthday({ today: "2026-08-15", birthDate: "1990-08-15", reachedYears: [2026] })
     ).toBeNull();
   });
 });

@@ -48,3 +48,6 @@ test-results/
 
 # 로컬 전용: 챕터 테스트 원복 스크립트 (개인 데이터 포함, 커밋 금지)
 /scripts/restore-chapter-test.mjs
+
+# 로컬 전용: 식단 일괄 수정 스크립트 (개인 데이터 포함, 커밋 금지)
+/scripts/bulk-update-meals.mjs

@@ -24,6 +24,7 @@ import { InputModal, type ItemKey } from "./input-modal";
 import { FeedbackArea } from "./feedback-area";
 import { FreeTextInput } from "./free-text-input";
 import type { DailyLog, DailyLogUpdate, ClearableField, GoalEvent } from "@/lib/types";
+import { milestoneToastMessage } from "@/lib/utils/milestone-toast";
 import { logStore } from "@/lib/stores/log-store";
 
 // 세리머니는 지연 로드 — 입력 탭 초기 진입 번들에 포함되지 않음
@@ -300,12 +301,7 @@ export function InputContainer() {
         setGoalToast("🎉 목표 체중 복귀! 다시 잘 버텼어요");
         setTimeout(() => setGoalToast(null), 4000);
       } else if (result.milestoneEvent) {
-        const m = result.milestoneEvent;
-        setGoalToast(
-          m.kind === "streak"
-            ? `🔥 ${m.streakDays}일 연속 기록! 꾸준함이 답이에요`
-            : `🎉 −${m.lostKg}kg 달성! 이 흐름 그대로 가요`
-        );
+        setGoalToast(milestoneToastMessage(result.milestoneEvent));
         setTimeout(() => setGoalToast(null), 4000);
       }
 

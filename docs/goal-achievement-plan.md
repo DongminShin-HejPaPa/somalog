@@ -57,6 +57,28 @@
 
 ---
 
+## ✅ 4단계 완료 (2026-07-02) — 이벤트 확장 (D-day 예측·역대최저·주간감량·기념일)
+
+마감 시점 판정 이벤트를 대폭 확장. 모두 `actionCloseDailyLog`(마감 액션)에서만 실행 — **탭/홈 진입 핫패스 미접촉**. 마감당 **하나만** 노출(다중 토스트 방지), 아래 우선순위로 먼저 걸리는 하나만 취함.
+
+**우선순위:** 목표 달성(세레머니) > 다이어트 N주년 > 생일 > D-day 예측 > 감량(−5kg) > N주 연속 감량 > 역대 최저 갱신 > 연속 기록(10일).
+
+| kind | 조건 | 저장(achievements.type) | 순수함수 |
+|------|------|------|------|
+| `anniversary` | 경과일 365 배수(1·2주년…) 첫 도달 | `anniversary_{days}` | `decideAnniversary` |
+| `birthday` | 마감일 월-일 == `settings.birthDate` (연 1회) | `birthday_{YYYY}` | `decideBirthday` |
+| `eta` | 예상 잔여일이 30/14/7일 임계 첫 진입 | `eta_{n}` | `decideEtaMilestone` |
+| `weeklyLoss` | 주평균 체중 N주 연속 감소(2/4/8/12) | `weeklyloss_{n}` | `decideWeeklyLossMilestone` + `computeConsecutiveLossWeeks` |
+| `lowest` | 역대 최저 경신마다(하강 구간엔 매일, 반복 가능) | (미저장) | `decideNewLow` |
+| `streak` | 연속 기록 **10일 단위**(10/20/30…)로 변경 | `streak_{n}` | `decideStreakMilestone` |
+
+- **D-day 예측 단일 소스:** `lib/utils/goal-projection.ts`의 `projectGoalEta()`를 그래프 탭 "목표까지 카드"(`weight-chart.tsx`)와 `detectEta`가 함께 사용 → 예상 도달일이 두 화면에서 절대 어긋나지 않음. 로직은 그래프 카드 기존 방식(전체 기간 평균 감량속도) 그대로.
+- **역대 최저(`lowest`):** 역대 최저를 경신할 때마다 축하(하강 구간엔 매일 — 사용자 요청) → 반복 가능하므로 DB 미저장. 이전까지의 최저 1행만 읽음.
+- **토스트 문구 통합:** `lib/utils/milestone-toast.ts`의 `milestoneToastMessage()`를 입력탭·홈탭이 공유.
+- **테스트:** 순수함수 유닛 대폭 추가(achievement-service 58 + goal-projection 5), 총 244 passed.
+
+---
+
 ## 🔜 남은 것 (선택)
 
 > **공통 제약:** 모든 후속 작업도 **앱 진입·탭 이동 속도 훼손 0** 원칙을 지킨다.

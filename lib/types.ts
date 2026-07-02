@@ -104,11 +104,21 @@ export interface GoalEvent {
 /**
  * 마일스톤 최초 도달 이벤트 — 작은 토스트.
  * - loss: 누적 감량 5kg 단위(5/10/15 …)
- * - streak: 연속 기록 N일(7/30/100 …)
+ * - streak: 연속 기록 N일(10일 단위 — 10/20/30 …)
+ * - lowest: 역대 최저 체중을 경신한 순간(경신마다, 반복 가능, 미저장)
+ * - eta: 예상 목표 도달 잔여일이 임계(30/14/7)에 처음 진입
+ * - weeklyLoss: 주평균 체중이 N주 연속 감소(2/4/8/12주)
+ * - anniversary: 다이어트 N주년(경과일 365 배수)
+ * - birthday: 생일 당일 마감
  */
 export type MilestoneEvent =
   | { kind: "loss"; lostKg: number }
-  | { kind: "streak"; streakDays: number };
+  | { kind: "streak"; streakDays: number }
+  | { kind: "lowest"; weight: number }
+  | { kind: "eta"; etaDays: number }
+  | { kind: "weeklyLoss"; weeks: number }
+  | { kind: "anniversary"; years: number; days: number }
+  | { kind: "birthday" };
 
 /** achievements 테이블 1행 */
 export interface Achievement {

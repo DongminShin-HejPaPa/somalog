@@ -64,8 +64,16 @@ export function HomeContent({ todayLog, recentLogs, cumulativeDay, onCloseToday,
   const currentChapterDay = settings.dietStartDate
     ? Math.max(getDayNumber(todayLog.date, settings.dietStartDate), 1)
     : todayLog.day;
-  // 이전 챕터가 있을 때만 명예의 전당 재진입 노출 (이미 계산된 cumulativeDay 활용 — 신규 쿼리 0)
-  const hasPriorChapters = cumulativeDay !== undefined && cumulativeDay > currentChapterDay;
+  // 이전 챕터 존재 판정은 "현재 챕터 시작일 < 최초 기록일" 인지로만 결정돼야 한다.
+  // cumulativeDay 는 실제 오늘(today) 기준으로 계산되므로(home-container), 비교 대상
+  // 챕터 일수도 반드시 오늘 기준이어야 정확히 일치한다. currentChapterDay 는 표시용이라
+  // shownLog 날짜(어제 미마감 로그일 수 있음) 기준이므로, 그대로 비교하면 오늘-어제
+  // 하루 차이만큼 부풀려져 완성한 챕터가 없어도 cumulativeDay > currentChapterDay 가
+  // 참이 되는 오탐이 발생한다.
+  const chapterDayAsOfToday = settings.dietStartDate
+    ? Math.max(getDayNumber(formatDate(new Date()), settings.dietStartDate), 1)
+    : currentChapterDay;
+  const hasPriorChapters = cumulativeDay !== undefined && cumulativeDay > chapterDayAsOfToday;
 
   return (
     <>
@@ -73,6 +81,7 @@ export function HomeContent({ todayLog, recentLogs, cumulativeDay, onCloseToday,
         date={todayLog.date}
         day={currentChapterDay}
         cumulativeDay={cumulativeDay}
+        hasPriorChapters={hasPriorChapters}
         currentWeight={todayLog.weight}
         fallbackWeight={fallbackWeight}
         startWeight={settings.startWeight}

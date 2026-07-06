@@ -5,6 +5,8 @@ interface DietProgressBannerProps {
   day: number;
   /** 첫 기록일부터의 누적 일수 — 이전 챕터가 있을 때만 보조로 표시 */
   cumulativeDay?: number;
+  /** 이전(종료) 챕터 존재 여부 — "총 N일째" 노출 조건. 홈에서 오늘 기준으로 정확히 계산해 전달 */
+  hasPriorChapters?: boolean;
   currentWeight: number | null;
   /** 오늘 체중 미입력 시 진행률 계산에 쓸 최근 기록 체중 */
   fallbackWeight?: number | null;
@@ -23,6 +25,7 @@ export function DietProgressBanner({
   date,
   day,
   cumulativeDay,
+  hasPriorChapters,
   currentWeight,
   fallbackWeight,
   startWeight,
@@ -70,7 +73,7 @@ export function DietProgressBanner({
         <div className="flex items-baseline gap-1.5">
           <span className="text-lg font-bold">{formatShortDate(date)}</span>
           <span className="text-sm font-normal text-muted-foreground">D+{day}</span>
-          {cumulativeDay !== undefined && cumulativeDay > day && (
+          {hasPriorChapters && cumulativeDay !== undefined && (
             <span className="text-xs font-normal text-muted-foreground/60">
               · 총 {cumulativeDay}일째
             </span>

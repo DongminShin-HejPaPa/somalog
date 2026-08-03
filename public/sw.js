@@ -76,6 +76,17 @@ self.addEventListener("fetch", (event) => {
   // PWA 콜드 진입에서도 HTML 이 SWR 경로로 들어가도록 보강.
   if (event.request.mode === "navigate" || event.request.destination === "document") {
     event.respondWith(staleWhileRevalidateHTML(event));
+
+    // 진입 탭 라우팅(app/layout.tsx 의 entry-route 스크립트)이 /home → /input 으로
+    // 문서를 바꿀 수 있다. /input 은 평소 바텀탭 <Link> 로만 가므로 RSC 로만 오가고
+    // 문서 요청이 없어 HTML_CACHE 에 **한 번도 안 담긴다** → 리다이렉트가 네트워크
+    // 왕복이 돼 진입이 느려진다. 홈 문서를 내줄 때마다 /input HTML 을 백그라운드로
+    // 데워, 리다이렉트 대상이 항상 캐시에서 즉시 나오게 한다.
+    // 응답을 이미 반환한 뒤 waitUntil 로 도는 작업이라 사용자 경로는 건드리지 않는다.
+    const path = new URL(event.request.url).pathname;
+    if (path === "/" || path === "/home") {
+      event.waitUntil(warmHtmlCache("/input"));
+    }
     return;
   }
 
@@ -130,6 +141,22 @@ async function makeCleanResponseForCache(response) {
     });
   } catch {
     return response.clone();
+  }
+}
+
+// 지정한 경로의 HTML 을 HTML_CACHE 에 채운다(백그라운드 전용).
+// 로그아웃 상태에서는 미들웨어가 /login 으로 307 을 내므로 response.redirected 로
+// 걸러, 로그인 HTML 이 /input 자리에 잘못 캐시되는 것을 막는다.
+async function warmHtmlCache(path) {
+  try {
+    const cacheKey = self.location.origin + path;
+    const response = await fetch(path, { credentials: "same-origin" });
+    if (!response || response.status !== 200 || response.redirected) return;
+    const cache = await caches.open(HTML_CACHE);
+    const clean = await makeCleanResponseForCache(response);
+    await cache.put(cacheKey, clean);
+  } catch {
+    // 오프라인 등 — 다음 진입에서 다시 시도
   }
 }
 

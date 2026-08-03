@@ -45,8 +45,22 @@ function addDays(dateStr: string, n: number): string {
 }
 
 export function InputContainer() {
-  const { settings } = useSettings();
+  const { settings, userId } = useSettings();
   const searchParams = useSearchParams();
+
+  // 진입 탭 라우팅(lib/utils/entry-route.ts) 때문에 입력 탭이 **콜드 문서 진입**의
+  // 착지점이 됐다. 그 경로에선 logStore 인메모리가 비어 있어 아래 init 이
+  // "No cache yet" 분기로 떨어지고 = 네트워크 왕복 + 스켈레톤. 홈 탭이 쓰는 것과
+  // 같은 영속 캐시를 useState 초기화에서 **동기로** 끌어와 첫 페인트를 보장한다.
+  // (탭 이동으로 들어온 경우엔 인메모리가 이미 차 있어 no-op)
+  useState(() => {
+    if (typeof window === "undefined" || !userId) return false;
+    try {
+      return logStore.hydrateFromHomeCache(userId);
+    } catch {
+      return false;
+    }
+  });
   const [currentDate, setCurrentDate] = useState<string>(formatDate(new Date()));
   const [currentLog, setCurrentLog] = useState<DailyLog | null>(null);
   const [isLoading, setIsLoading] = useState(true);

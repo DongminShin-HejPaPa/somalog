@@ -27,6 +27,8 @@ vi.stubGlobal("setTimeout", ((cb: () => void, ms?: number) => {
 import { logStore } from "@/lib/stores/log-store";
 import { mockDailyLog } from "@/tests/fixtures/mock-data";
 import type { DailyLog } from "@/lib/types";
+import { formatDate } from "@/lib/utils/date-utils";
+import { ENTRY_DATE_KEY, INPUT_DONE_KEY } from "@/lib/utils/entry-route";
 
 beforeEach(() => {
   memStorage.clear();
@@ -188,5 +190,89 @@ describe("LogStore - resetInMemory 부수효과 없음", () => {
 
     expect(logStore.getRecentLogs()).toBeNull();
     expect(readCacheKey("userA")).not.toBeNull();
+  });
+});
+
+describe("LogStore - 진입 탭 라우팅 연동 (입력 완료 플래그)", () => {
+  const today = formatDate(new Date());
+
+  it("오늘 로그 마감 시 입력 완료 플래그를 세운다", () => {
+    logStore.setLog(makeLog(today, { closed: true }));
+    expect(localStorage.getItem(INPUT_DONE_KEY)).toBe(today);
+  });
+
+  it("마감 취소(reopen) 시 플래그를 해제한다", () => {
+    logStore.setLog(makeLog(today, { closed: true }));
+    logStore.setLog(makeLog(today, { closed: false }));
+    expect(localStorage.getItem(INPUT_DONE_KEY)).toBeNull();
+  });
+
+  it("과거 날짜 로그 마감은 오늘 플래그에 영향을 주지 않는다", () => {
+    logStore.setLog(makeLog("2024-01-15", { closed: true }));
+    expect(localStorage.getItem(INPUT_DONE_KEY)).toBeNull();
+  });
+
+  it("setRecentLogs 로 오늘 로그가 들어와도 플래그가 반영된다", () => {
+    logStore.setRecentLogs([
+      makeLog("2024-01-15", { closed: true }),
+      makeLog(today, { closed: true }),
+    ]);
+    expect(localStorage.getItem(INPUT_DONE_KEY)).toBe(today);
+  });
+
+  it("로그아웃(next=null) 시 진입 판정 상태를 비운다", () => {
+    logStore.invalidateIfUserChanged("userA");
+    localStorage.setItem(ENTRY_DATE_KEY, today);
+    localStorage.setItem(INPUT_DONE_KEY, today);
+
+    logStore.invalidateIfUserChanged(null);
+
+    expect(localStorage.getItem(ENTRY_DATE_KEY)).toBeNull();
+    expect(localStorage.getItem(INPUT_DONE_KEY)).toBeNull();
+  });
+
+  it("cold start (prev=null) 에서는 진입 판정 상태를 건드리지 않는다", () => {
+    localStorage.setItem(ENTRY_DATE_KEY, today);
+
+    logStore.invalidateIfUserChanged("userA");
+
+    expect(localStorage.getItem(ENTRY_DATE_KEY)).toBe(today);
+  });
+});
+
+describe("LogStore - hydrateFromHomeCache (콜드 문서 진입 부팅)", () => {
+  const today = formatDate(new Date());
+
+  beforeEach(() => {
+    logStore.saveHomeCache("userA", [makeLog(today)], makeLog(today));
+    logStore.resetInMemory(); // 인메모리만 비움 = 콜드 문서 진입 재현
+  });
+
+  it("영속 캐시로 인메모리를 채운다", () => {
+    expect(logStore.getRecentLogs()).toBeNull();
+
+    expect(logStore.hydrateFromHomeCache("userA")).toBe(true);
+
+    expect(logStore.getRecentLogs()).toHaveLength(1);
+    expect(logStore.getLog(today)).not.toBeUndefined();
+  });
+
+  it("캐시 부팅은 stale 을 유지한다 — 소비자의 백그라운드 갱신이 반드시 돌아야 하므로", () => {
+    logStore.hydrateFromHomeCache("userA");
+    expect(logStore.isStale()).toBe(true);
+  });
+
+  it("대조군: 네트워크 fetch 경로(setRecentLogs)는 fresh 로 표시한다", () => {
+    logStore.setRecentLogs([makeLog(today)]);
+    expect(logStore.isStale()).toBe(false);
+  });
+
+  it("인메모리가 이미 차 있으면 no-op (탭 이동 경로)", () => {
+    logStore.setRecentLogs([makeLog(today)]);
+    expect(logStore.hydrateFromHomeCache("userA")).toBe(false);
+  });
+
+  it("캐시가 없으면 false", () => {
+    expect(logStore.hydrateFromHomeCache("userB")).toBe(false);
   });
 });

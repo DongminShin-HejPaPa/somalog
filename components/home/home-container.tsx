@@ -11,6 +11,7 @@ import { milestoneToastMessage } from "@/lib/utils/milestone-toast";
 import { useSettings } from "@/lib/contexts/settings-context";
 import type { DailyLog, GoalEvent, WeightPoint } from "@/lib/types";
 import { logStore } from "@/lib/stores/log-store";
+import { markHomeEntry } from "@/lib/utils/entry-route";
 
 const GoalCeremony = dynamic(
   () => import("@/components/celebration/goal-ceremony"),
@@ -58,6 +59,11 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
 
   useEffect(() => {
     const today = formatDate(new Date());
+
+    // 진입 탭 라우팅용 "오늘 홈에 접속함" 마킹 (lib/utils/entry-route.ts).
+    // 로그인 상태에서만 기록해, 비로그인 사용자가 다음 진입에 입력 탭으로
+    // 튕기는 일이 없게 한다. 다음 콜드 진입부터 "당일 첫 접속"이 아니게 된다.
+    if (userId) markHomeEntry();
 
     // 회귀 수정: bootCache 적중 시 logStore (메모리 싱글톤) 도 즉시 채운다.
     // 이게 없으면 사용자가 홈 마운트 직후 다른 탭으로 가면 logStore 캐시 미스 →

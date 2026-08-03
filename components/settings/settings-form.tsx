@@ -15,6 +15,7 @@ import { logout, deleteAccount } from "@/app/actions/auth-actions";
 import { AccountInfoDialog } from "./account-info-dialog";
 import { actionGetRecentDailyLogs } from "@/app/actions/log-actions";
 import { logStore } from "@/lib/stores/log-store";
+import { clearEntryRouteState } from "@/lib/utils/entry-route";
 import { computeRecommendedWater } from "@/lib/utils/compute-daily";
 import { NewChapterModal } from "@/components/chapter/new-chapter-modal";
 
@@ -1311,7 +1312,12 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
             </p>
             <div className="flex gap-2">
               <button
-                onClick={() => startTransition(() => logout())}
+                onClick={() => {
+                  // 진입 탭 판정 상태는 사용자 스코프가 없으므로 로그아웃 시 즉시 비운다.
+                  // (/login 은 (tabs) 레이아웃 밖이라 useUserCacheLifecycle 이 안 돌 수 있음)
+                  clearEntryRouteState();
+                  startTransition(() => logout());
+                }}
                 disabled={isPending}
                 className="flex-1 py-2.5 rounded-lg bg-navy text-white text-sm font-semibold min-h-[44px] disabled:opacity-50 transition-colors"
               >

@@ -84,6 +84,8 @@ interface SettingsContextValue {
   resetAllSettings: () => void;
   loadDemoSettings: () => void;
   isLoaded: boolean;
+  /** 현재 로그인 사용자 id — 탭 컨테이너가 영속 캐시(logStore) 키를 만들 때 사용 */
+  userId: string | null;
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
@@ -207,6 +209,7 @@ export function SettingsProvider({
         resetAllSettings,
         loadDemoSettings,
         isLoaded,
+        userId: uid,
       }}
     >
       {children}

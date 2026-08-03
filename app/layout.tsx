@@ -38,6 +38,57 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body className="bg-[#f8fafc] min-h-dvh">
+        {/*
+          진입 탭 라우팅 (홈 vs 입력). 규칙·근거는 lib/utils/entry-route.ts 참고.
+          - KST 당일 첫 접속이거나 오늘 입력이 완료됐으면 → 홈 (아무것도 안 함)
+          - 그 외에는 → /input
+
+          **next/script 를 쓰지 않고 raw <script> 를 body 최상단에 둔다.**
+          next/script 의 beforeInteractive 는 인라인 코드를 self.__next_s 큐에 넣어
+          Next 런타임(main-app 청크)이 로드된 뒤에야 실행한다 — 프레임워크 번들을
+          다 받고 나서 리다이렉트하면 이 기능의 존재 이유(속도)가 사라진다.
+          raw 인라인 스크립트는 HTML 파싱 시점에 동기 실행돼, body 콘텐츠·RSC 플라이트
+          스트림·하이드레이션 그 무엇보다 먼저 판정이 끝난다.
+
+          판정 비용은 localStorage 읽기 2회 — 네트워크 0회, Intl 0회.
+          "홈으로 간다" 경로는 조기 return 이라 기존 진입 속도와 완전히 동일하고,
+          "입력으로 간다" 경로만 location.replace 로 문서를 바꾸는데 그 /input HTML 은
+          sw.js 의 warmHtmlCache 가 미리 캐시에 채워둬 네트워크 없이 즉시 나온다.
+
+          ⚠️ 로직 변경 시 lib/utils/entry-route.ts 의 decideEntryRoute 도 같이 고칠 것.
+        */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+            (function () {
+              try {
+                var p = location.pathname;
+                if (p !== '/' && p !== '/home') return;
+
+                /* 새로고침은 '접속'이 아니다 — 홈에서 당겨서 새로고침 시 입력 탭으로 튕기지 않도록. */
+                var isReload = false;
+                try {
+                  var e = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
+                  isReload = e ? e.type === 'reload'
+                    : !!(performance.navigation && performance.navigation.type === 1);
+                } catch (_) {}
+                if (isReload) return;
+
+                /* KST(UTC+9) 오늘 — Intl 초기화 비용을 피하려고 산술로 계산 */
+                var k = new Date(Date.now() + 32400000);
+                var mo = k.getUTCMonth() + 1, dy = k.getUTCDate();
+                var today = k.getUTCFullYear() + '-' + (mo < 10 ? '0' : '') + mo + '-' + (dy < 10 ? '0' : '') + dy;
+
+                /* entry date 는 '인증된 홈 마운트'에서만 기록된다 → 값이 오늘이 아니면 당일 첫 접속 */
+                if (localStorage.getItem('somalog_entry_date') !== today) return;
+                if (localStorage.getItem('somalog_input_done_date') === today) return;
+
+                location.replace('/input');
+              } catch (_) {}
+            })();
+          `,
+          }}
+        />
         <div className="mx-auto max-w-[480px] min-h-dvh bg-white relative shadow-sm">
           {children}
         </div>

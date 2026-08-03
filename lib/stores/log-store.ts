@@ -3,6 +3,7 @@
 import type { DailyLog, WeeklyLog, WeightPoint } from "@/lib/types";
 import { perfLog } from "@/lib/utils/perf-log";
 import { formatDate } from "@/lib/utils/date-utils";
+import { clearEntryRouteState, syncInputDone } from "@/lib/utils/entry-route";
 
 const STALE_MS = 2 * 60 * 1000; // 2 minutes
 const HOME_CACHE_KEY_PREFIX = "somalog_home_v1:";
@@ -109,6 +110,8 @@ class LogStore {
     // (다음 cold reopen 시 stale 데이터 없이 바로 최신)
     this.persistGraphCacheIfReady();
     this.persistHomeCacheIfReady();
+    // 진입 탭 라우팅용 "입력 완료" 플래그 (마감 = 입력 완료).
+    syncInputDone(log.date, log.closed);
   }
 
   setLogs(logs: DailyLog[]) {
@@ -134,6 +137,8 @@ class LogStore {
     // home/graph 캐시도 자동 영속화 (recentLogs 갱신 시 home cache 의 recentLogs 도 같이)
     this.persistHomeCacheIfReady();
     this.persistGraphCacheIfReady();
+    const todayLog = this.cache.get(formatDate(new Date()));
+    if (todayLog) syncInputDone(todayLog.date, todayLog.closed);
   }
 
   getRecentLogs(): DailyLog[] | null {
@@ -239,11 +244,14 @@ class LogStore {
     }
     if (userId === null) {
       this.resetInMemory();
+      // 진입 판정 상태는 사용자별 스코프가 없으므로 로그아웃 시 반드시 비운다.
+      clearEntryRouteState();
       perfLog(`auth-resolved prev=${prev} next=null action=resetInMemory`);
       return;
     }
     if (prev !== userId) {
       this.resetInMemory();
+      clearEntryRouteState();
       perfLog(`auth-resolved prev=${prev} next=${userId} action=resetInMemory(userSwap)`);
       return;
     }
@@ -307,6 +315,27 @@ class LogStore {
     }
   }
 
+  /**
+   * 영속 홈 캐시로 **인메모리를 부팅**한다. 콜드 문서 진입(진입 탭 라우팅으로 /input 에
+   * 바로 떨어지는 경우)에서 스켈레톤을 없애는 용도.
+   *
+   * `setRecentLogs` 를 쓰지 않는 이유: 그건 lastFetchTime 을 now 로 찍어 `isStale()` 을
+   * false 로 만든다. 캐시 부팅은 네트워크 fetch 가 아니므로 lastFetchTime 을 건드리면
+   * 소비자의 백그라운드 갱신이 통째로 스킵돼 낡은 데이터가 그대로 남는다.
+   * 여기서는 lastFetchTime 을 0 으로 둬 "즉시 표시 + 반드시 백그라운드 갱신"을 보장한다.
+   *
+   * @returns 부팅이 실제로 일어났으면 true (이미 인메모리가 차 있거나 캐시가 없으면 false)
+   */
+  hydrateFromHomeCache(userId: string): boolean {
+    if (this.recentLogs) return false;
+    const cached = this.loadHomeCache(userId);
+    if (!cached) return false;
+    this.recentLogs = [...cached.recentLogs].sort((a, b) => b.date.localeCompare(a.date));
+    this.setLogs(cached.recentLogs);
+    if (cached.activeLog) this.cache.set(cached.activeLog.date, cached.activeLog);
+    return true;
+  }
+
   /** 특정 userId의 영구 캐시만 명시적으로 삭제. 계정 삭제 / 데이터 reset / 데모 로드에서 호출. */
   clearHomeCacheForUser(userId: string): void {
     if (typeof window === "undefined") return;
@@ -335,6 +364,7 @@ class LogStore {
       }
       keys.forEach((k) => localStorage.removeItem(k));
       localStorage.removeItem(LEGACY_HOME_CACHE_KEY);
+      clearEntryRouteState();
     } catch {
       // 무시
     }

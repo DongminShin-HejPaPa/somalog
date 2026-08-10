@@ -1,9 +1,15 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X, Trash2 } from "lucide-react";
+import { X, Trash2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useKeyboardOffset } from "@/lib/hooks/use-keyboard-offset";
+import { PresetChips } from "./preset-chips";
+import {
+  MAX_PRESETS_PER_FIELD,
+  canRegisterPreset,
+  togglePresetInText,
+} from "@/lib/utils/input-presets";
 import type { DailyLog, DailyLogUpdate, ClearableField, CustomFieldDef } from "@/lib/types";
 
 export type ItemKey =
@@ -22,6 +28,12 @@ interface InputModalProps {
   waterGoal: number;
   prevWeight: number | null;
   customFieldDef?: CustomFieldDef | null;
+  /** 현재 항목에 등록된 자주 쓰는 메뉴 (운동/아침/점심/저녁/야식) */
+  presets?: string[];
+  /** 저장한 입력값을 자주 쓰는 메뉴로 등록 */
+  onRegisterPreset?: (value: string) => void;
+  /** 등록된 자주 쓰는 메뉴 삭제 */
+  onDeletePreset?: (value: string) => void;
   isSaving?: boolean;
   onSave: (update: DailyLogUpdate) => void;
   onDelete: (field: ClearableField) => void;
@@ -114,12 +126,107 @@ function AlcoholToggle({
   );
 }
 
+/**
+ * 텍스트 입력 + "자주 쓰는 메뉴" 등록 체크박스(위) + 등록된 칩 목록(아래).
+ * 운동·아침·점심·저녁·야식이 공통으로 사용한다.
+ */
+function PresetTextField({
+  value,
+  onChange,
+  onEnter,
+  placeholder,
+  testId,
+  presets,
+  register,
+  onRegisterChange,
+  onDeletePreset,
+  disabled,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onEnter: () => void;
+  placeholder: string;
+  testId: string;
+  presets: string[];
+  register: boolean;
+  onRegisterChange: (v: boolean) => void;
+  onDeletePreset: (preset: string) => void;
+  disabled?: boolean;
+}) {
+  const isFull = presets.length >= MAX_PRESETS_PER_FIELD;
+  const alreadyRegistered = presets.includes(value.trim());
+  const registerable = canRegisterPreset(presets, value);
+
+  const label = alreadyRegistered
+    ? "이미 자주 쓰는 메뉴예요"
+    : isFull
+      ? `자주 쓰는 메뉴가 가득 찼어요 (최대 ${MAX_PRESETS_PER_FIELD}개)`
+      : "자주 이용하는 메뉴로 추가";
+
+  return (
+    <div className="space-y-2">
+      <button
+        type="button"
+        onClick={() => onRegisterChange(!register)}
+        disabled={disabled || !registerable}
+        data-testid="preset-register-check"
+        aria-pressed={register && registerable}
+        className={cn(
+          "flex items-center gap-1.5 text-[11px] transition-colors",
+          registerable && !disabled
+            ? "text-muted-foreground hover:text-navy"
+            : "text-muted-foreground/50 cursor-default"
+        )}
+      >
+        <span
+          className={cn(
+            "w-4 h-4 rounded border flex items-center justify-center shrink-0",
+            register && registerable
+              ? "bg-navy border-navy text-white"
+              : "bg-white border-border"
+          )}
+        >
+          {register && registerable && <Check className="w-3 h-3" />}
+        </span>
+        {label}
+        {registerable && (
+          <span className="text-muted-foreground/60">
+            ({presets.length}/{MAX_PRESETS_PER_FIELD})
+          </span>
+        )}
+      </button>
+
+      <input
+        type="text"
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && onEnter()}
+        autoFocus
+        data-testid={testId}
+        className="w-full px-4 py-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[52px]"
+      />
+
+      <PresetChips
+        presets={presets}
+        value={value}
+        onToggle={(preset) => onChange(togglePresetInText(value, preset))}
+        onDelete={onDeletePreset}
+        disabled={disabled}
+      />
+    </div>
+  );
+}
+
 export function InputModal({
   field,
   log,
   waterGoal,
   prevWeight,
   customFieldDef,
+  presets = [],
+  onRegisterPreset,
+  onDeletePreset,
   isSaving,
   onSave,
   onDelete,
@@ -131,6 +238,8 @@ export function InputModal({
   const [dinnerAlcohol, setDinnerAlcohol] = useState(false);
   const [lateSnackAlcohol, setLateSnackAlcohol] = useState(false);
   const [lateSnackConnected, setLateSnackConnected] = useState(false);
+  // "자주 이용하는 메뉴로 추가" 체크 상태 — 저장 시 프리셋으로 등록
+  const [registerPreset, setRegisterPreset] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
 
   const keyboardOffset = useKeyboardOffset();
@@ -138,6 +247,7 @@ export function InputModal({
   // Pre-fill existing values when modal opens
   useEffect(() => {
     if (!field) return;
+    setRegisterPreset(false);
     if (field === "weight") {
       setWeightValue(log.weight != null ? String(log.weight) : (prevWeight != null ? String(prevWeight) : "70"));
     } else if (field === "water") {
@@ -189,6 +299,13 @@ export function InputModal({
     onSave({ water: waterValue });
   };
 
+  /** 체크되어 있으면 저장 직전에 입력값을 자주 쓰는 메뉴로 등록 */
+  const registerIfChecked = (value: string) => {
+    if (!registerPreset) return;
+    if (!canRegisterPreset(presets, value)) return;
+    onRegisterPreset?.(value.trim());
+  };
+
   const handleExerciseSave = () => {
     const trimmed = textValue.trim();
     if (!trimmed) {
@@ -196,6 +313,7 @@ export function InputModal({
       else onClose();
       return;
     }
+    registerIfChecked(trimmed);
     onSave({ exercise: trimmed });
   };
 
@@ -206,6 +324,7 @@ export function InputModal({
       else onClose();
       return;
     }
+    registerIfChecked(trimmed);
     onSave({ [mealField]: trimmed } as DailyLogUpdate);
   };
 
@@ -216,6 +335,7 @@ export function InputModal({
       else onClose();
       return;
     }
+    registerIfChecked(trimmed);
     const update: DailyLogUpdate = { dinner: trimmed, dinnerAlcohol };
     if (lateSnackConnected) update.lateSnack = "저녁 식사 연결";
     onSave(update);
@@ -228,6 +348,7 @@ export function InputModal({
       else onClose();
       return;
     }
+    registerIfChecked(trimmed);
     onSave({ lateSnack: trimmed, lateSnackAlcohol });
   };
 
@@ -439,15 +560,17 @@ export function InputModal({
         {/* 운동 — 텍스트 입력 + 안 했음 */}
         {field === "exercise" && (
           <div className="space-y-3">
-            <input
-              type="text"
-              placeholder="예: 헬스 1시간, 줄넘기 30분, 산책"
+            <PresetTextField
               value={textValue}
-              onChange={(e) => setTextValue(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleExerciseSave()}
-              autoFocus
-              data-testid="modal-exercise-input"
-              className="w-full px-4 py-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[52px]"
+              onChange={setTextValue}
+              onEnter={handleExerciseSave}
+              placeholder="예: 헬스 1시간, 줄넘기 30분, 산책"
+              testId="modal-exercise-input"
+              presets={presets}
+              register={registerPreset}
+              onRegisterChange={setRegisterPreset}
+              onDeletePreset={(p) => onDeletePreset?.(p)}
+              disabled={isSaving}
             />
             <SaveButton onClick={handleExerciseSave} isSaving={isSaving} />
             <button
@@ -473,15 +596,17 @@ export function InputModal({
         {/* 아침 / 점심 */}
         {(field === "breakfast" || field === "lunch") && (
           <div className="space-y-3">
-            <input
-              type="text"
-              placeholder="예: 버섯크림파스타와 콜라ㅠㅠ, 한식 소식, 고칼로리 식단"
+            <PresetTextField
               value={textValue}
-              onChange={(e) => setTextValue(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleMealSave(field)}
-              autoFocus
-              data-testid="modal-meal-input"
-              className="w-full px-4 py-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[52px]"
+              onChange={setTextValue}
+              onEnter={() => handleMealSave(field)}
+              placeholder="예: 버섯크림파스타와 콜라ㅠㅠ, 한식 소식, 고칼로리 식단"
+              testId="modal-meal-input"
+              presets={presets}
+              register={registerPreset}
+              onRegisterChange={setRegisterPreset}
+              onDeletePreset={(p) => onDeletePreset?.(p)}
+              disabled={isSaving}
             />
             <SaveButton onClick={() => handleMealSave(field)} isSaving={isSaving} />
             <button
@@ -510,15 +635,17 @@ export function InputModal({
         {/* 저녁 — 텍스트 + 술 토글 + 야식 연결 */}
         {field === "dinner" && (
           <div className="space-y-3">
-            <input
-              type="text"
-              placeholder="예: 버섯크림파스타와 콜라ㅠㅠ, 한식 소식, 고칼로리 식단"
+            <PresetTextField
               value={textValue}
-              onChange={(e) => setTextValue(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleDinnerSave()}
-              autoFocus
-              data-testid="modal-meal-input"
-              className="w-full px-4 py-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[52px]"
+              onChange={setTextValue}
+              onEnter={handleDinnerSave}
+              placeholder="예: 버섯크림파스타와 콜라ㅠㅠ, 한식 소식, 고칼로리 식단"
+              testId="modal-meal-input"
+              presets={presets}
+              register={registerPreset}
+              onRegisterChange={setRegisterPreset}
+              onDeletePreset={(p) => onDeletePreset?.(p)}
+              disabled={isSaving}
             />
             <div className="flex gap-2">
               <SaveButton onClick={handleDinnerSave} isSaving={isSaving} className="flex-1 py-3" />
@@ -569,15 +696,17 @@ export function InputModal({
         {/* 야식 — 텍스트 + 술 토글 + 안 먹음 */}
         {field === "lateSnack" && (
           <div className="space-y-3">
-            <input
-              type="text"
-              placeholder="예: 치킨, 라면, 과자"
+            <PresetTextField
               value={textValue}
-              onChange={(e) => setTextValue(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleLateSnackSave()}
-              autoFocus
-              data-testid="modal-late-snack-input"
-              className="w-full px-4 py-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[52px]"
+              onChange={setTextValue}
+              onEnter={handleLateSnackSave}
+              placeholder="예: 치킨, 라면, 과자"
+              testId="modal-late-snack-input"
+              presets={presets}
+              register={registerPreset}
+              onRegisterChange={setRegisterPreset}
+              onDeletePreset={(p) => onDeletePreset?.(p)}
+              disabled={isSaving}
             />
             <div className="flex gap-2">
               <SaveButton onClick={handleLateSnackSave} isSaving={isSaving} className="flex-1 py-3" />

@@ -26,6 +26,12 @@ import { FreeTextInput } from "./free-text-input";
 import type { DailyLog, DailyLogUpdate, ClearableField, GoalEvent } from "@/lib/types";
 import { milestoneToastMessage } from "@/lib/utils/milestone-toast";
 import { logStore } from "@/lib/stores/log-store";
+import {
+  addPreset,
+  emptyInputPresets,
+  isPresetField,
+  removePreset,
+} from "@/lib/utils/input-presets";
 
 // 세리머니는 지연 로드 — 입력 탭 초기 진입 번들에 포함되지 않음
 const GoalCeremony = dynamic(
@@ -45,7 +51,7 @@ function addDays(dateStr: string, n: number): string {
 }
 
 export function InputContainer() {
-  const { settings, userId } = useSettings();
+  const { settings, userId, updateSettings } = useSettings();
   const searchParams = useSearchParams();
 
   // 진입 탭 라우팅(lib/utils/entry-route.ts) 때문에 입력 탭이 **콜드 문서 진입**의
@@ -242,6 +248,26 @@ export function InputContainer() {
   const handleChipClick = (field: ItemKey) => {
     if (currentLog?.closed) return;
     setModalField(field);
+  };
+
+  // ── 자주 쓰는 메뉴(프리셋) — 항목별로 따로 관리 ──
+  const allPresets = settings.inputPresets ?? emptyInputPresets();
+  const modalPresets =
+    modalField && isPresetField(modalField) ? allPresets[modalField] : [];
+
+  const writePresets = (next: string[]) => {
+    if (!modalField || !isPresetField(modalField)) return;
+    updateSettings({ inputPresets: { ...allPresets, [modalField]: next } });
+  };
+
+  const handleRegisterPreset = (value: string) => {
+    const next = addPreset(modalPresets, value);
+    if (next === modalPresets) return; // 공백·중복·개수초과
+    writePresets(next);
+  };
+
+  const handleDeletePreset = (value: string) => {
+    writePresets(removePreset(modalPresets, value));
   };
 
   const handleModalSave = async (update: DailyLogUpdate) => {
@@ -600,6 +626,9 @@ export function InputContainer() {
         waterGoal={settings.waterGoal}
         prevWeight={prevWeight ?? (settings.currentWeight > 0 ? settings.currentWeight : null)}
         customFieldDef={settings.customField}
+        presets={modalPresets}
+        onRegisterPreset={handleRegisterPreset}
+        onDeletePreset={handleDeletePreset}
         isSaving={isSaving}
         onSave={handleModalSave}
         onDelete={handleDelete}

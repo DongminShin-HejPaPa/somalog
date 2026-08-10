@@ -17,6 +17,12 @@ import { actionGetRecentDailyLogs } from "@/app/actions/log-actions";
 import { logStore } from "@/lib/stores/log-store";
 import { clearEntryRouteState } from "@/lib/utils/entry-route";
 import { computeRecommendedWater } from "@/lib/utils/compute-daily";
+import {
+  MAX_PRESETS_PER_FIELD,
+  PRESET_FIELDS,
+  PRESET_FIELD_LABELS,
+  emptyInputPresets,
+} from "@/lib/utils/input-presets";
 import { NewChapterModal } from "@/components/chapter/new-chapter-modal";
 
 type DialogState = "idle" | "confirm-reset" | "confirm-onboarding" | "confirm-demo" | "confirm-delete-custom-field" | "confirm-delete-account" | "confirm-delete-account-final";
@@ -150,15 +156,18 @@ function InputField({
   );
 }
 
-/** 루틴/코치스타일 추가 항목 리스트 — 추가/수정/삭제 지원 */
+/** 루틴/코치스타일/프리셋 추가 항목 리스트 — 추가/수정/삭제 지원 */
 function ExtraItemList({
   items,
   placeholder,
   onChange,
+  max,
 }: {
   items: string[];
   placeholder: string;
   onChange: (items: string[]) => void;
+  /** 최대 개수 — 도달하면 추가 버튼 대신 안내 문구 노출 */
+  max?: number;
 }) {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingValue, setEditingValue] = useState("");
@@ -189,8 +198,15 @@ function ExtraItemList({
   };
 
   const handleAddConfirm = () => {
-    if (!newValue.trim()) return;
-    onChange([...items, newValue.trim()]);
+    const trimmed = newValue.trim();
+    if (!trimmed) return;
+    if (max != null && items.length >= max) return;
+    if (items.includes(trimmed)) {
+      setIsAdding(false);
+      setNewValue("");
+      return;
+    }
+    onChange([...items, trimmed]);
     setIsAdding(false);
     setNewValue("");
   };
@@ -274,6 +290,10 @@ function ExtraItemList({
             취소
           </button>
         </div>
+      ) : max != null && items.length >= max ? (
+        <p className="text-xs text-muted-foreground mt-1">
+          최대 {max}개까지 등록할 수 있어요
+        </p>
       ) : (
         <button
           onClick={() => setIsAdding(true)}
@@ -974,7 +994,7 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
 
       <CategoryGroup
         title="입력 맞춤"
-        subtitle="매일 추적할 나만의 항목"
+        subtitle="자주 쓰는 메뉴 · 매일 추적할 나만의 항목"
         icon={<SlidersHorizontal className="w-4 h-4 text-emerald-600" />}
         open={openCats.input}
         onToggle={() => toggleCat("input")}
@@ -982,6 +1002,40 @@ export function SettingsForm({ isAdmin = false }: { isAdmin?: boolean }) {
         titleClass="text-emerald-700"
         iconWrapClass="bg-emerald-100"
       >
+
+      {/* 자주 쓰는 메뉴 */}
+      <Section title="자주 쓰는 메뉴">
+        <p className="text-xs text-muted-foreground mb-3">
+          운동·아침·점심·저녁·야식에서 자주 입력하는 내용을 항목별로 최대 {MAX_PRESETS_PER_FIELD}개까지
+          등록해두면, 입력창 아래 칩을 탭해 한 번에 채울 수 있어요. 입력 화면에서 저장할 때
+          체크해도 등록됩니다.
+        </p>
+        <div className="space-y-4">
+          {PRESET_FIELDS.map((f) => (
+            <div key={f}>
+              <p className="text-xs font-medium text-muted-foreground">
+                {PRESET_FIELD_LABELS[f]}
+                <span className="ml-1 text-muted-foreground/60">
+                  ({(form.inputPresets?.[f] ?? []).length}/{MAX_PRESETS_PER_FIELD})
+                </span>
+              </p>
+              <ExtraItemList
+                items={form.inputPresets?.[f] ?? []}
+                placeholder={
+                  f === "exercise" ? "예: 헬스 1시간" : "예: 닭가슴살 샐러드"
+                }
+                max={MAX_PRESETS_PER_FIELD}
+                onChange={(items) =>
+                  handleChange("inputPresets", {
+                    ...(form.inputPresets ?? emptyInputPresets()),
+                    [f]: items,
+                  })
+                }
+              />
+            </div>
+          ))}
+        </div>
+      </Section>
 
       {/* 맞춤 입력 */}
       <Section title="맞춤 입력" highlight={blinkOn}>

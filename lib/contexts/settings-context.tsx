@@ -11,6 +11,7 @@ import {
 import type { Settings, SettingsUpdate, SettingsInput } from "@/lib/types";
 import { mockSettings } from "@/lib/mock-data-new";
 import { logStore } from "@/lib/stores/log-store";
+import { emptyInputPresets, normalizeInputPresets } from "@/lib/utils/input-presets";
 import { useUserCacheLifecycle } from "@/lib/hooks/use-user-cache-lifecycle";
 import {
   actionGetSettings,
@@ -29,7 +30,8 @@ function readCachedSettings(userId: string | null): Settings | null {
     const parsed: Settings = JSON.parse(raw);
     // onboardingComplete=false 이면 초기/손상된 상태로 판단 → 무시
     if (!parsed.onboardingComplete) return null;
-    return parsed;
+    // 프리셋 추가 이전에 저장된 캐시에는 inputPresets 가 없다 → 항상 정규화해서 반환
+    return { ...parsed, inputPresets: normalizeInputPresets(parsed.inputPresets) };
   } catch {
     return null;
   }
@@ -70,6 +72,7 @@ export const DEFAULT_SETTINGS: Settings = {
   coachStylePreset: "strong",
   coachStyleExtra: [],
   customField: null,
+  inputPresets: emptyInputPresets(),
   mode: "losing",
   onboardingComplete: false,
   lastNoticeSeenAt: null,
@@ -170,7 +173,7 @@ export function SettingsProvider({
       setSettings(initialized);
       writeCachedSettings(initialized, uid);
     } catch {
-      const fallback: Settings = { ...data, customField: null, mode: "losing", onboardingComplete: true, lastNoticeSeenAt: null };
+      const fallback: Settings = { ...data, customField: null, inputPresets: emptyInputPresets(), mode: "losing", onboardingComplete: true, lastNoticeSeenAt: null };
       setSettings(fallback);
       writeCachedSettings(fallback, uid);
     }

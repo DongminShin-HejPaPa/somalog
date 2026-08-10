@@ -12,7 +12,7 @@ import type { InputPresets, PresetField } from "@/lib/types";
 export const MAX_PRESETS_PER_FIELD = 5;
 
 /** 프리셋 1개의 최대 글자 수 */
-export const MAX_PRESET_LENGTH = 30;
+export const MAX_PRESET_LENGTH = 60;
 
 /** 프리셋을 쓸 수 있는 입력 항목 */
 export const PRESET_FIELDS: PresetField[] = [

@@ -2,7 +2,7 @@ import { cache } from "react";
 import { revalidateTag } from "next/cache";
 import { getAuthUser } from "@/lib/supabase/server";
 import { createClient } from "@/lib/supabase/server";
-import type { Settings, SettingsInput, SettingsUpdate, CustomFieldDef } from "@/lib/types";
+import type { Settings, SettingsInput, SettingsUpdate, CustomFieldDef, InputPresets } from "@/lib/types";
 import { formatDate } from "@/lib/utils/date-utils";
 import { emptyInputPresets, normalizeInputPresets } from "@/lib/utils/input-presets";
 import { mockSettings } from "@/lib/mock-data-new";
@@ -146,6 +146,36 @@ export async function updateSettings(data: SettingsUpdate): Promise<Settings> {
 
   revalidateTag(`settings-${user.id}`);
   return rowToSettings(upserted as Record<string, unknown>);
+}
+
+/**
+ * 자주 쓰는 메뉴(프리셋)만 부분 갱신.
+ *
+ * 입력 탭에서 칩을 등록·삭제할 때마다 불리는 경로라 updateSettings(전체 행 read + upsert)
+ * 대신 input_presets 컬럼만 UPDATE 한다. 프리셋을 읽는 서버 컴포넌트가 없어
+ * revalidate 도 하지 않는다 — revalidatePath/Tag 는 클라이언트 라우터 캐시까지
+ * 통째로 비워서 프리셋 하나 등록할 때마다 탭 전환이 느려진다.
+ */
+export async function updateInputPresets(
+  presets: InputPresets
+): Promise<InputPresets> {
+  const user = await getAuthUser();
+  if (!user) throw new Error("Unauthorized");
+
+  const normalized = normalizeInputPresets(presets);
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("settings")
+    .update({ input_presets: normalized })
+    .eq("user_id", user.id)
+    .select("user_id")
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  // 설정 행이 아직 없으면 UPDATE 가 조용히 no-op 이 된다 → 전체 경로로 폴백해 행을 만든다
+  if (!data) await updateSettings({ inputPresets: normalized });
+
+  return normalized;
 }
 
 export async function initializeSettings(

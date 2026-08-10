@@ -41,3 +41,39 @@ if (isLoading) {
 
 ### 보류 사유
 사용자가 추가 테스트 10회에서 재현 안 됨. 발생 빈도 낮고 해법 단순. 다른 우선순위 작업 후 처리.
+
+---
+
+## [PRESET-REVALIDATE] ✅ 해결 — 프리셋 등록이 탭 전환 prefetch 를 통째로 버리던 문제
+
+### 증상
+"자주 쓰는 메뉴" 칩을 등록·삭제한 직후 홈/기록/그래프 탭으로 이동하면 첫 전환이 느려짐.
+
+### 원인
+입력 탭의 프리셋 등록이 `updateSettings()` → `actionUpdateSettings()` 를 타고 있었다.
+이 액션은 끝에서 `revalidatePath("/graph")` + `revalidatePath("/home")` 을 부른다.
+서버 액션 안의 `revalidatePath` 는 **클라이언트 라우터 캐시 전체를 무효화**하므로,
+`BottomNav` 의 `<Link prefetch>` 가 미리 받아둔 4개 탭 RSC 페이로드가 전부 버려지고
+다음 탭 이동이 서버 왕복이 된다.
+
+프리셋 하나 등록할 때 실제로 발생하던 비용:
+- settings 전체 read + 전체 컬럼 upsert (문자열 하나 저장하려고)
+- `revalidatePath` ×2 → 라우터 캐시 전체 무효화 + 현재 라우트 RSC 리프레시
+- 그 리프레시로 `(tabs)/layout` 재실행 → `getAuthUser()` + `after()` 의 `user_profiles` UPDATE
+
+이 기능 전에는 `actionUpdateSettings` 를 설정 화면에서만 불렀기 때문에 문제가 드러나지 않았다.
+입력 탭(최다 사용 화면)이 같은 경로를 타면서 영향 범위가 일상 흐름으로 넓어진 것.
+
+### 해결
+프리셋 전용 경량 경로를 분리했다.
+- `updateInputPresets()` (settings-service) — `input_presets` 컬럼만 UPDATE, revalidate 없음
+- `actionUpdateInputPresets()` — `revalidatePath` 호출 안 함
+- context 의 `updateInputPresets()` — 로컬 state 먼저 반영(낙관적), 서버 응답 대기 안 함
+
+프리셋을 읽는 서버 컴포넌트가 없어서 무효화할 캐시가 애초에 없다.
+회귀 방지 테스트: `settings-service.test.ts` TC-13 (`revalidateTag` 미호출 단언).
+
+### 남은 관련 사항
+`revalidateTag(\`settings-${userId}\`)` 는 소비자가 없다 (unstable_cache → React.cache 전환 이후 유실).
+지금은 라우터 캐시만 비우는 순수 비용. 제거 후보지만 `settings/chapters` 가
+서버에서 `getSettings()` 를 읽으므로 설정 변경 후 stale 가능성 검토가 먼저 필요.

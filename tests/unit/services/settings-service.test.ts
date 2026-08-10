@@ -14,10 +14,12 @@ vi.mock("next/cache", () => ({
   revalidateTag: vi.fn(),
 }));
 
+import { revalidateTag } from "next/cache";
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import {
   getSettings,
   updateSettings,
+  updateInputPresets,
   initializeSettings,
   resetSettings,
 } from "@/lib/services/settings-service";
@@ -28,6 +30,9 @@ function buildClient(opts: {
   singleError?: unknown;
   upsertSingleData?: unknown;
   upsertSingleError?: unknown;
+  /** update().eq().select().maybeSingle() 결과 — null 이면 "설정 행 없음" */
+  updateMaybeSingleData?: unknown;
+  updateError?: unknown;
 }) {
   const resolvedUser = opts.user !== undefined ? opts.user : mockUser;
   vi.mocked(getAuthUser).mockResolvedValue(resolvedUser as any);
@@ -50,13 +55,29 @@ function buildClient(opts: {
       error: opts.singleError ?? null,
     }),
   });
+  const updateMock = vi.fn().mockReturnValue({
+    eq: vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        maybeSingle: vi.fn().mockResolvedValue({
+          data:
+            opts.updateMaybeSingleData !== undefined
+              ? opts.updateMaybeSingleData
+              : { user_id: "test-user" },
+          error: opts.updateError ?? null,
+        }),
+      }),
+    }),
+  });
   const fromMock = vi.fn().mockReturnValue({
     select: selectMock,
     upsert: upsertMock,
+    update: updateMock,
     delete: deleteMock,
   });
   return {
     from: fromMock,
+    updateMock,
+    upsertMock,
   };
 }
 
@@ -145,6 +166,77 @@ describe("updateSettings", () => {
     vi.mocked(createClient).mockResolvedValue(mockClient as any);
 
     await expect(updateSettings({})).rejects.toThrow();
+  });
+});
+
+describe("updateInputPresets", () => {
+  const presets = {
+    exercise: ["헬스 1시간"],
+    breakfast: [],
+    lunch: [],
+    dinner: [],
+    lateSnack: [],
+  };
+
+  it("TC-11: 유저 없음 → Error throw", async () => {
+    const mockClient = buildClient({ user: null });
+    vi.mocked(createClient).mockResolvedValue(mockClient as any);
+
+    await expect(updateInputPresets(presets)).rejects.toThrow();
+  });
+
+  it("TC-12: 정상 호출 → input_presets 컬럼만 UPDATE (전체 upsert 아님)", async () => {
+    const mockClient = buildClient({});
+    vi.mocked(createClient).mockResolvedValue(mockClient as any);
+
+    const result = await updateInputPresets(presets);
+
+    expect(mockClient.updateMock).toHaveBeenCalledWith({
+      input_presets: presets,
+    });
+    expect(mockClient.upsertMock).not.toHaveBeenCalled();
+    expect(result.exercise).toEqual(["헬스 1시간"]);
+  });
+
+  it("TC-13: 탭 전환 prefetch 보존 — revalidate 하지 않는다", async () => {
+    const mockClient = buildClient({});
+    vi.mocked(createClient).mockResolvedValue(mockClient as any);
+
+    await updateInputPresets(presets);
+
+    expect(vi.mocked(revalidateTag)).not.toHaveBeenCalled();
+  });
+
+  it("TC-14: 저장 전 정규화 — 공백/중복/개수 초과 제거", async () => {
+    const mockClient = buildClient({});
+    vi.mocked(createClient).mockResolvedValue(mockClient as any);
+
+    const result = await updateInputPresets({
+      ...presets,
+      lunch: ["  샐러드  ", "샐러드", "", "닭가슴살"],
+    });
+
+    expect(result.lunch).toEqual(["샐러드", "닭가슴살"]);
+  });
+
+  it("TC-15: 설정 행 없음 → 전체 upsert 로 폴백해 행을 만든다", async () => {
+    const mockClient = buildClient({
+      updateMaybeSingleData: null,
+      singleData: mockSettingsRow,
+      upsertSingleData: mockSettingsRow,
+    });
+    vi.mocked(createClient).mockResolvedValue(mockClient as any);
+
+    await updateInputPresets(presets);
+
+    expect(mockClient.upsertMock).toHaveBeenCalled();
+  });
+
+  it("TC-16: UPDATE 에러 → Error throw", async () => {
+    const mockClient = buildClient({ updateError: { message: "DB error" } });
+    vi.mocked(createClient).mockResolvedValue(mockClient as any);
+
+    await expect(updateInputPresets(presets)).rejects.toThrow("DB error");
   });
 });
 

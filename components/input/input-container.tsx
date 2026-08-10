@@ -51,7 +51,7 @@ function addDays(dateStr: string, n: number): string {
 }
 
 export function InputContainer() {
-  const { settings, userId, updateSettings } = useSettings();
+  const { settings, userId, updateInputPresets } = useSettings();
   const searchParams = useSearchParams();
 
   // 진입 탭 라우팅(lib/utils/entry-route.ts) 때문에 입력 탭이 **콜드 문서 진입**의
@@ -257,7 +257,7 @@ export function InputContainer() {
 
   const writePresets = (next: string[]) => {
     if (!modalField || !isPresetField(modalField)) return;
-    updateSettings({ inputPresets: { ...allPresets, [modalField]: next } });
+    updateInputPresets({ ...allPresets, [modalField]: next });
   };
 
   const handleRegisterPreset = (value: string) => {

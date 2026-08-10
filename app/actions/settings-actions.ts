@@ -4,11 +4,12 @@ import { revalidatePath } from "next/cache";
 import {
   getSettings,
   updateSettings,
+  updateInputPresets,
   initializeSettings,
 } from "@/lib/services/settings-service";
 import { clearAllCustomFieldValues } from "@/lib/services/daily-log-service";
 import { deleteGoalAchievement } from "@/lib/services/achievement-service";
-import type { Settings, SettingsInput, SettingsUpdate } from "@/lib/types";
+import type { Settings, SettingsInput, SettingsUpdate, InputPresets } from "@/lib/types";
 
 export async function actionGetSettings(): Promise<Settings> {
   return getSettings();
@@ -28,6 +29,21 @@ export async function actionUpdateSettings(
   revalidatePath("/graph");
   revalidatePath("/home");
   return result;
+}
+
+/**
+ * 자주 쓰는 메뉴 전용 경량 저장.
+ * actionUpdateSettings 와 달리 revalidatePath 를 부르지 않는다 — 프리셋은 서버 컴포넌트가
+ * 읽지 않으므로 무효화할 캐시가 없고, 무효화하면 탭 전환 prefetch 만 버려진다.
+ */
+export async function actionUpdateInputPresets(
+  presets: InputPresets
+): Promise<InputPresets | null> {
+  try {
+    return await updateInputPresets(presets);
+  } catch {
+    return null;
+  }
 }
 
 export async function actionInitializeSettings(

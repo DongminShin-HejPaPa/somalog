@@ -8,7 +8,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import type { Settings, SettingsUpdate, SettingsInput } from "@/lib/types";
+import type { Settings, SettingsUpdate, SettingsInput, InputPresets } from "@/lib/types";
 import { mockSettings } from "@/lib/mock-data-new";
 import { logStore } from "@/lib/stores/log-store";
 import { emptyInputPresets, normalizeInputPresets } from "@/lib/utils/input-presets";
@@ -16,6 +16,7 @@ import { useUserCacheLifecycle } from "@/lib/hooks/use-user-cache-lifecycle";
 import {
   actionGetSettings,
   actionUpdateSettings,
+  actionUpdateInputPresets,
   actionInitializeSettings,
 } from "@/app/actions/settings-actions";
 
@@ -81,6 +82,8 @@ export const DEFAULT_SETTINGS: Settings = {
 interface SettingsContextValue {
   settings: Settings;
   updateSettings: (data: SettingsUpdate) => void;
+  /** 자주 쓰는 메뉴만 저장 — 라우터 캐시를 비우지 않는 경량 경로 */
+  updateInputPresets: (presets: InputPresets) => void;
   /** 서버에서 이미 갱신된 Settings를 추가 쓰기 없이 클라이언트 상태에만 반영 */
   syncSettings: (s: Settings) => void;
   initializeSettings: (data: SettingsInput) => void;
@@ -162,6 +165,23 @@ export function SettingsProvider({
     }
   }, [uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /**
+   * 프리셋 등록·삭제 전용. 칩 등록은 입력 저장에 딸린 부수 동작이라
+   * 로컬 state 를 먼저 반영하고 서버 응답은 기다리지 않는다.
+   */
+  const updateInputPresets = useCallback(async (presets: InputPresets) => {
+    setSettings((prev) => {
+      const next = { ...prev, inputPresets: presets };
+      if (next.onboardingComplete) writeCachedSettings(next, uid);
+      return next;
+    });
+    try {
+      await actionUpdateInputPresets(presets);
+    } catch {
+      // 실패해도 로컬 상태는 유지 — 다음 전체 로드 때 서버 값으로 수렴한다
+    }
+  }, [uid]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const syncSettings = useCallback((s: Settings) => {
     setSettings(s);
     if (s.onboardingComplete) writeCachedSettings(s, uid);
@@ -207,6 +227,7 @@ export function SettingsProvider({
       value={{
         settings,
         updateSettings,
+        updateInputPresets,
         syncSettings,
         initializeSettings,
         resetAllSettings,

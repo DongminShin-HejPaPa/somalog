@@ -27,6 +27,13 @@ export const mockSettings: Settings = {
   coachStylePreset: "balanced",
   coachStyleExtra: [],
   customField: null,
+  inputPresets: {
+    exercise: ["헬스 1시간", "저녁 산책 30분"],
+    breakfast: ["그릭요거트", "삶은 계란 2개"],
+    lunch: ["닭가슴살 샐러드", "현미밥 한공기"],
+    dinner: ["두부김치", "샐러드"],
+    lateSnack: ["방울토마토"],
+  },
   mode: "losing",
   onboardingComplete: true,
   lastNoticeSeenAt: null,

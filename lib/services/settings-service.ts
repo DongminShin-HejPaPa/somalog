@@ -4,6 +4,7 @@ import { getAuthUser } from "@/lib/supabase/server";
 import { createClient } from "@/lib/supabase/server";
 import type { Settings, SettingsInput, SettingsUpdate, CustomFieldDef } from "@/lib/types";
 import { formatDate } from "@/lib/utils/date-utils";
+import { emptyInputPresets, normalizeInputPresets } from "@/lib/utils/input-presets";
 import { mockSettings } from "@/lib/mock-data-new";
 
 export function createDefaultSettings(): Settings {
@@ -26,6 +27,7 @@ export function createDefaultSettings(): Settings {
     coachStylePreset: "strong",
     coachStyleExtra: [],
     customField: null,
+    inputPresets: emptyInputPresets(),
     mode: "losing",
     onboardingComplete: false,
     lastNoticeSeenAt: null,
@@ -62,6 +64,7 @@ function rowToSettings(row: Record<string, unknown>): Settings {
       "strong",
     coachStyleExtra: (row.coach_style_extra as string[]) ?? [],
     customField: (row.custom_field as CustomFieldDef | null) ?? null,
+    inputPresets: normalizeInputPresets(row.input_presets),
     mode: (row.mode as "losing" | "maintaining") ?? "losing",
     onboardingComplete: ((row.onboarding_complete as boolean) ?? false) || !!(row.diet_start_date as string),
     lastNoticeSeenAt: (row.last_notice_seen_at as string | null) ?? null,
@@ -93,11 +96,38 @@ function settingsToRow(
     coach_style_extra: s.coachStyleExtra,
     mode: "mode" in s ? s.mode : "losing",
     custom_field: "customField" in s ? s.customField : null,
+    input_presets: "inputPresets" in s ? normalizeInputPresets(s.inputPresets) : emptyInputPresets(),
     onboarding_complete:
       "onboardingComplete" in s ? s.onboardingComplete : false,
     last_notice_seen_at:
       "lastNoticeSeenAt" in s ? s.lastNoticeSeenAt : undefined,
   };
+}
+
+/**
+ * settings upsert — `input_presets` 컬럼 마이그레이션
+ * (20260810000000_add_input_presets.sql) 적용 전 배포를 견디기 위한 폴백 포함.
+ * 컬럼이 없다는 에러면 해당 필드를 빼고 1회 재시도한다(프리셋만 저장되지 않고 나머지는 정상 저장).
+ * 마이그레이션이 원격에 적용된 뒤에는 제거해도 된다.
+ */
+async function upsertSettingsRow(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  row: Record<string, unknown>
+) {
+  const first = await supabase
+    .from("settings")
+    .upsert(row, { onConflict: "user_id" })
+    .select()
+    .single();
+
+  if (!first.error || !first.error.message?.includes("input_presets")) return first;
+
+  const { input_presets: _omitted, ...withoutPresets } = row;
+  return supabase
+    .from("settings")
+    .upsert(withoutPresets, { onConflict: "user_id" })
+    .select()
+    .single();
 }
 
 /**
@@ -131,11 +161,7 @@ export async function updateSettings(data: SettingsUpdate): Promise<Settings> {
   const supabase = await createClient();
   const row = settingsToRow(merged, user.id);
 
-  const { data: upserted, error } = await supabase
-    .from("settings")
-    .upsert(row, { onConflict: "user_id" })
-    .select()
-    .single();
+  const { data: upserted, error } = await upsertSettingsRow(supabase, row);
 
   if (error || !upserted) throw new Error(error?.message ?? "upsert failed");
 
@@ -149,15 +175,11 @@ export async function initializeSettings(
   const user = await getAuthUser();
   if (!user) throw new Error("Unauthorized");
 
-  const full: Settings = { ...data, customField: null, mode: "losing", onboardingComplete: true, lastNoticeSeenAt: null };
+  const full: Settings = { ...data, customField: null, inputPresets: emptyInputPresets(), mode: "losing", onboardingComplete: true, lastNoticeSeenAt: null };
   const supabase = await createClient();
   const row = settingsToRow(full, user.id);
 
-  const { data: upserted, error } = await supabase
-    .from("settings")
-    .upsert(row, { onConflict: "user_id" })
-    .select()
-    .single();
+  const { data: upserted, error } = await upsertSettingsRow(supabase, row);
 
   if (error || !upserted) throw new Error(error?.message ?? "upsert failed");
 
@@ -181,8 +203,6 @@ export async function loadMockSettings(): Promise<void> {
   const supabase = await createClient();
   const row = settingsToRow(mockSettings, user.id);
 
-  await supabase
-    .from("settings")
-    .upsert(row, { onConflict: "user_id" });
+  await upsertSettingsRow(supabase, row);
   revalidateTag(`settings-${user.id}`);
 }

@@ -28,6 +28,7 @@ export const mockSettings: Settings = {
   coachStylePreset: "balanced",
   coachStyleExtra: [],
   customField: null,
+  inputPresets: { exercise: [], breakfast: [], lunch: [], dinner: [], lateSnack: [] },
   mode: "losing",
   onboardingComplete: true,
   lastNoticeSeenAt: null,

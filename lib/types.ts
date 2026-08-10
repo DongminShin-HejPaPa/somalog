@@ -4,6 +4,12 @@ export interface CustomFieldDef {
   options?: string[];          // 선택형일 경우 선택지 (최대 3개)
 }
 
+/** 프리셋(자주 쓰는 메뉴)을 등록할 수 있는 입력 항목 */
+export type PresetField = "exercise" | "breakfast" | "lunch" | "dinner" | "lateSnack";
+
+/** 항목별 자주 쓰는 메뉴 목록 (항목당 최대 5개) */
+export type InputPresets = Record<PresetField, string[]>;
+
 export interface DailyLog {
   date: string;
   day: number;
@@ -80,6 +86,7 @@ export interface Settings {
   coachStylePreset: "strong" | "balanced" | "empathy" | "data";
   coachStyleExtra: string[];
   customField: CustomFieldDef | null; // 맞춤 입력 필드 정의
+  inputPresets: InputPresets; // 항목별 자주 쓰는 메뉴 — 입력 모달에서 칩으로 노출
   mode: "losing" | "maintaining"; // 감량 모드 / (목표 달성 후) 유지 모드
   onboardingComplete: boolean;
   lastNoticeSeenAt: string | null; // ISO string — 마지막 공지 팝업 확인 시각
@@ -243,6 +250,6 @@ export type DailyLogUpdate = Partial<DailyLogInput>;
 /** 개별 삭제 가능한 필드 */
 export type ClearableField = "weight" | "water" | "exercise" | "breakfast" | "lunch" | "dinner" | "lateSnack" | "customFieldValue";
 
-export type SettingsInput = Omit<Settings, "onboardingComplete" | "lastNoticeSeenAt" | "customField" | "mode">;
+export type SettingsInput = Omit<Settings, "onboardingComplete" | "lastNoticeSeenAt" | "customField" | "inputPresets" | "mode">;
 
 export type SettingsUpdate = Partial<Settings>;

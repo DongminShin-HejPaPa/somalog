@@ -63,6 +63,12 @@ export const TEST_IDS = {
   MODAL_LATE_SNACK_N: "modal-late-snack-n",
   MODAL_ENERGY: (e: string) => `modal-energy-${e}`,
 
+  // ── Input Modal: 자주 쓰는 메뉴 프리셋 ──────────────────
+  PRESET_REGISTER_CHECK: "preset-register-check",
+  PRESET_CHIPS: "preset-chips",
+  PRESET_CHIP: (v: string) => `preset-chip-${v}`,
+  PRESET_CHIP_DELETE: (v: string) => `preset-chip-delete-${v}`,
+
   // ── Home Page ─────────────────────────────────────────
   HOME_COACH_ONELINER: "home-coach-oneliner",
   HOME_WEIGHT_DISPLAY: "home-weight-display",

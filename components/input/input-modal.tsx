@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { X, Trash2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useKeyboardOffset } from "@/lib/hooks/use-keyboard-offset";
+import { useModalFocusTrap } from "@/lib/hooks/use-modal-focus-trap";
 import { PresetChips } from "./preset-chips";
 import {
   MAX_PRESETS_PER_FIELD,
@@ -242,7 +243,12 @@ export function InputModal({
   const [registerPreset, setRegisterPreset] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
 
-  const keyboardOffset = useKeyboardOffset();
+  // 블루투스 키보드로 전환되면 소프트 키보드는 사라지고 액세서리 바만 남는다 —
+  // 하단 저장 버튼이 그 바에 가리지 않도록 최소 여백을 확보한다.
+  const keyboardOffset = useKeyboardOffset({ accessoryBarFloor: true });
+
+  // 액세서리 바의 이전/다음 필드 이동이 뒤 페이지 입력창으로 새는 것을 막는다.
+  useModalFocusTrap(overlayRef, field !== null);
 
   // Pre-fill existing values when modal opens
   useEffect(() => {
@@ -372,12 +378,28 @@ export function InputModal({
     <div
       ref={overlayRef}
       onClick={handleOverlayClick}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${label} 입력`}
       className="fixed inset-0 bg-black/40 z-[60] flex items-end justify-center"
     >
+      {/*
+        키보드 회피는 padding 이 아니라 transform 으로 처리한다.
+        패딩을 늘렸다 줄이면 키보드가 사라지는 순간 시트 높이가 통째로 바뀌면서
+        내용이 아래로 주저앉는다 (블루투스 키보드 전환 때 특히 눈에 띈다).
+        transform 은 레이아웃을 건드리지 않아 부드럽게 따라 움직인다.
+      */}
       <div
-        className="w-full max-w-[480px] bg-white rounded-t-2xl px-4 pt-4 animate-in slide-in-from-bottom-4"
-        style={{ paddingBottom: `${keyboardOffset + 32}px` }}
+        className="w-full max-w-[480px] transition-transform duration-200 ease-out will-change-transform"
+        style={{
+          transform: `translate3d(0, -${keyboardOffset}px, 0)`,
+          maxHeight: `calc(100dvh - ${keyboardOffset + 12}px)`,
+        }}
       >
+        <div
+          className="bg-white rounded-t-2xl px-4 pt-4 max-h-[inherit] overflow-y-auto overscroll-contain animate-in slide-in-from-bottom-4"
+          style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 24px)" }}
+        >
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-semibold">{label} 입력</h3>
@@ -791,6 +813,7 @@ export function InputModal({
           </div>
         )}
 
+        </div>
       </div>
     </div>
   );

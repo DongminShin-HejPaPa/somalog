@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useActionState } from "react";
+import { useState, useEffect, useActionState, useRef } from "react";
 import { X } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 import { updateAccountInfo, type AccountInfoState } from "@/app/actions/account-actions";
 import { useKeyboardOffset } from "@/lib/hooks/use-keyboard-offset";
+import { useModalFocusTrap } from "@/lib/hooks/use-modal-focus-trap";
 
 interface Props {
   isOpen: boolean;
@@ -15,7 +16,12 @@ const initial: AccountInfoState = {};
 
 export function AccountInfoDialog({ isOpen, onClose }: Props) {
   const [state, formAction, isPending] = useActionState(updateAccountInfo, initial);
-  const keyboardOffset = useKeyboardOffset();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // 블루투스 키보드 전환 시 남는 액세서리 바만큼 최소 여백 확보
+  const keyboardOffset = useKeyboardOffset({ accessoryBarFloor: true });
+
+  // 액세서리 바의 이전/다음 필드 이동이 뒤 페이지로 새지 않도록 포커스를 가둔다.
+  useModalFocusTrap(dialogRef, isOpen);
 
   // 현재 유저 정보 (초기값)
   const [currentName, setCurrentName] = useState("");
@@ -57,7 +63,7 @@ export function AccountInfoDialog({ isOpen, onClose }: Props) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col justify-end">
+    <div ref={dialogRef} className="fixed inset-0 z-[60] flex flex-col justify-end">
       {/* 백드롭 */}
       <div
         className="absolute inset-0 bg-black/40"
@@ -65,10 +71,15 @@ export function AccountInfoDialog({ isOpen, onClose }: Props) {
         aria-hidden="true"
       />
 
-      {/* 바텀 시트 — marginBottom으로 키보드 위로 밀어올림 */}
+      {/* 바텀 시트 — transform 으로 키보드 위로 밀어올린다.
+          (margin/padding 을 쓰면 키보드가 사라지는 순간 레이아웃이 통째로 바뀌어
+           시트가 아래로 주저앉는다) */}
       <div
-        className="relative bg-white rounded-t-2xl max-h-[90dvh] flex flex-col shadow-xl"
-        style={{ marginBottom: keyboardOffset }}
+        className="relative bg-white rounded-t-2xl flex flex-col shadow-xl transition-transform duration-200 ease-out will-change-transform"
+        style={{
+          transform: `translate3d(0, -${keyboardOffset}px, 0)`,
+          maxHeight: `calc(100dvh - ${keyboardOffset + 24}px)`,
+        }}
       >
         {/* 헤더 */}
         <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-border shrink-0">

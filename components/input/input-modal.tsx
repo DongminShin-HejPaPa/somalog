@@ -250,9 +250,34 @@ export function InputModal({
   // 액세서리 바의 이전/다음 필드 이동이 뒤 페이지 입력창으로 새는 것을 막는다.
   useModalFocusTrap(overlayRef, field !== null);
 
-  // Pre-fill existing values when modal opens
+  // 초기값 계산에만 쓰는 최신 스냅샷 — 렌더마다 갱신하되 prefill 을 다시 돌리진 않는다.
+  const logRef = useRef(log);
+  logRef.current = log;
+  const prevWeightRef = useRef(prevWeight);
+  prevWeightRef.current = prevWeight;
+  const waterGoalRef = useRef(waterGoal);
+  waterGoalRef.current = waterGoal;
+  // 어떤 항목으로 prefill 을 끝냈는지 — 같은 항목에 두 번 채우지 않기 위한 표식
+  const prefilledField = useRef<ItemKey | null>(null);
+
+  // 모달이 "열리는 순간"에만 기존 값을 채운다.
+  //
+  // log 를 의존성에 두면, 앞 항목 저장의 서버 응답이 도착해 log 객체가 교체되는
+  // 순간 이 effect 가 다시 돌면서 사용자가 지금 타이핑 중인 다음 항목의 입력을
+  // DB 값(대개 빈 값)으로 덮어써 버린다. 열림 시점 한 번만 채우고, 이후 log 변경은
+  // 무시한다.
   useEffect(() => {
-    if (!field) return;
+    if (!field) {
+      prefilledField.current = null;
+      return;
+    }
+    if (prefilledField.current === field) return;
+    prefilledField.current = field;
+
+    const log = logRef.current;
+    const prevWeight = prevWeightRef.current;
+    const waterGoal = waterGoalRef.current;
+
     setRegisterPreset(false);
     if (field === "weight") {
       setWeightValue(log.weight != null ? String(log.weight) : (prevWeight != null ? String(prevWeight) : "70"));
@@ -276,7 +301,7 @@ export function InputModal({
     } else if (field === "customFieldValue") {
       setTextValue(log.customFieldValue ?? "");
     }
-  }, [field, log]);
+  }, [field]);
 
   if (!field) return null;
 

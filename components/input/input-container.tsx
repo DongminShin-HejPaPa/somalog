@@ -100,6 +100,10 @@ export function InputContainer() {
 
   const hasSavedRef = useRef(false);
 
+  // 저장 순번 — 연속으로 입력할 때 먼저 보낸 저장의 응답이 나중에 도착해
+  // 그 사이에 반영된 최신 값을 되돌리는 것을 막는다. (뒤늦은 응답은 버린다)
+  const saveSeqRef = useRef(0);
+
   const updateCache = useCallback((log: DailyLog) => {
     logStore.setLog(log);
   }, []);
@@ -277,8 +281,11 @@ export function InputContainer() {
     setModalField(null);
 
     hasSavedRef.current = true;
+    const seq = ++saveSeqRef.current;
     try {
       const updated = await actionUpsertDailyLog(currentDate, update);
+      // 이미 다음 저장이 진행 중이면 이 응답은 낡은 스냅샷 — 화면·캐시를 되돌리지 않는다.
+      if (seq !== saveSeqRef.current) return;
       setCurrentLog(updated);
       updateCache(updated);
       setAllLogs((prev) => {
@@ -287,6 +294,7 @@ export function InputContainer() {
         return [...prev, updated].sort((a, b) => b.date.localeCompare(a.date));
       });
     } catch {
+      if (seq !== saveSeqRef.current) return;
       setCurrentLog(previousLog);
       autoCloseFiredRef.current = false;
       setSaveError("저장에 실패했습니다. 다시 시도해주세요.");
@@ -307,13 +315,15 @@ export function InputContainer() {
     setCurrentLog(currentLog ? { ...currentLog, [field]: null } as DailyLog : null);
     setModalField(null);
     hasSavedRef.current = true;
+    const seq = ++saveSeqRef.current;
     try {
       const updated = await actionClearDailyLogField(currentDate, field);
-      if (updated) {
+      if (updated && seq === saveSeqRef.current) {
         setCurrentLog(updated);
         updateCache(updated);
       }
     } catch {
+      if (seq !== saveSeqRef.current) return;
       setCurrentLog(previousLog);
       setSaveError("삭제에 실패했습니다. 다시 시도해주세요.");
       setTimeout(() => setSaveError(null), 4000);
@@ -324,6 +334,8 @@ export function InputContainer() {
     if (!currentLog || isClosing) return;
     setIsClosing(true);
     setCloseError(null);
+    // 아직 도착하지 않은 저장 응답이 마감 결과를 덮어쓰지 않도록 순번을 올린다.
+    saveSeqRef.current += 1;
     try {
       const result = await actionCloseDailyLog(currentDate, currentLog ?? undefined);
       const updated = result.log;
@@ -389,7 +401,9 @@ export function InputContainer() {
         }
       );
       if (Object.keys(update).length > 0) {
+        const seq = ++saveSeqRef.current;
         const updated = await actionUpsertDailyLog(currentDate, update);
+        if (seq !== saveSeqRef.current) return;
         setCurrentLog(updated);
         updateCache(updated);
       }

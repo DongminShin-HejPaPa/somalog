@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { isIOSWebKit } from "@/lib/utils/platform";
 
 /**
  * 블루투스(하드웨어) 키보드가 연결되면 소프트 키보드는 사라지지만
@@ -11,6 +12,9 @@ interface KeyboardOffsetOptions {
   /**
    * 소프트 키보드가 내려가도 액세서리 바만큼 최소 여백을 유지한다.
    * 하단 버튼이 바에 가리면 안 되는 바텀 시트에서만 켠다.
+   * (iOS 전용 보정 — 안드로이드는 액세서리 바가 없고, 브라우저에 따라
+   *  키보드가 레이아웃 뷰포트를 줄여 offset 이 0 으로 측정되기 때문에
+   *  여기서 최소 여백을 잡으면 하단에 빈 공간만 생긴다)
    */
   accessoryBarFloor?: boolean;
 }
@@ -45,9 +49,8 @@ export function useKeyboardOffset(options?: KeyboardOffsetOptions): number {
     const vv = window.visualViewport;
     if (!vv) return;
 
-    // 데스크톱처럼 소프트 키보드가 없는 환경에서 최소 여백을 잡으면 시트가 떠 보인다.
-    const coarsePointer = window.matchMedia?.("(pointer: coarse)").matches ?? false;
-    const useFloor = accessoryBarFloor && coarsePointer;
+    // 액세서리 바는 iOS 에만 있다 — 다른 환경에서 여백을 잡으면 시트가 떠 보인다.
+    const useFloor = accessoryBarFloor && isIOSWebKit();
 
     let raf = 0;
     let current = -1;

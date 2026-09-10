@@ -1,4 +1,5 @@
 import { useEffect, useRef, type RefObject } from "react";
+import { isIOSWebKit } from "@/lib/utils/platform";
 
 /** setSelectionRange 를 지원하는 입력 타입 (number·range 등은 예외를 던진다) */
 const SELECTABLE_TYPES = new Set(["text", "search", "url", "tel", "password", ""]);
@@ -40,6 +41,9 @@ export function useCaretSync(ref: RefObject<HTMLElement | null>, settleMs = 280)
   const lastRefocus = useRef(0);
 
   const schedule = () => {
+    // iOS(WebKit) 전용 보정 — 다른 환경에서는 커서가 정상이고, blur/focus 는
+    // 안드로이드에서 키보드를 닫아버리므로 아무것도 하지 않는다.
+    if (!isIOSWebKit()) return;
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       timer.current = null;
@@ -93,6 +97,8 @@ export function useCaretSync(ref: RefObject<HTMLElement | null>, settleMs = 280)
   });
 
   useEffect(() => {
+    // iOS 가 아니면 리스너도 달지 않는다 (불필요한 비용 0).
+    if (!isIOSWebKit()) return;
     const trigger = () => scheduleRef.current();
     const onCompositionStart = () => {
       composing.current = true;

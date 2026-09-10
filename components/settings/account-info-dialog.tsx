@@ -6,6 +6,7 @@ import { createBrowserClient } from "@supabase/ssr";
 import { updateAccountInfo, type AccountInfoState } from "@/app/actions/account-actions";
 import { useKeyboardOffset } from "@/lib/hooks/use-keyboard-offset";
 import { useModalFocusTrap } from "@/lib/hooks/use-modal-focus-trap";
+import { useCaretSync } from "@/lib/hooks/use-caret-sync";
 
 interface Props {
   isOpen: boolean;
@@ -22,6 +23,9 @@ export function AccountInfoDialog({ isOpen, onClose }: Props) {
 
   // 액세서리 바의 이전/다음 필드 이동이 뒤 페이지로 새지 않도록 포커스를 가둔다.
   useModalFocusTrap(dialogRef, isOpen);
+
+  // 시트가 움직였을 때 iOS 커서 좌표가 어긋나는 것을 보정한다.
+  useCaretSync(dialogRef);
 
   // 현재 유저 정보 (초기값)
   const [currentName, setCurrentName] = useState("");
@@ -71,14 +75,14 @@ export function AccountInfoDialog({ isOpen, onClose }: Props) {
         aria-hidden="true"
       />
 
-      {/* 바텀 시트 — transform 으로 키보드 위로 밀어올린다.
-          (margin/padding 을 쓰면 키보드가 사라지는 순간 레이아웃이 통째로 바뀌어
-           시트가 아래로 주저앉는다) */}
+      {/* 바텀 시트 — 바닥은 화면에 붙인 채 키보드 높이만큼 아래 여백만 확보한다.
+          (transform 으로 띄우면 뒤 화면이 비치고, 편집 중인 입력창 위에 합성
+           레이어가 생겨 iOS 커서 좌표가 어긋난다) */}
       <div
-        className="relative bg-white rounded-t-2xl flex flex-col shadow-xl transition-transform duration-200 ease-out will-change-transform"
+        className="relative bg-white rounded-t-2xl flex flex-col shadow-xl"
         style={{
-          transform: `translate3d(0, -${keyboardOffset}px, 0)`,
-          maxHeight: `calc(100dvh - ${keyboardOffset + 24}px)`,
+          paddingBottom: `${keyboardOffset}px`,
+          maxHeight: "100dvh",
         }}
       >
         {/* 헤더 */}

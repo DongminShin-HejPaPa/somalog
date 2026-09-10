@@ -5,6 +5,7 @@ import { X, Trash2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useKeyboardOffset } from "@/lib/hooks/use-keyboard-offset";
 import { useModalFocusTrap } from "@/lib/hooks/use-modal-focus-trap";
+import { useCaretSync } from "@/lib/hooks/use-caret-sync";
 import { PresetChips } from "./preset-chips";
 import {
   MAX_PRESETS_PER_FIELD,
@@ -250,6 +251,9 @@ export function InputModal({
   // 액세서리 바의 이전/다음 필드 이동이 뒤 페이지 입력창으로 새는 것을 막는다.
   useModalFocusTrap(overlayRef, field !== null);
 
+  // 시트가 움직이면 iOS 는 커서(캐럿) 좌표를 따라 옮기지 않는다 — 강제로 재동기화.
+  useCaretSync(overlayRef);
+
   // 초기값 계산에만 쓰는 최신 스냅샷 — 렌더마다 갱신하되 prefill 을 다시 돌리진 않는다.
   const logRef = useRef(log);
   logRef.current = log;
@@ -409,21 +413,22 @@ export function InputModal({
       className="fixed inset-0 bg-black/40 z-[60] flex items-end justify-center"
     >
       {/*
-        키보드 회피는 padding 이 아니라 transform 으로 처리한다.
-        패딩을 늘렸다 줄이면 키보드가 사라지는 순간 시트 높이가 통째로 바뀌면서
-        내용이 아래로 주저앉는다 (블루투스 키보드 전환 때 특히 눈에 띈다).
-        transform 은 레이아웃을 건드리지 않아 부드럽게 따라 움직인다.
+        키보드 회피 — 시트를 transform 으로 띄우지 않는다.
+        띄우면 (1) 시트 아래로 뒤 화면이 비쳐 보이고, (2) 편집 중인 입력창 위에
+        합성 레이어가 생겨 iOS 커서 좌표가 더 잘 어긋난다.
+        대신 시트 바닥은 화면 바닥에 붙인 채, 키보드 높이만큼 아래쪽 여백만 확보해
+        내용이 키보드 위에 오게 한다. (스크롤 영역은 그 위에서 따로 높이를 잡는다)
       */}
       <div
-        className="w-full max-w-[480px] transition-transform duration-200 ease-out will-change-transform"
-        style={{
-          transform: `translate3d(0, -${keyboardOffset}px, 0)`,
-          maxHeight: `calc(100dvh - ${keyboardOffset + 12}px)`,
-        }}
+        className="w-full max-w-[480px] bg-white rounded-t-2xl animate-in slide-in-from-bottom-4"
+        style={{ paddingBottom: `${keyboardOffset}px` }}
       >
         <div
-          className="bg-white rounded-t-2xl px-4 pt-4 max-h-[inherit] overflow-y-auto overscroll-contain animate-in slide-in-from-bottom-4"
-          style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 24px)" }}
+          className="px-4 pt-4 overflow-y-auto overscroll-contain"
+          style={{
+            maxHeight: `calc(100dvh - ${keyboardOffset + 12}px)`,
+            paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 24px)",
+          }}
         >
         {/* Header */}
         <div className="flex items-center justify-between mb-4">

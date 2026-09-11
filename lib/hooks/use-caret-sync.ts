@@ -71,11 +71,13 @@ export function useCaretSync(ref: RefObject<HTMLElement | null>, settleMs = 280)
 
       // 하드웨어 키보드일 때는 blur/focus 가 화면에 아무 흔적을 남기지 않는다
       // (소프트 키보드가 없으니 열고 닫는 애니메이션이 없다) — 가장 확실한 재동기화.
+      // preventScroll 은 쓰지 않는다: WebKit 이 포커스 요소를 화면에 맞추는 그
+      // 스크롤이 커서 좌표를 다시 계산시키는 장치이기 때문이다.
       const now = Date.now();
       if (!softKeyboardUp() && now - lastRefocus.current > 1000) {
         lastRefocus.current = now;
         el.blur();
-        el.focus({ preventScroll: true });
+        el.focus();
       }
       try {
         // 같은 값으로 다시 지정하면 무시될 수 있어 한 번 흔들었다가 되돌린다.
@@ -84,6 +86,8 @@ export function useCaretSync(ref: RefObject<HTMLElement | null>, settleMs = 280)
       } catch {
         /* 선택을 지원하지 않는 입력 — 무시 */
       }
+      // 스크롤로 위치가 갱신되면 WebKit 이 선택 영역 좌표를 다시 보낸다.
+      el.scrollIntoView({ block: "nearest" });
     }, settleMs);
   };
 

@@ -244,9 +244,16 @@ export function InputModal({
   const [registerPreset, setRegisterPreset] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
 
-  // 블루투스 키보드로 전환되면 소프트 키보드는 사라지고 액세서리 바만 남는다 —
-  // 하단 저장 버튼이 그 바에 가리지 않도록 최소 여백을 확보한다.
-  const keyboardOffset = useKeyboardOffset({ accessoryBarFloor: true });
+  // 텍스트 입력이 있는 항목만 액세서리 바 높이를 미리 비워 둔다.
+  // (수분·선택형 맞춤 항목은 입력창이 없어 키보드가 뜨지 않는다)
+  const hasTextEntry =
+    field != null &&
+    field !== "water" &&
+    !(field === "customFieldValue" && customFieldDef?.type !== "text");
+
+  // 시트가 열리는 첫 렌더부터 바 높이만큼 비워 둬서, 포커스가 들어온 뒤에
+  // 레이아웃이 움직이지 않게 한다 — iOS 커서가 어긋나는 원인을 없앤다.
+  const keyboardOffset = useKeyboardOffset({ accessoryBarFloor: hasTextEntry });
 
   // 액세서리 바의 이전/다음 필드 이동이 뒤 페이지 입력창으로 새는 것을 막는다.
   useModalFocusTrap(overlayRef, field !== null);

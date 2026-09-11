@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { isIOSWebKit } from "@/lib/utils/platform";
 
 /**
@@ -12,8 +12,12 @@ import { isIOSWebKit } from "@/lib/utils/platform";
  */
 const BAR_RESERVE = 88;
 
-/** 이 이상 벌어지면 소프트 키보드로 본다 (액세서리 바는 이보다 훨씬 낮다) */
-const SOFT_KEYBOARD_MIN = 160;
+/**
+ * 이 이상 벌어지면 소프트 키보드로 본다.
+ * 액세서리 바는 후보줄이 붙어도 ~120px 안쪽이고, 소프트 키보드는 세로 290px 이상
+ * (가로에서도 160px 이상)이라 그 사이에서 자른다.
+ */
+const SOFT_KEYBOARD_MIN = 140;
 
 const INSET_STORAGE_KEY = "somalog:hwKeyboardInset";
 
@@ -63,10 +67,13 @@ export function useKeyboardOffset(options?: KeyboardOffsetOptions): number {
 
   // 예약 높이는 렌더 중에 동기로 결정한다. 측정(effect)까지 기다리면 시트가
   // 이미 포커스를 받은 뒤에 올라가고, 그 순간 커서가 원래 자리에 남는다.
-  const [reserveBase] = useState(() =>
-    typeof window !== "undefined" && isIOSWebKit()
-      ? Math.max(BAR_RESERVE, readLearnedInset())
-      : 0
+  // 시트가 열리는 렌더(accessoryBarFloor: false → true)에서 학습값까지 반영한다.
+  const reserve = useMemo(
+    () =>
+      accessoryBarFloor && typeof window !== "undefined" && isIOSWebKit()
+        ? Math.max(BAR_RESERVE, readLearnedInset())
+        : 0,
+    [accessoryBarFloor]
   );
 
   useEffect(() => {
@@ -114,5 +121,13 @@ export function useKeyboardOffset(options?: KeyboardOffsetOptions): number {
   }, []);
 
   // 액세서리 바는 iOS 에만 있다 — 다른 환경에서 여백을 잡으면 시트가 떠 보인다.
-  return Math.max(measured, accessoryBarFloor ? reserveBase : 0);
+  if (reserve === 0) return measured;
+
+  // 하드웨어 키보드 영역(소프트 키보드가 아닌 구간)에서는 실측값을 쓰지 않고
+  // 예약값으로 고정한다. 기종·입력기에 따라 바 높이가 달라도 포커스 전후로
+  // 레이아웃이 절대 움직이지 않게 하는 것이 목적이다.
+  // (실측값이 예약값보다 크면 그만큼 시트 아래쪽이 바에 가려지지만, 그 값은
+  //  localStorage 에 학습해 다음 열림부터 정확히 비운다 — 움직임 0 을 우선한다)
+  if (measured < SOFT_KEYBOARD_MIN) return reserve;
+  return Math.max(measured, reserve);
 }

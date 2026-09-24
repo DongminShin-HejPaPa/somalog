@@ -6,7 +6,27 @@
 
 ---
 
-## [INPUT-LOADING-1-2S] 입력 탭 "로딩 중..." 1-2초 노출 (가끔)
+## [INPUT-LOADING-1-2S] ✅ 해결 — 입력 탭 "로딩 중..." 수초 노출
+
+### 진짜 원인 (2026-09 재조사)
+아래 "발생 조건"은 맞았지만 **왜 1왕복이 수초가 되는지**가 빠져 있었다.
+Next 라우터는 Server Action 을 **직렬로 하나씩** 처리한다
+(`next/dist/client/components/app-router-instance.js` 의 action queue).
+앱을 켜면 홈이 `actionGetHomeInitialData` · `actionGetPrefetchData`(전체 체중 시리즈) ·
+`actionAutoCloseOldLogs`(1년 스캔) 를, 설정·공지·챕터가 각자 로드 액션을 쏴서 큐가 6~7개로 찬다.
+이때 입력 탭으로 가서 오늘 로그 캐시가 비어 있으면 `actionGetDailyLog` 가 그 맨 뒤에 줄을 서고,
+null 이면 `actionUpsertDailyLog` 가 또 줄을 선다 → "로딩 중..." 수초.
+진입 탭 자동 분기(42ae68b) 이후로 "당일 첫 접속 = 홈 → 바로 입력 탭" 흐름이 매일 첫 진입마다 반복돼
+체감 빈도가 크게 늘었다.
+
+### 해결
+- 입력 탭 읽기(날짜 로드, 최근 로그)를 Route Handler(`/api/daily-log`, `/api/daily-log/recent`)
+  + plain fetch 로 옮겨 Server Action 큐를 타지 않게 했다. get→upsert 2왕복도 1왕복(`ensure`)으로.
+  실패 시 기존 액션 경로로 폴백 (`lib/api/input-api.ts`).
+- 오늘 로그가 캐시에 없으면 **빈 로그로 즉시 그리고** 서버 로그는 뒤에서 교체 (backlog 옵션 2).
+  저장은 upsert 라 행이 없어도 동작, 마감은 자리표시자를 넘기지 않고 서버가 직접 읽는다.
+
+### (이하 최초 조사 기록)
 
 ### 증상
 강제종료 후 빠른 재진입 시, 홈 탭에서 짧게 머문 뒤 입력 탭으로 이동하면 "로딩 중..." 텍스트가 1-2초 노출되는 경우가 가끔 발생.

@@ -13,8 +13,8 @@ import { mockSettings } from "@/lib/mock-data-new";
 import { logStore } from "@/lib/stores/log-store";
 import { emptyInputPresets, normalizeInputPresets } from "@/lib/utils/input-presets";
 import { useUserCacheLifecycle } from "@/lib/hooks/use-user-cache-lifecycle";
+import { fetchSettings } from "@/lib/api/boot-api";
 import {
-  actionGetSettings,
   actionUpdateSettings,
   actionUpdateInputPresets,
   actionInitializeSettings,
@@ -135,7 +135,7 @@ export function SettingsProvider({
 
     const loadSettings = async () => {
       try {
-        const loaded = await actionGetSettings();
+        const loaded = await fetchSettings();
         if (loaded.onboardingComplete) {
           setSettings(loaded);
           writeCachedSettings(loaded, uid);

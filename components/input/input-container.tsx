@@ -7,14 +7,12 @@ import { cn } from "@/lib/utils";
 import { useSettings } from "@/lib/contexts/settings-context";
 import { formatDate, getDayNumber } from "@/lib/utils/date-utils";
 import {
-  actionGetDailyLog,
   actionUpsertDailyLog,
   actionCloseDailyLog,
   actionReopenDailyLog,
   actionGetRecentDailyLogs,
   actionAutoCloseOldLogs,
   actionCloseAllUnclosedExceptToday,
-  actionGetFirstUnclosedLog,
   actionClearDailyLogField,
 } from "@/app/actions/log-actions";
 import { actionParseFreText } from "@/app/actions/parse-actions";
@@ -26,6 +24,7 @@ import { FreeTextInput } from "./free-text-input";
 import type { DailyLog, DailyLogUpdate, ClearableField, GoalEvent } from "@/lib/types";
 import { milestoneToastMessage } from "@/lib/utils/milestone-toast";
 import { logStore } from "@/lib/stores/log-store";
+import { fetchDailyLog, fetchRecentLogs } from "@/lib/api/input-api";
 import {
   addPreset,
   emptyInputPresets,
@@ -42,6 +41,33 @@ const GoalCeremony = dynamic(
 function fmtShort(dateStr: string): string {
   const [, m, d] = dateStr.split("-");
   return `${parseInt(m)}/${parseInt(d)}`;
+}
+
+/**
+ * 오늘 로그가 아직 캐시에 없을 때 **즉시** 그리는 빈 로그.
+ * 오늘 로그가 캐시에 없다는 건 거의 항상 "오늘 아직 아무것도 안 적었다"는 뜻이라
+ * 빈 칩이 실제 상태와 같다. 서버 로그가 도착하면 교체한다. logStore 에는 넣지 않는다.
+ */
+function blankLog(date: string, day: number): DailyLog {
+  return {
+    date,
+    day,
+    weight: null,
+    avgWeight3d: null,
+    weightChange: null,
+    water: null,
+    exercise: null,
+    breakfast: null,
+    lunch: null,
+    dinner: null,
+    lateSnack: null,
+    note: null,
+    closed: false,
+    intensiveDay: null,
+    feedback: null,
+    dailySummary: null,
+    oneLiner: null,
+  };
 }
 
 function addDays(dateStr: string, n: number): string {
@@ -70,6 +96,8 @@ export function InputContainer() {
   const [currentDate, setCurrentDate] = useState<string>(formatDate(new Date()));
   const [currentLog, setCurrentLog] = useState<DailyLog | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // currentLog 가 blankLog() 자리표시자인 날짜. 서버 로그로 교체되면 null.
+  const [placeholderDate, setPlaceholderDate] = useState<string | null>(null);
   const [modalField, setModalField] = useState<ItemKey | null>(null);
   const [pendingDays, setPendingDays] = useState(0);
   const [allLogs, setAllLogs] = useState<DailyLog[]>([]);
@@ -93,6 +121,10 @@ export function InputContainer() {
   const [closeNavMessage, setCloseNavMessage] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  // loadLog 는 마운트 시점 클로저로 고정돼 있어 최신 settings 를 ref 로 읽는다.
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+
   const currentDateRef = useRef(currentDate);
   useEffect(() => {
     currentDateRef.current = currentDate;
@@ -108,29 +140,58 @@ export function InputContainer() {
     logStore.setLog(log);
   }, []);
 
+  // 날짜 로드 순번 — 빠르게 날짜를 넘길 때 앞 날짜 응답이 늦게 와서 화면을 덮지 않게 한다.
+  const loadSeqRef = useRef(0);
+
   const loadLog = useCallback(async (date: string) => {
+    const seq = ++loadSeqRef.current;
     const cached = logStore.getLog(date);
     if (cached) {
+      setPlaceholderDate(null);
       setCurrentLog(cached);
       setCurrentDate(date);
       setIsLoading(false);
       return;
     }
 
+    const today = formatDate(new Date());
+
+    // 오늘: 빈 로그로 바로 그리고 서버 로그는 뒤에서 받는다 — "로딩 중..." 없음.
+    // 칩 저장은 upsert 라 서버에 행이 없어도 그대로 동작한다.
+    if (date === today) {
+      setPlaceholderDate(date);
+      setCurrentLog(blankLog(date, getDayNumber(date, settingsRef.current.dietStartDate)));
+      setCurrentDate(date);
+      setIsLoading(false);
+      const saveSeqAtStart = saveSeqRef.current;
+      try {
+        const log = await fetchDailyLog(date, true);
+        if (log) logStore.setLog(log);
+        // 그 사이 다른 날짜로 갔거나, 사용자가 이미 저장했으면(저장 응답이 더 최신) 덮지 않는다.
+        if (!log || seq !== loadSeqRef.current || saveSeqAtStart !== saveSeqRef.current) return;
+        setCurrentLog(log);
+        setPlaceholderDate(null);
+      } catch {
+        // 자리표시자 유지 — 저장하면 서버가 행을 만든다
+      }
+      return;
+    }
+
     setIsLoading(true);
     try {
-      let log = await actionGetDailyLog(date);
-      if (!log && date <= formatDate(new Date())) {
-        log = await actionUpsertDailyLog(date, {});
-      }
+      const log = await fetchDailyLog(date, date <= today);
       if (log) logStore.setLog(log);
+      if (seq !== loadSeqRef.current) return;
+      setPlaceholderDate(null);
       setCurrentLog(log);
       setCurrentDate(date);
     } catch {
+      if (seq !== loadSeqRef.current) return;
+      setPlaceholderDate(null);
       setCurrentLog(null);
       setCurrentDate(date);
     } finally {
-      setIsLoading(false);
+      if (seq === loadSeqRef.current) setIsLoading(false);
     }
   }, []);
 
@@ -181,11 +242,8 @@ export function InputContainer() {
 
         // Stale: background refresh without blocking UI
         if (logStore.isStale()) {
-          Promise.all([
-            actionGetRecentDailyLogs(30),
-            actionGetFirstUnclosedLog(),
-          ])
-            .then(([freshLogs]) => {
+          fetchRecentLogs(30)
+            .then(({ logs: freshLogs }) => {
               logStore.setRecentLogs(freshLogs);
               applyLogs(freshLogs);
               // Update currentLog with fresh server data — but only if the user
@@ -199,6 +257,7 @@ export function InputContainer() {
                 );
                 if (freshCurrentLog) {
                   setCurrentLog(freshCurrentLog);
+                  if (freshCurrentLog.date === currentDateRef.current) setPlaceholderDate(null);
                 }
               }
             })
@@ -206,10 +265,8 @@ export function InputContainer() {
         }
       } else {
         // No cache yet: fetch (skeleton shows until complete)
-        const [fetchedLogs, fetchedFirstUnclosed] = await Promise.all([
-          actionGetRecentDailyLogs(30),
-          actionGetFirstUnclosedLog(),
-        ]);
+        const { logs: fetchedLogs, firstUnclosed: fetchedFirstUnclosed } =
+          await fetchRecentLogs(30, true);
         logStore.setRecentLogs(fetchedLogs);
         applyLogs(fetchedLogs);
         const targetDate = fetchedFirstUnclosed?.date ?? today;
@@ -337,7 +394,9 @@ export function InputContainer() {
     // 아직 도착하지 않은 저장 응답이 마감 결과를 덮어쓰지 않도록 순번을 올린다.
     saveSeqRef.current += 1;
     try {
-      const result = await actionCloseDailyLog(currentDate, currentLog ?? undefined);
+      // 자리표시자는 서버 값이 아니므로 넘기지 않는다 — 서버가 직접 읽게 한다.
+      const isPlaceholder = placeholderDate === currentLog.date;
+      const result = await actionCloseDailyLog(currentDate, isPlaceholder ? undefined : currentLog);
       const updated = result.log;
       if (!updated) {
         setCloseError("마감에 실패했습니다. 잠시 후 다시 시도해주세요.");
@@ -438,7 +497,9 @@ export function InputContainer() {
     if (isLoading || !currentLog) return;
     loadTimeCountRef.current = completedCount;
     autoCloseFiredRef.current = false;
-  }, [currentLog?.date, currentLog?.closed, isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+    // placeholderDate: 빈 자리표시자 → 서버 로그 교체 시점도 "로드 시점"으로 본다.
+    // (이미 다 채워진 날을 불러온 걸 "방금 다 채웠다"로 오인해 자동 마감하지 않도록)
+  }, [currentLog?.date, currentLog?.closed, isLoading, placeholderDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCloseRef = useRef(handleClose);
   useEffect(() => {

@@ -3,7 +3,9 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { actionGetDailyLog, actionGetRecentDailyLogs, actionCloseDailyLog, actionAutoCloseOldLogs, actionGetPrefetchData, actionGetHomeInitialData } from "@/app/actions/log-actions";
+import { actionGetDailyLog, actionGetRecentDailyLogs, actionCloseDailyLog } from "@/app/actions/log-actions";
+import { fetchHomeInitialData, fetchPrefetchData, fetchAutoCloseOldLogs } from "@/lib/api/boot-api";
+import { fetchRecentLogs } from "@/lib/api/input-api";
 import { HomeContent } from "./home-content";
 import { formatDate, getDayNumber } from "@/lib/utils/date-utils";
 import { getGreetingMessage } from "@/lib/utils/greeting-messages";
@@ -83,7 +85,7 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
     // useState 초기화에서 동기로 캐시를 읽으면 이미 첫 페인트는 보장된다.
     const fetchFresh = async () => {
       try {
-        const data = await actionGetHomeInitialData();
+        const data = await fetchHomeInitialData();
         const newActive = data.firstUnclosed ?? data.todayLog ?? null;
         setRecentLogs(data.recentLogs);
         setActiveLog(newActive);
@@ -104,7 +106,7 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
     const fetchRecords = !logStore.getWeeklyLogs() || logStore.getTotalCount() === null;
     const fetchGraph = !logStore.getAllLogs() || !logStore.hasLowestWeight();
     if (fetchRecords || fetchGraph) {
-      actionGetPrefetchData(fetchRecords, fetchGraph)
+      fetchPrefetchData(fetchRecords, fetchGraph)
         .then((res) => {
           if (res.w) logStore.setWeeklyLogs(res.w);
           if (res.c !== undefined) logStore.setTotalCount(res.c);
@@ -118,10 +120,12 @@ export function HomeContainer({ userId, initialDisplayName }: HomeContainerProps
     }
 
     // 백그라운드 밀린 로그 일괄 마감
-    logStore.runAutoCloseOnce(() => actionAutoCloseOldLogs())
+    // 마운트 시점 요청은 전부 Route Handler 로 — Server Action 큐를 비워 둬야
+    // 곧바로 탭을 옮겨도 이동 후 전체 새로고침(needsRefresh)이 붙지 않는다 (lib/api/fetch-json.ts).
+    logStore.runAutoCloseOnce(() => fetchAutoCloseOldLogs())
       ?.then(async (result) => {
         if (result.filledCount + result.closedCount > 0) {
-          const updatedLogs = await actionGetRecentDailyLogs(30);
+          const { logs: updatedLogs } = await fetchRecentLogs(30);
           logStore.setRecentLogs(updatedLogs);
           setRecentLogs(updatedLogs);
           const newFirstUnclosed = logStore.getFirstUnclosedLog();

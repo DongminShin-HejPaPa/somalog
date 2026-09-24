@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, X, Megaphone } from "lucide-react";
-import { actionGetUnseenImportantNotices, actionMarkNoticesSeen } from "@/app/actions/notice-actions";
+import { actionMarkNoticesSeen } from "@/app/actions/notice-actions";
+import { fetchUnseenImportantNotices } from "@/lib/api/boot-api";
 import { useSettings } from "@/lib/contexts/settings-context";
 import type { Notice } from "@/lib/types";
 
@@ -24,7 +25,7 @@ export function NoticePopup() {
 
   useEffect(() => {
     if (!isLoaded || !settings.onboardingComplete) return;
-    actionGetUnseenImportantNotices(settings.lastNoticeSeenAt).then((data) => {
+    fetchUnseenImportantNotices(settings.lastNoticeSeenAt).then((data) => {
       setNotices(data);
     });
   }, [isLoaded, settings.onboardingComplete, settings.lastNoticeSeenAt]);

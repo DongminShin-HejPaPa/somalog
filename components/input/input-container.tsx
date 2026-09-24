@@ -11,7 +11,6 @@ import {
   actionCloseDailyLog,
   actionReopenDailyLog,
   actionGetRecentDailyLogs,
-  actionAutoCloseOldLogs,
   actionCloseAllUnclosedExceptToday,
   actionClearDailyLogField,
 } from "@/app/actions/log-actions";
@@ -25,6 +24,7 @@ import type { DailyLog, DailyLogUpdate, ClearableField, GoalEvent } from "@/lib/
 import { milestoneToastMessage } from "@/lib/utils/milestone-toast";
 import { logStore } from "@/lib/stores/log-store";
 import { fetchDailyLog, fetchRecentLogs } from "@/lib/api/input-api";
+import { fetchAutoCloseOldLogs } from "@/lib/api/boot-api";
 import {
   addPreset,
   emptyInputPresets,
@@ -210,7 +210,7 @@ export function InputContainer() {
 
     const init = async () => {
       // Auto-close: deduplicated via logStore so only one container fires per session
-      logStore.runAutoCloseOnce(() => actionAutoCloseOldLogs())
+      logStore.runAutoCloseOnce(() => fetchAutoCloseOldLogs())
         ?.then(async (result) => {
           if (result.hadOldUnclosed && result.oldUnclosedRange) {
             setPendingOldClose(result.oldUnclosedRange);
@@ -221,7 +221,7 @@ export function InputContainer() {
               setAutoCloseToast(`한 달 넘게 지난 미마감 날짜 ${result.closedCount}일을 자동 마감했어요`);
               setTimeout(() => setAutoCloseToast(null), 5000);
             }
-            const updatedLogs = await actionGetRecentDailyLogs(30);
+            const { logs: updatedLogs } = await fetchRecentLogs(30);
             logStore.setRecentLogs(updatedLogs);
             applyLogs(updatedLogs);
             const newFirstUnclosed = logStore.getFirstUnclosedLog();

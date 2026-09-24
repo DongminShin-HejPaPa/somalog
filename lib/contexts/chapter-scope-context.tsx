@@ -11,7 +11,7 @@ import {
 } from "react";
 import type { ChapterScope, Settings } from "@/lib/types";
 import { useSettings } from "@/lib/contexts/settings-context";
-import { actionGetChapterScopes } from "@/app/actions/chapter-actions";
+import { fetchChapterScopes } from "@/lib/api/boot-api";
 import { formatDate } from "@/lib/utils/date-utils";
 
 // 선택 챕터는 기기에 영속(사용자 결정). 스코프 목록도 캐시해 재방문 시 즉시 표시.
@@ -113,7 +113,7 @@ export function ChapterScopeProvider({
   });
 
   const loadScopes = useCallback(() => {
-    actionGetChapterScopes()
+    fetchChapterScopes()
       .then((list) => {
         if (!list || list.length === 0) return;
         setFetchedScopes(list);

@@ -416,14 +416,30 @@ export function InputContainer() {
         setTimeout(() => setGoalToast(null), 4000);
       }
 
-      const logs = await actionGetRecentDailyLogs(30);
-      logStore.setRecentLogs(logs);
+      // 마감으로 바뀐 건 방금 받은 이 로그 하나뿐이고 updateCache 로 이미 반영됐다 →
+      // 다음 날짜는 가진 목록으로 바로 정한다. 예전엔 여기서 최근 30일을 다시 받아올 때까지
+      // (Server Action 큐 + 인증·조회 순차 3단계) 다음 날로 넘어가지 않았다.
+      // 서버와의 정합은 뒤에서 조용히 맞춘다 (화면의 날짜는 건드리지 않음).
+      const applyRecent = (logs: DailyLog[]) => {
+        setPendingDays(logs.filter((l) => !l.closed).length);
+        setAllLogs([...logs]); // logStore 내부 배열은 제자리 갱신되므로 복사해 넘긴다
+        const dates = logs.map((l) => l.date).sort();
+        if (dates.length > 0) setMinDate(dates[0]);
+      };
+      let logs = logStore.getRecentLogs();
+      if (!logs) {
+        logs = (await fetchRecentLogs(30)).logs;
+        logStore.setRecentLogs(logs);
+      } else {
+        fetchRecentLogs(30)
+          .then(({ logs: fresh }) => {
+            logStore.setRecentLogs(fresh);
+            applyRecent(fresh);
+          })
+          .catch(() => {});
+      }
+      applyRecent(logs);
       const unclosed = logs.filter((l) => !l.closed);
-      setPendingDays(unclosed.length);
-      setAllLogs(logs);
-
-      const dates = logs.map((l) => l.date).sort();
-      if (dates.length > 0) setMinDate(dates[0]);
 
       const sortedUnclosed = [...unclosed]
         .filter((l) => l.date <= today)

@@ -21,18 +21,14 @@ import {
 import { getWeeklyLogs } from "@/lib/services/weekly-log-service";
 import { getLowestWeight } from "@/lib/services/stats-service";
 import {
-  detectGoalAchievement,
-  detectMilestone,
-  detectStreakMilestone,
-  detectNewLow,
-  detectEta,
-  detectWeeklyLoss,
-  detectAnniversary,
-  detectBirthday,
+  evaluateCloseEvents,
+  commitCloseEvent,
   getAchievements,
   getJourneyReport,
   markAchievementSeen,
+  type CloseEventDecision,
 } from "@/lib/services/achievement-service";
+import type { CloseContext } from "@/lib/services/daily-log-service";
 import type {
   DailyLog,
   DailyLogUpdate,
@@ -65,37 +61,43 @@ export async function actionCloseDailyLog(
   date: string,
   log?: DailyLog
 ): Promise<CloseDailyLogResult> {
-  const result = await closeDailyLog(date, log);
+  const t0 = Date.now();
+  let tCtx = 0;
+  let ctx: CloseContext | null = null;
+  let pending: Promise<CloseEventDecision | null> | null = null;
+
+  const result = await closeDailyLog(date, log, {
+    // 인증·설정·이전 체중이 준비되는 즉시 이벤트 판정 읽기를 시작 — AI 총평 생성과 동시에 돈다.
+    // 판정 실패(예: 마이그레이션 미적용)가 마감 자체를 깨뜨리지 않도록 null 로 삼킨다.
+    onContext: (c) => {
+      tCtx = Date.now();
+      ctx = c;
+      pending = evaluateCloseEvents(c).catch(() => null);
+    },
+  });
+  const tClosed = Date.now();
+
+  let goalEvent: CloseDailyLogResult["goalEvent"] = null;
+  let milestoneEvent: CloseDailyLogResult["milestoneEvent"] = null;
+  if (result && ctx && pending) {
+    const decision = await (pending as Promise<CloseEventDecision | null>);
+    if (decision) {
+      // 마감이 확정된 뒤에만 기록 — 이긴 이벤트 1건만 (achievement-service 주석 참고)
+      await commitCloseEvent(ctx, decision).catch(() => {});
+      goalEvent = decision.goalEvent;
+      milestoneEvent = decision.milestoneEvent;
+    }
+  }
+
+  // 단계별 소요 — Vercel 함수 로그에서 "[close-timing]" 으로 확인. ai 는 AI 총평+upsert 포함.
+  console.info(
+    `[close-timing] total=${Date.now() - t0}ms ctx=${tCtx ? tCtx - t0 : -1}ms ` +
+      `ai+upsert=${tCtx ? tClosed - tCtx : -1}ms events=${Date.now() - tClosed}ms`
+  );
+
   revalidatePath("/home");
   revalidatePath("/log");
   revalidatePath("/graph");
-
-  // 마감 직후 목표 달성 판정 (closeDailyLog는 미변경 — 별도 서비스에서 처리)
-  // 판정 실패(예: 마이그레이션 미적용)가 마감 자체를 깨뜨리지 않도록 방어
-  const goalEvent = result
-    ? await detectGoalAchievement(result).catch(() => null)
-    : null;
-  // 목표 달성이 없을 때만 마일스톤 판정 — 목표 세리머니가 우선.
-  // 마감당 하나만 노출(다중 토스트 방지). 우선순위(위 → 아래)로 먼저 걸리는 하나만 취하고
-  // 뒤 판정은 건너뛴다(불필요한 쿼리/INSERT/노출 방지). 모두 마감 액션에서만 실행(핫패스 미접촉).
-  //   주년 > 생일 > D-day 예측(30/14/7) > 감량(−5kg) > N주 연속 감량 > 역대 최저 > 연속 기록(10일)
-  let milestoneEvent: import("@/lib/types").MilestoneEvent | null = null;
-  if (result && !goalEvent) {
-    const closed = result;
-    const detectors = [
-      detectAnniversary,
-      detectBirthday,
-      detectEta,
-      detectMilestone,
-      detectWeeklyLoss,
-      detectNewLow,
-      detectStreakMilestone,
-    ];
-    for (const detect of detectors) {
-      milestoneEvent = await detect(closed).catch(() => null);
-      if (milestoneEvent) break;
-    }
-  }
   return { log: result, goalEvent, milestoneEvent };
 }
 

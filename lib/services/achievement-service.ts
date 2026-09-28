@@ -9,8 +9,7 @@ import type {
   MilestoneEvent,
 } from "@/lib/types";
 import { getSettings } from "./settings-service";
-import { getLogsForJourney } from "./daily-log-service";
-import { getWeeklyLogs } from "./weekly-log-service";
+import { getLogsForJourney, type CloseContext } from "./daily-log-service";
 import { projectGoalEta } from "@/lib/utils/goal-projection";
 
 const GOAL_TYPE = "goal_reached";
@@ -241,402 +240,217 @@ function rowToAchievement(row: Record<string, unknown>): Achievement {
   };
 }
 
-/**
- * 마감된 로그가 목표 달성(또는 재달성)인지 판정한다.
- * - 최초 달성: achievements에 goal_reached 행이 없을 때 → INSERT + 풀 세리머니(kind:"first")
- * - 재달성: 행이 있고, 직전 체중이 목표 위였다가 다시 목표 이하로 '복귀'했을 때 → 미니 토스트(kind:"repeat")
- *   (감량/유지 모드 공통 — 유지 중 요요 후 복귀도 격려)
- * - 목표 이하로 계속 머무는 날 / 목표 미설정 / 체중 미입력 / 목표 초과: 이벤트 없음
- *
- * closeDailyLog 자체는 건드리지 않고, actionCloseDailyLog에서 마감 직후 호출한다.
- * (closeDailyLog는 같은 요청에서 getSettings를 이미 호출 → React.cache로 중복 조회 없음)
- */
-export async function detectGoalAchievement(
-  closedLog: DailyLog
-): Promise<GoalEvent | null> {
-  if (closedLog.weight === null) return null;
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const settings = await getSettings();
-  if (!settings.targetWeight || settings.targetWeight <= 0) return null;
-  if (closedLog.weight > settings.targetWeight) return null;
-
-  // 기존 최초 달성 기록 + 직전 체중 조회
-  const [{ data: existing }, { data: prevRow }] = await Promise.all([
-    supabase
-      .from("achievements")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("type", GOAL_TYPE)
-      .maybeSingle(),
-    supabase
-      .from("daily_logs")
-      .select("weight")
-      .eq("user_id", user.id)
-      .lt("date", closedLog.date)
-      .not("weight", "is", null)
-      .order("date", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-  ]);
-
-  const kind = decideGoalEventKind({
-    weight: closedLog.weight,
-    targetWeight: settings.targetWeight,
-    mode: settings.mode,
-    hasExistingAchievement: !!existing,
-    prevWeight: (prevRow?.weight as number | null) ?? null,
-  });
-  if (!kind) return null;
-
-  const snapshot = await buildSnapshot(closedLog, settings, user.id, supabase);
-
-  // 최초 달성만 영구 기록(UNIQUE) — 재달성은 토스트만
-  if (kind === "first") {
-    await supabase.from("achievements").insert({
-      user_id: user.id,
-      type: GOAL_TYPE,
-      payload: snapshot,
-    });
-  }
-
-  return { kind, snapshot };
+/** 마감 이벤트 판정 결과 — 읽기만 끝낸 상태. 마감이 성공했을 때만 commitCloseEvent 로 기록한다. */
+export interface CloseEventDecision {
+  goalEvent: GoalEvent | null;
+  milestoneEvent: MilestoneEvent | null;
+  /** 마감이 확정되면 achievements 에 넣을 1행 (없으면 null) */
+  insert: { type: string; payload?: GoalSnapshot } | null;
 }
 
-/**
- * 마감된 로그가 새 감량 마일스톤(−5/−10kg…)에 도달했는지 판정.
- * 도달 시 achievements에 milestone_{kg} 1행(UNIQUE) INSERT + 이벤트 반환(작은 토스트용).
- * 목표 달성과 동시면 호출하지 않는다(goal 우선 — log-actions에서 분기).
- */
-export async function detectMilestone(
-  closedLog: DailyLog
-): Promise<MilestoneEvent | null> {
-  if (closedLog.weight === null) return null;
+const NO_EVENT: CloseEventDecision = { goalEvent: null, milestoneEvent: null, insert: null };
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const settings = await getSettings();
-  if (!settings.startWeight || settings.startWeight <= 0) return null;
-
-  const { data: rows } = await supabase
-    .from("achievements")
-    .select("type")
-    .eq("user_id", user.id)
-    .like("type", `${MILESTONE_PREFIX}%`);
-
-  const reachedMilestones = (rows ?? [])
-    .map((r) => parseInt((r.type as string).slice(MILESTONE_PREFIX.length), 10))
+/** achievements.type 목록에서 prefix_{N} 의 N 들을 뽑는다 */
+function reachedNumbers(types: string[], prefix: string): number[] {
+  return types
+    .filter((t) => t.startsWith(prefix))
+    .map((t) => parseInt(t.slice(prefix.length), 10))
     .filter((n) => !Number.isNaN(n));
-
-  const milestone = decideMilestoneReached({
-    weight: closedLog.weight,
-    startWeight: settings.startWeight,
-    reachedMilestones,
-  });
-  if (milestone === null) return null;
-
-  await supabase.from("achievements").insert({
-    user_id: user.id,
-    type: `${MILESTONE_PREFIX}${milestone}`,
-  });
-
-  return { kind: "loss", lostKg: milestone };
 }
 
 /**
- * 마감된 로그 기준으로 새 '연속 기록일' 마일스톤(7/30/100…)에 도달했는지 판정.
- * 도달 시 achievements에 streak_{N} 1행(UNIQUE) INSERT + 이벤트 반환(작은 토스트용).
- * 목표 달성·감량 마일스톤이 우선이므로 둘 다 없을 때만 log-actions에서 호출한다.
+ * 마감 1회의 목표 달성 / 마일스톤 이벤트를 판정한다 (**읽기 전용**).
  *
- * 속도: 마감 액션에서만 실행(탭/홈 진입 경로 미접촉). 추가 쿼리는 date 컬럼만 읽는
- * 인덱스(`daily_logs_user_date_idx`) 커버 쿼리 1개 + 업적 1개로, AI 총평 await에 묻힌다.
+ * 규칙 (이전 detect* 8개와 동일):
+ * - 목표 달성이 우선. 최초 달성 → 풀 세리머니 + goal_reached 기록, 재달성 → 미니 토스트.
+ * - 목표 이벤트가 없을 때만 마일스톤을 우선순위 순으로 보고 **먼저 걸리는 하나만** 취한다.
+ *   주년 > 생일 > D-day 예측(30/14/7) > 감량(−5kg) > N주 연속 감량 > 역대 최저 > 연속 기록(10일)
+ *
+ * 속도: 예전엔 판정기 8개가 **순차로** 돌면서 각자 auth.getUser + getSettings + 쿼리를 했다
+ * (Server Action 안에선 React.cache 가 동작하지 않아 중복 제거도 안 됨) → 이벤트가 없는
+ * 평범한 마감에도 순차 왕복 ~15단계. 이제 인증·설정·이전 체중은 closeDailyLog 가 이미 가진
+ * 값(ctx)을 쓰고, 필요한 읽기 5개를 한 번에 병렬로 보낸다 → 1단계. 호출자는 이걸 AI 총평
+ * 생성과 동시에 돌려 그 대기 시간 뒤에 숨긴다.
+ *
+ * 쓰기(achievements INSERT)는 여기서 하지 않는다 — 마감 upsert 가 성공한 뒤에만
+ * commitCloseEvent 로 1행을 넣는다. (병렬로 판정해도 "하나만 축하" 규칙이 유지되도록
+ * 이긴 이벤트 하나만 기록한다. 여러 개를 기록하면 보여주지 못한 축하가 소진돼 버린다.)
  */
-export async function detectStreakMilestone(
-  closedLog: DailyLog
-): Promise<MilestoneEvent | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
+export async function evaluateCloseEvents(ctx: CloseContext): Promise<CloseEventDecision> {
+  const { supabase, userId, settings, log, prevWeight } = ctx;
+  const weight = log.weight;
+  const goalCandidate =
+    weight !== null && settings.targetWeight > 0 && weight <= settings.targetWeight;
+  const maxWeeklyMilestone = WEEKLYLOSS_MILESTONES[WEEKLYLOSS_MILESTONES.length - 1];
 
-  const [{ data: achRows }, { data: logRows }] = await Promise.all([
-    supabase
-      .from("achievements")
-      .select("type")
-      .eq("user_id", user.id)
-      .like("type", `${STREAK_PREFIX}%`),
+  const [achRes, minRes, streakRes, weeklyRes, countRes] = await Promise.all([
+    supabase.from("achievements").select("type").eq("user_id", userId),
+    weight !== null
+      ? supabase
+          .from("daily_logs")
+          .select("weight")
+          .eq("user_id", userId)
+          .lt("date", log.date)
+          .not("weight", "is", null)
+          .order("weight", { ascending: true })
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
     supabase
       .from("daily_logs")
       .select("date")
-      .eq("user_id", user.id)
-      .lte("date", closedLog.date)
+      .eq("user_id", userId)
+      .lte("date", log.date)
       .order("date", { ascending: false })
       .limit(STREAK_FETCH_CAP + 1),
-  ]);
-
-  const reachedMilestones = (achRows ?? [])
-    .map((r) => parseInt((r.type as string).slice(STREAK_PREFIX.length), 10))
-    .filter((n) => !Number.isNaN(n));
-
-  const dates = (logRows ?? []).map((r) => r.date as string);
-  const currentStreak = computeCurrentStreak(dates, closedLog.date);
-
-  const milestone = decideStreakMilestone({ currentStreak, reachedMilestones });
-  if (milestone === null) return null;
-
-  await supabase.from("achievements").insert({
-    user_id: user.id,
-    type: `${STREAK_PREFIX}${milestone}`,
-  });
-
-  return { kind: "streak", streakDays: milestone };
-}
-
-/**
- * 역대 최저 체중 '갱신 순간' 판정 — 오늘 체중이 이전까지의 역대 최저보다 낮으면 축하.
- * 하강 구간엔 매일 뜬다(의도). 반복 가능하므로 DB 미저장.
- * 오늘 이전까지의 역대 최저 1행(weight 인덱스 커버)만 읽는다.
- */
-export async function detectNewLow(
-  closedLog: DailyLog
-): Promise<MilestoneEvent | null> {
-  if (closedLog.weight === null) return null;
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data: minRow } = await supabase
-    .from("daily_logs")
-    .select("weight")
-    .eq("user_id", user.id)
-    .lt("date", closedLog.date)
-    .not("weight", "is", null)
-    .order("weight", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  const isNewLow = decideNewLow({
-    weight: closedLog.weight,
-    prevMin: (minRow?.weight as number | null) ?? null,
-  });
-  if (!isNewLow) return null;
-
-  return { kind: "lowest", weight: closedLog.weight };
-}
-
-/**
- * D-day 예측 임계(30/14/7일) 진입 판정. 그래프 카드와 동일한 projectGoalEta 로직 사용.
- * 도달 시 achievements 에 eta_{n} 1행(UNIQUE) INSERT + 이벤트 반환.
- */
-export async function detectEta(
-  closedLog: DailyLog
-): Promise<MilestoneEvent | null> {
-  if (closedLog.weight === null) return null;
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const settings = await getSettings();
-  if (!settings.targetWeight || settings.targetWeight <= 0) return null;
-  if (!settings.startWeight || settings.startWeight <= 0) return null;
-  if (!settings.dietStartDate) return null;
-  if (closedLog.weight <= settings.targetWeight) return null; // 이미 목표 도달
-
-  const { daysToGoal } = projectGoalEta({
-    startWeight: settings.startWeight,
-    currentWeight: closedLog.weight,
-    targetWeight: settings.targetWeight,
-    startDate: settings.dietStartDate,
-    nowMs: new Date(closedLog.date + "T00:00:00").getTime(),
-  });
-
-  const { data: rows } = await supabase
-    .from("achievements")
-    .select("type")
-    .eq("user_id", user.id)
-    .like("type", `${ETA_PREFIX}%`);
-
-  const reachedThresholds = (rows ?? [])
-    .map((r) => parseInt((r.type as string).slice(ETA_PREFIX.length), 10))
-    .filter((n) => !Number.isNaN(n));
-
-  const threshold = decideEtaMilestone({ daysToGoal, reachedThresholds });
-  if (threshold === null) return null;
-
-  await supabase.from("achievements").insert({
-    user_id: user.id,
-    type: `${ETA_PREFIX}${threshold}`,
-  });
-
-  return { kind: "eta", etaDays: threshold };
-}
-
-/**
- * N주 연속 감량(2/4/8/12주) 판정. 주간 로그의 주평균 체중으로 연속 감량 주 수를 센다.
- * 도달 시 weeklyloss_{n} 1행(UNIQUE) INSERT + 이벤트 반환.
- */
-export async function detectWeeklyLoss(
-  _closedLog: DailyLog
-): Promise<MilestoneEvent | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const maxMilestone = WEEKLYLOSS_MILESTONES[WEEKLYLOSS_MILESTONES.length - 1];
-  const [weeklyLogs, { data: rows }] = await Promise.all([
-    getWeeklyLogs(maxMilestone + 2), // 연속 판정에 필요한 만큼만
     supabase
-      .from("achievements")
-      .select("type")
-      .eq("user_id", user.id)
-      .like("type", `${WEEKLYLOSS_PREFIX}%`),
+      .from("weekly_logs")
+      .select("avg_weight")
+      .eq("user_id", userId)
+      .order("week_start", { ascending: false })
+      .limit(maxWeeklyMilestone + 2),
+    // 최초 달성 스냅샷의 기록 일수 — 목표 이하일 때만 필요
+    goalCandidate
+      ? supabase
+          .from("daily_logs")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", userId)
+      : Promise.resolve({ count: null }),
   ]);
 
-  const avgWeightsNewestFirst = weeklyLogs
-    .map((w) => w.avgWeight)
-    .filter((n): n is number => typeof n === "number" && n > 0);
-  const consecutiveLossWeeks = computeConsecutiveLossWeeks(avgWeightsNewestFirst);
+  const types = ((achRes.data ?? []) as { type: string }[]).map((r) => r.type);
 
-  const reachedMilestones = (rows ?? [])
-    .map((r) => parseInt((r.type as string).slice(WEEKLYLOSS_PREFIX.length), 10))
-    .filter((n) => !Number.isNaN(n));
+  // ── 1. 목표 달성 ──
+  if (goalCandidate) {
+    const kind = decideGoalEventKind({
+      weight,
+      targetWeight: settings.targetWeight,
+      mode: settings.mode,
+      hasExistingAchievement: types.includes(GOAL_TYPE),
+      prevWeight,
+    });
+    if (kind) {
+      const snapshot: GoalSnapshot = {
+        startWeight: settings.startWeight,
+        targetWeight: settings.targetWeight,
+        finalWeight: weight as number,
+        daysElapsed: log.day,
+        recordedDays: (countRes as { count: number | null }).count ?? 0,
+      };
+      return {
+        goalEvent: { kind, snapshot },
+        milestoneEvent: null,
+        // 최초 달성만 영구 기록(UNIQUE) — 재달성은 토스트만
+        insert: kind === "first" ? { type: GOAL_TYPE, payload: snapshot } : null,
+      };
+    }
+  }
 
-  const milestone = decideWeeklyLossMilestone({
-    consecutiveLossWeeks,
-    reachedMilestones,
-  });
-  if (milestone === null) return null;
-
-  await supabase.from("achievements").insert({
-    user_id: user.id,
-    type: `${WEEKLYLOSS_PREFIX}${milestone}`,
-  });
-
-  return { kind: "weeklyLoss", weeks: milestone };
-}
-
-/**
- * 다이어트 N주년(경과일 365 배수) 판정. 도달 시 anniversary_{days} 1행 INSERT + 이벤트.
- */
-export async function detectAnniversary(
-  closedLog: DailyLog
-): Promise<MilestoneEvent | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const settings = await getSettings();
-  if (!settings.dietStartDate) return null;
-
-  const elapsedDays =
-    Math.floor(
-      (new Date(closedLog.date + "T00:00:00").getTime() -
-        new Date(settings.dietStartDate + "T00:00:00").getTime()) /
-        86_400_000
-    ) + 1;
-
-  const { data: rows } = await supabase
-    .from("achievements")
-    .select("type")
-    .eq("user_id", user.id)
-    .like("type", `${ANNIVERSARY_PREFIX}%`);
-
-  const reachedYears = (rows ?? [])
-    .map((r) => parseInt((r.type as string).slice(ANNIVERSARY_PREFIX.length), 10))
-    .filter((n) => !Number.isNaN(n))
-    .map((days) => Math.round(days / YEAR_DAYS));
-
-  const year = decideAnniversary({ elapsedDays, reachedYears });
-  if (year === null) return null;
-
-  const days = year * YEAR_DAYS;
-  await supabase.from("achievements").insert({
-    user_id: user.id,
-    type: `${ANNIVERSARY_PREFIX}${days}`,
+  // ── 2. 마일스톤 (우선순위 순, 첫 적중 하나만) ──
+  const hit = (milestoneEvent: MilestoneEvent, type: string | null): CloseEventDecision => ({
+    goalEvent: null,
+    milestoneEvent,
+    insert: type ? { type } : null,
   });
 
-  return { kind: "anniversary", years: year, days };
-}
+  // 주년
+  if (settings.dietStartDate) {
+    const elapsedDays =
+      Math.floor(
+        (new Date(log.date + "T00:00:00").getTime() -
+          new Date(settings.dietStartDate + "T00:00:00").getTime()) /
+          86_400_000
+      ) + 1;
+    const reachedYears = reachedNumbers(types, ANNIVERSARY_PREFIX).map((days) =>
+      Math.round(days / YEAR_DAYS)
+    );
+    const year = decideAnniversary({ elapsedDays, reachedYears });
+    if (year !== null) {
+      const days = year * YEAR_DAYS;
+      return hit({ kind: "anniversary", years: year, days }, `${ANNIVERSARY_PREFIX}${days}`);
+    }
+  }
 
-/**
- * 생일 판정 — 마감일 월-일이 settings.birthDate 와 같으면(그 해 최초) 축하.
- * 도달 시 birthday_{YYYY} 1행 INSERT + 이벤트.
- */
-export async function detectBirthday(
-  closedLog: DailyLog
-): Promise<MilestoneEvent | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const settings = await getSettings();
-  if (!settings.birthDate) return null;
-
-  const { data: rows } = await supabase
-    .from("achievements")
-    .select("type")
-    .eq("user_id", user.id)
-    .like("type", `${BIRTHDAY_PREFIX}%`);
-
-  const reachedYears = (rows ?? [])
-    .map((r) => parseInt((r.type as string).slice(BIRTHDAY_PREFIX.length), 10))
-    .filter((n) => !Number.isNaN(n));
-
-  const year = decideBirthday({
-    today: closedLog.date,
+  // 생일
+  const birthYear = decideBirthday({
+    today: log.date,
     birthDate: settings.birthDate,
-    reachedYears,
+    reachedYears: reachedNumbers(types, BIRTHDAY_PREFIX),
   });
-  if (year === null) return null;
+  if (birthYear !== null) return hit({ kind: "birthday" }, `${BIRTHDAY_PREFIX}${birthYear}`);
 
-  await supabase.from("achievements").insert({
-    user_id: user.id,
-    type: `${BIRTHDAY_PREFIX}${year}`,
+  // D-day 예측 (아직 목표 위일 때만)
+  if (
+    weight !== null &&
+    settings.targetWeight > 0 &&
+    settings.startWeight > 0 &&
+    settings.dietStartDate &&
+    weight > settings.targetWeight
+  ) {
+    const { daysToGoal } = projectGoalEta({
+      startWeight: settings.startWeight,
+      currentWeight: weight,
+      targetWeight: settings.targetWeight,
+      startDate: settings.dietStartDate,
+      nowMs: new Date(log.date + "T00:00:00").getTime(),
+    });
+    const threshold = decideEtaMilestone({
+      daysToGoal,
+      reachedThresholds: reachedNumbers(types, ETA_PREFIX),
+    });
+    if (threshold !== null) return hit({ kind: "eta", etaDays: threshold }, `${ETA_PREFIX}${threshold}`);
+  }
+
+  // 누적 감량 (−5kg 단위)
+  if (weight !== null && settings.startWeight > 0) {
+    const milestone = decideMilestoneReached({
+      weight,
+      startWeight: settings.startWeight,
+      reachedMilestones: reachedNumbers(types, MILESTONE_PREFIX),
+    });
+    if (milestone !== null) return hit({ kind: "loss", lostKg: milestone }, `${MILESTONE_PREFIX}${milestone}`);
+  }
+
+  // N주 연속 감량
+  const avgWeightsNewestFirst = ((weeklyRes.data ?? []) as { avg_weight: number | null }[])
+    .map((w) => Number(w.avg_weight))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  const weeks = decideWeeklyLossMilestone({
+    consecutiveLossWeeks: computeConsecutiveLossWeeks(avgWeightsNewestFirst),
+    reachedMilestones: reachedNumbers(types, WEEKLYLOSS_PREFIX),
   });
+  if (weeks !== null) return hit({ kind: "weeklyLoss", weeks }, `${WEEKLYLOSS_PREFIX}${weeks}`);
 
-  return { kind: "birthday" };
+  // 역대 최저 갱신 (반복 가능 — 기록 안 함)
+  if (weight !== null) {
+    const prevMin = (minRes.data as { weight: number | null } | null)?.weight ?? null;
+    if (decideNewLow({ weight, prevMin: prevMin === null ? null : Number(prevMin) })) {
+      return hit({ kind: "lowest", weight }, null);
+    }
+  }
+
+  // 연속 기록 (10일 단위)
+  const dates = ((streakRes.data ?? []) as { date: string }[]).map((r) => r.date);
+  const streak = decideStreakMilestone({
+    currentStreak: computeCurrentStreak(dates, log.date),
+    reachedMilestones: reachedNumbers(types, STREAK_PREFIX),
+  });
+  if (streak !== null) return hit({ kind: "streak", streakDays: streak }, `${STREAK_PREFIX}${streak}`);
+
+  return NO_EVENT;
 }
 
-async function buildSnapshot(
-  log: DailyLog,
-  settings: Settings,
-  userId: string,
-  supabase: Awaited<ReturnType<typeof createClient>>
-): Promise<GoalSnapshot> {
-  const { count } = await supabase
-    .from("daily_logs")
-    .select("*", { count: "exact", head: true })
-    .eq("user_id", userId);
-
-  return {
-    startWeight: settings.startWeight,
-    targetWeight: settings.targetWeight,
-    finalWeight: log.weight as number,
-    daysElapsed: log.day,
-    recordedDays: count ?? 0,
-  };
+/** 마감이 성공한 뒤 판정된 이벤트 1건을 achievements 에 기록한다 (UNIQUE 충돌은 무시 — 이전과 동일). */
+export async function commitCloseEvent(
+  ctx: CloseContext,
+  decision: CloseEventDecision
+): Promise<void> {
+  if (!decision.insert) return;
+  await ctx.supabase.from("achievements").insert({
+    user_id: ctx.userId,
+    type: decision.insert.type,
+    ...(decision.insert.payload ? { payload: decision.insert.payload } : {}),
+  });
 }
 
 /** 명예의 전당 / 재진입 배너용 — 사용자의 모든 업적 조회 (최신순) */

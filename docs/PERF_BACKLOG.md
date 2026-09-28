@@ -6,6 +6,35 @@
 
 ---
 
+## [CLOSE-SLOW] ✅ 해결 — 마감하기가 갈수록 느려짐 (1~2초 → ~10초 체감)
+
+### 원인 (코드 이력 + 실측)
+- 6월 전 마감 = `closeDailyLog` 하나. 이후 마감 뒤 판정기가 늘었다:
+  6/16 목표 달성 → 6/17 감량 마일스톤 → 6/18 연속 기록 → 7/02 D-day·최저·주간감량·주년·생일 (총 8개).
+  **모두 순차 실행**이고 각자 `auth.getUser()`(인증 서버 왕복) + `getSettings()` + 쿼리를 했다.
+- `React.cache` 는 Server Action / Route Handler 안에서 **동작하지 않는다** (React 요청 스코프 밖 →
+  매 호출 새 Map). 임시 액션·라우트로 실측: cache 로 감싼 함수 3회 호출 → 3회 모두 실행.
+  그래서 getSettings/getAuthUser 중복 제거가 전혀 안 됐다.
+- 호출당 지연을 주입한 가짜 Supabase 로 실제 `actionCloseDailyLog` 를 돌려 측정
+  (`tests/unit/services/close-latency.test.ts`): 이벤트 없는 평일 마감 = **순차 20단계, 인증 10회** (+AI).
+  마감 후 클라이언트가 최근 30일을 다시 받을 때까지(큐 + 순차 3단계) 다음 날로 안 넘어갔다.
+
+### 해결
+- `closeDailyLog`: 인증 1회 → 로그·설정·이전 체중 병렬 1회. 설정은 `getSettingsForUser(userId)`.
+- 판정기 8개 → `evaluateCloseEvents(ctx)` 하나: 읽기 5개 병렬 1단계, **AI 총평 생성과 동시에** 실행.
+  우선순위·"하나만 축하" 규칙 유지 — 이긴 이벤트 1건만 마감 성공 후 `commitCloseEvent` 로 기록.
+- 결과: 순차 **20 → 3단계, 인증 10 → 1회** (테스트로 고정).
+- 클라이언트: 마감 후 다음 날짜를 가진 목록으로 즉시 결정, 최근 30일 재조회는 백그라운드.
+
+### 남은 미확인 요인 — AI 응답 시간
+AI 총평 타임아웃이 10초라, OpenRouter 가 느리면 그것만으로 ~10초가 될 수 있다. 실측 데이터가 없어
+손대지 않았다. 대신 계측을 추가했다:
+- `ai_usage_logs.latency_ms` 를 이제 채운다 (예전엔 항상 null). 실패(타임아웃) 행도 소요 시간이 남는다.
+- Vercel 함수 로그 `[close-timing] total/ctx/ai+upsert/events` 한 줄.
+다음에 느리면 이 두 값으로 AI 쪽인지 바로 판별할 것.
+
+---
+
 ## [INPUT-LOADING-1-2S] ✅ 해결 — 입력 탭 "로딩 중..." 수초 노출
 
 ### 진짜 원인 (2026-09 재조사)

@@ -3,6 +3,7 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 vi.mock("@/lib/services/settings-service", () => ({
   getSettings: vi.fn(),
+  getSettingsForUser: vi.fn(),
 }));
 vi.mock("@/lib/services/weekly-log-service", () => ({
   upsertWeeklyLog: vi.fn().mockResolvedValue(undefined),
@@ -10,7 +11,7 @@ vi.mock("@/lib/services/weekly-log-service", () => ({
 
 import { vi, beforeEach } from "vitest";
 import { createClient } from "@/lib/supabase/server";
-import { getSettings } from "@/lib/services/settings-service";
+import { getSettings, getSettingsForUser } from "@/lib/services/settings-service";
 import { upsertWeeklyLog } from "@/lib/services/weekly-log-service";
 import {
   mockDailyLogRow,
@@ -34,6 +35,7 @@ import {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(getSettings).mockResolvedValue(mockSettings);
+  vi.mocked(getSettingsForUser).mockResolvedValue(mockSettings);
   vi.mocked(upsertWeeklyLog).mockResolvedValue({
     weekStart: "2024-01-15",
     weekEnd: "2024-01-21",
@@ -468,9 +470,14 @@ describe("closeDailyLog", () => {
           single: vi
             .fn()
             .mockResolvedValue({ data: null, error: { message: "Not found" } }),
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          order: vi.fn().mockReturnThis(),
           gte: vi.fn().mockReturnThis(),
           lte: vi.fn().mockReturnThis(),
+          // 이전 체중 조회 — 로그 조회와 병렬로 나간다
+          lt: vi.fn().mockReturnThis(),
+          not: vi.fn().mockReturnThis(),
+          limit: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
         }),
         upsert: vi.fn().mockReturnValue({
           select: vi.fn().mockReturnValue({

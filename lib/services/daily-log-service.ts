@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import type { DailyLog, DailyLogUpdate, WeightPoint, DailyEventPoint } from "@/lib/types";
+import type { DailyLog, DailyLogUpdate, WeightPoint, DailyEventPoint, Settings } from "@/lib/types";
 import { formatDate, getWeekRange } from "@/lib/utils/date-utils";
 import {
   computeDay,
@@ -17,7 +17,7 @@ import {
   generateAiOneLiner,
   generateAiDailySummary,
 } from "@/lib/ai/coach-service";
-import { getSettings } from "./settings-service";
+import { getSettings, getSettingsForUser } from "./settings-service";
 import { upsertWeeklyLog } from "./weekly-log-service";
 import { mockDailyLogs } from "@/lib/mock-data-new";
 
@@ -363,7 +363,28 @@ export async function clearDailyLogField(
   return rowToDailyLog(upserted as Record<string, unknown>);
 }
 
-export async function closeDailyLog(date: string, existingLog?: DailyLog): Promise<DailyLog | null> {
+/** 마감 1회에서 한 번만 확인·조회한 값들 — 마감 이벤트 판정이 재조회 없이 그대로 쓴다. */
+export interface CloseContext {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+  settings: Settings;
+  /** 마감 대상 로그 (마감 직전 상태) */
+  log: DailyLog;
+  /** 이 날짜 이전 가장 최근 체중 */
+  prevWeight: number | null;
+}
+
+export async function closeDailyLog(
+  date: string,
+  existingLog?: DailyLog,
+  hooks?: {
+    /**
+     * 컨텍스트가 준비되는 즉시(AI 총평 생성 전) 동기 호출된다.
+     * 호출자는 여기서 마감 이벤트 판정 읽기를 시작해 AI 대기 시간 뒤에 숨긴다.
+     */
+    onContext?: (ctx: CloseContext) => void;
+  }
+): Promise<DailyLog | null> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -371,27 +392,28 @@ export async function closeDailyLog(date: string, existingLog?: DailyLog): Promi
 
   if (!user) return null;
 
-  // 클라이언트에서 이미 로그를 갖고 있으면 재조회 불필요 (병목 제거)
-  const [existing, settings] = await Promise.all([
+  // 로그·설정·이전 체중을 한 번에. 설정은 이미 확인한 user.id 로 바로 읽는다 —
+  // getSettings() 는 auth.getUser 왕복을 한 번 더 하고, Server Action 안에선
+  // React.cache 가 동작하지 않아 부를 때마다 반복된다 (settings-service 주석 참고).
+  const [existing, settings, { data: prevRow }] = await Promise.all([
     existingLog ? Promise.resolve(existingLog) : getDailyLog(date),
-    getSettings(),
+    getSettingsForUser(user.id),
+    supabase
+      .from("daily_logs")
+      .select("weight")
+      .eq("user_id", user.id)
+      .lt("date", date)
+      .not("weight", "is", null)
+      .order("date", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
   if (!existing) return null;
 
-  // 1. 총평 + 한줄 요약 생성 (AI 실패 시에도 반드시 upsert 진행)
-  // AI 총평에 필요한 이전 체중(prevWeight) 조회
-  const { data: prevRow } = await supabase
-    .from("daily_logs")
-    .select("weight")
-    .eq("user_id", user.id)
-    .lt("date", date)
-    .not("weight", "is", null)
-    .order("date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
   const prevWeight = prevRow?.weight ? Number(prevRow.weight) : null;
+  hooks?.onContext?.({ supabase, userId: user.id, settings, log: existing, prevWeight });
 
+  // 1. 총평 + 한줄 요약 생성 (AI 실패 시에도 반드시 upsert 진행)
   let dailySummary: string;
   let oneLiner: string;
   try {

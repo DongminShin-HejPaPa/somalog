@@ -38,6 +38,7 @@ export async function generateAiFeedback(
   const focusInstruction = changedField
     ? `"${changedField}"을/를 중심으로 코칭 한 마디(2~3문장). 단, [사용자 루틴] 규칙에 위배되는 인과 연결은 절대 하지 마라.`
     : `오늘 입력 내용을 중심으로 코칭 한 마디(2~3문장). 단, [사용자 루틴] 규칙에 위배되는 인과 연결은 절대 하지 마라.`;
+  const startedAt = Date.now();
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -63,6 +64,7 @@ export async function generateAiFeedback(
           userId: user.id,
           callType: "feedback",
           model: MODEL,
+          latencyMs: Date.now() - startedAt,
           inputTokens: usage.inputTokens,
           outputTokens: usage.outputTokens,
           success: true,
@@ -79,6 +81,7 @@ export async function generateAiFeedback(
           userId: user.id,
           callType: "feedback",
           model: MODEL,
+          latencyMs: Date.now() - startedAt,
           success: false,
           errorMessage: err instanceof Error ? err.message : String(err),
         });
@@ -100,6 +103,7 @@ export async function generateAiDailySummary(
   if (!process.env.OPENROUTER_API_KEY) {
     return generateDailySummary(log, settings.waterGoal);
   }
+  const startedAt = Date.now();
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
@@ -122,6 +126,7 @@ export async function generateAiDailySummary(
           userId: user.id,
           callType: "daily_summary",
           model: MODEL,
+          latencyMs: Date.now() - startedAt,
           inputTokens: usage.inputTokens,
           outputTokens: usage.outputTokens,
           success: true,
@@ -138,6 +143,7 @@ export async function generateAiDailySummary(
           userId: user.id,
           callType: "daily_summary",
           model: MODEL,
+          latencyMs: Date.now() - startedAt,
           success: false,
           errorMessage: err instanceof Error ? err.message : String(err),
         });
@@ -158,6 +164,7 @@ export async function generateAiOneLiner(
   if (!process.env.OPENROUTER_API_KEY) {
     return fallbackOneLiner(log);
   }
+  const startedAt = Date.now();
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -180,6 +187,7 @@ export async function generateAiOneLiner(
           userId: user.id,
           callType: "one_liner",
           model: MODEL,
+          latencyMs: Date.now() - startedAt,
           inputTokens: usage.inputTokens,
           outputTokens: usage.outputTokens,
           success: true,
@@ -196,6 +204,7 @@ export async function generateAiOneLiner(
           userId: user.id,
           callType: "one_liner",
           model: MODEL,
+          latencyMs: Date.now() - startedAt,
           success: false,
           errorMessage: err instanceof Error ? err.message : String(err),
         });

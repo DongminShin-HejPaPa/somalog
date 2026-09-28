@@ -120,6 +120,18 @@ const fetchSettingsOnce = cache(async (userId: string): Promise<Settings | null>
   return rowToSettings(data as Record<string, unknown>);
 });
 
+/**
+ * 이미 인증된 userId 로 설정만 읽는다 (auth.getUser 왕복 없음).
+ *
+ * ⚠️ React.cache 는 Server Action / Route Handler 안에서 동작하지 않는다
+ * (React 요청 스코프 밖이라 매 호출이 새 Map — 실측 확인). 그 경로에서 getSettings() 를
+ * 여러 번 부르면 부를 때마다 인증 서버 왕복 + 설정 쿼리가 새로 나간다.
+ * 한 요청에서 여러 곳이 설정을 쓰면 user 를 한 번 확인하고 이 함수로 한 번만 읽어 넘길 것.
+ */
+export async function getSettingsForUser(userId: string): Promise<Settings> {
+  return (await fetchSettingsOnce(userId)) ?? createDefaultSettings();
+}
+
 export async function getSettings(): Promise<Settings> {
   const user = await getAuthUser();
   if (!user) return createDefaultSettings();
